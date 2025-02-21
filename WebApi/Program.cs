@@ -49,11 +49,11 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
-        // Ensure database is created
-        context.Database.EnsureCreated();
-        // Run migrations
-        context.Database.Migrate();
-        // Seed data
+        
+        // First apply migrations
+        await context.Database.MigrateAsync();
+        
+        // Then seed data
         await DbSeeder.Initialize(context);
     }
     catch (Exception ex)
