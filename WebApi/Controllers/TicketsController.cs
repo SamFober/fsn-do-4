@@ -947,14 +947,17 @@ namespace WebApi.Controllers
             {
                 var order = await _context.TicketOrders
                     .Include(o => o.Items)
-                    .Include(o => o.Presentation)
-                        .ThenInclude(p => p.Movie)
-                    .Include(o => o.Presentation)
-                        .ThenInclude(p => p.Hall)
+                    .Include(o => o.Presentation) // Load Presentation for null-check
                     .FirstOrDefaultAsync(o => o.OrderToken == orderToken);
 
                 if (order?.Presentation == null || order.Status != OrderStatus.Pending)
                     return NotFound("Order not found or expired");
+
+// Now explicitly load related entities
+                await _context.Entry(order.Presentation).Reference(p => p.Movie).LoadAsync();
+                await _context.Entry(order.Presentation).Reference(p => p.Hall).LoadAsync();
+
+// Now you can safely access order.Presentation.Movie and order.Presentation.Hall
 
                 // Remove all seat locks for this order
                 var seatLocks = await _context.SeatLocks
