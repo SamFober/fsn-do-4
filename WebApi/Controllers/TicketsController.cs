@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebApi.Data;
+using WebApi.Interfaces;
 using WebApi.Models;
 
 namespace WebApi.Controllers
@@ -13,7 +14,10 @@ namespace WebApi.Controllers
         private readonly ApplicationDbContext _context;
         private readonly ILogger<TicketsController> _logger;
 
-        public TicketsController(ApplicationDbContext context, ILogger<TicketsController> logger)
+        public TicketsController(
+            ApplicationDbContext context,
+            ILogger<TicketsController> logger
+        )
         {
             _context = context;
             _logger = logger;
@@ -44,86 +48,6 @@ namespace WebApi.Controllers
             TicketStatus Status,
             DateTime PurchaseDate
         );
-
-        [HttpPost]
-        [ProducesResponseType(typeof(TicketResponse), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<TicketResponse>> BookTicket(BookTicketRequest request)
-        {
-            try
-            {
-                var presentation = await _context.Presentations
-                    .Include(p => p.Movie)
-                    .Include(p => p.Hall)
-                    .Include(p => p.Tickets.Where(t => t.Status != TicketStatus.Cancelled))
-                    .FirstOrDefaultAsync(p => p.Id == request.PresentationId);
-
-                if (presentation == null || presentation.Movie == null || presentation.Hall == null)
-                {
-                    return NotFound("Presentation not found or missing required data");
-                }
-
-                // If no seat specified, automatically assign one
-                var seatId = request.SeatId;
-                if (seatId == 0)
-                {
-                    var autoAssignResult = await GetAutomaticSeatAssignment(request.PresentationId, 1);
-                    if (autoAssignResult.Result is OkObjectResult okResult && 
-                        okResult.Value is List<SeatInfo> seatInfos && 
-                        seatInfos.Any())
-                    {
-                        seatId = seatInfos.First().SeatId;
-                    }
-                    else
-                    {
-                        return BadRequest("No seats available for this presentation");
-                    }
-                }
-
-                var seat = await _context.Seats
-                    .FirstOrDefaultAsync(s => s.Id == seatId && s.HallId == presentation.HallId);
-
-                if (seat == null)
-                {
-                    return BadRequest("Invalid seat for this hall");
-                }
-
-                var isBooked = await _context.Tickets
-                    .AnyAsync(t => t.PresentationId == request.PresentationId 
-                        && t.SeatId == seatId 
-                        && t.Status != TicketStatus.Cancelled);
-
-                if (isBooked)
-                {
-                    return BadRequest("Seat is already booked");
-                }
-
-                var ticket = new Ticket
-                {
-                    PresentationId = request.PresentationId,
-                    SeatId = seatId,
-                    CustomerName = request.CustomerName,
-                    CustomerEmail = request.CustomerEmail,
-                    Status = TicketStatus.Reserved,
-                    PurchaseDate = DateTime.UtcNow,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow,
-                    Presentation = presentation,
-                    Seat = seat
-                };
-
-                _context.Tickets.Add(ticket);
-                await _context.SaveChangesAsync();
-
-                return Ok(CreateTicketResponse(ticket, presentation));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error booking ticket");
-                return StatusCode(500, "An error occurred while booking the ticket");
-            }
-        }
 
         [HttpPost("test/setup-split-scenario")]
         public async Task<ActionResult> SetupSplitScenario(int presentationId)
