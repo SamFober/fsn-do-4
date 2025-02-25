@@ -1,0 +1,86 @@
+﻿<div class="numpad-container">
+    <div class="display">@inputValue</div>
+    <div class="numpad-grid">
+        @foreach (var num in new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9" })
+        {
+            <button class="numpad-button" @onclick="() => AddNumber(num)">@num</button>
+        }
+        <button class="numpad-button" @onclick="RemoveNumber">&larr;</button>
+        <button class="numpad-button" @onclick="ConfirmInput">OK</button>
+        <button class="numpad-button" @onclick="@(() => AddNumber("0"))">0</button>
+        <button class="numpad-button clear" @onclick="ClearInput">Clear</button>
+    </div>
+</div>
+
+<style>
+    .numpad-container {
+    width: 250px;
+    background: black;
+    color: white;
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }
+    .display {
+    height: 50px;
+    font-size: 1.5em;
+    background: darkgray;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    }
+    .numpad-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+    }
+    .numpad-button {
+    background: #333;
+    color: white;
+    border: none;
+    padding: 15px;
+    font-size: 1.2em;
+    border-radius: 5px;
+    cursor: pointer;
+    }
+    .numpad-button:hover {
+    background: #555;
+    }
+    .clear {
+    grid-column: span 3;
+    background: red;
+    }
+</style>
+
+@code {
+    private string inputValue = "";
+
+    private void AddNumber(string number)
+    {
+        if (inputValue == "Error") ClearInput();
+        if (inputValue.Length < 4)
+            inputValue += number;
+    }
+
+    private void RemoveNumber()
+    {
+        if (!string.IsNullOrEmpty(inputValue) && inputValue != "Error" && inputValue != "Confirmed")
+        {
+            inputValue = inputValue[..^1];
+        }
+    }
+
+    private void ClearInput() => inputValue = "";
+    private void ConfirmInput()
+    {
+        if (inputValue.Length == 4 && inputValue.All(char.IsDigit))
+        {
+            inputValue = "Confirmed";
+        }
+        else
+        {
+            inputValue = "Error";
+        }
+    }
+}
