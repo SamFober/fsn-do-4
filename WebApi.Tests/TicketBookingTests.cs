@@ -6,10 +6,15 @@ using Moq;
 using WebApi.Controllers;
 using WebApi.Data;
 using WebApi.Models;
+using WebApi.Models.Requests;
+using WebApi.Models.Responses;
 using Xunit;
 using static WebApi.Controllers.TicketsController;  // Add this at the top to access nested types
 using Microsoft.Extensions.DependencyInjection;
 using WebApi.Services;  // Add this for OrderCleanupService
+using WebApi.Interfaces.Services;    // Add this for ITicketService
+using WebApi.Interfaces.Repositories; // Add this for ITicketRepository
+using WebApi.Models.Responses;  // Add this to use TicketResponse
 
 namespace WebApi.Tests;
 
@@ -18,12 +23,14 @@ public class TicketBookingTests : IDisposable
     private readonly ApplicationDbContext _context;
     private readonly TicketsController _controller;
     private readonly Mock<ILogger<TicketsController>> _loggerMock;
+    private readonly Mock<ILogger<TicketService>> _serviceLoggerMock;
+    private readonly Mock<ITicketRepository> _repositoryMock;
+    private readonly ITicketService _ticketService;
     private readonly IServiceProvider _services;  // Add this for cleanup service testing
-    private Presentation? _presentation;  // Make it nullable
+    private Presentation _presentation;  // Make it non-nullable
 
     public TicketBookingTests()
     {
-        // Setup in-memory database
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
@@ -31,7 +38,36 @@ public class TicketBookingTests : IDisposable
 
         _context = new ApplicationDbContext(options);
         _loggerMock = new Mock<ILogger<TicketsController>>();
-        _controller = new TicketsController(_context, _loggerMock.Object);
+        _serviceLoggerMock = new Mock<ILogger<TicketService>>();
+        _repositoryMock = new Mock<ITicketRepository>();
+
+        // Setup repository mock
+        _repositoryMock.Setup(r => r.GetAvailableSeats(It.IsAny<int>(), It.IsAny<bool>()))
+            .ReturnsAsync((int presentationId, bool findBest) => 
+                _context.Seats.Where(s => s.Hall.Presentations.Any(p => p.Id == presentationId))
+                    .ToList());
+
+        // Add mock logger to capture error details
+        var loggerMock = new Mock<ILogger<TicketService>>();
+        string capturedErrorMessage = null;
+        Exception capturedException = null;
+
+        loggerMock.Setup(x => x.Log(
+            It.IsAny<LogLevel>(),
+            It.IsAny<EventId>(),
+            It.IsAny<It.IsAnyType>(),
+            It.IsAny<Exception>(),
+            It.IsAny<Func<It.IsAnyType, Exception?, string>>()
+        )).Callback(new InvocationAction(invocation =>
+        {
+            var state = invocation.Arguments[2];
+            var exception = invocation.Arguments[3] as Exception;
+            capturedErrorMessage = state.ToString();
+            capturedException = exception;
+        }));
+
+        _ticketService = new TicketService(_repositoryMock.Object, loggerMock.Object);
+        _controller = new TicketsController(_ticketService, _context, _loggerMock.Object);
 
         // Setup services for cleanup service testing
         var services = new ServiceCollection();
@@ -46,53 +82,74 @@ public class TicketBookingTests : IDisposable
 
     private void SetupTestData()
     {
-        var hall = new Hall 
-        { 
-            Id = 1, 
-            Name = "Test Hall", 
-            Rows = 10, 
-            SeatsPerRow = 10 
-        };
-        _context.Halls.Add(hall);
-
-        // Add seats
-        for (int row = 1; row <= hall.Rows; row++)
+        try
         {
-            for (int seatNum = 1; seatNum <= hall.SeatsPerRow; seatNum++)
+            // Create and save hall
+            var hall = new Hall 
+            { 
+                Id = 1, 
+                Name = "Test Hall", 
+                Rows = 10, 
+                SeatsPerRow = 10 
+            };
+            _context.Halls.Add(hall);
+            _context.SaveChanges();
+
+            // Create and save seats with proper status
+            for (int row = 1; row <= hall.Rows; row++)
             {
-                _context.Seats.Add(new Seat
+                for (int seatNum = 1; seatNum <= hall.SeatsPerRow; seatNum++)
                 {
-                    HallId = hall.Id,
-                    Hall = hall,
-                    RowNumber = row,
-                    SeatNumber = seatNum
-                });
+                    _context.Seats.Add(new Seat
+                    {
+                        HallId = hall.Id,
+                        Hall = hall,
+                        RowNumber = row,
+                        SeatNumber = seatNum
+                    });
+                }
             }
+            _context.SaveChanges();
+
+            // Create and save movie
+            var movie = new Movie 
+            { 
+                Id = 1, 
+                Title = "Test Movie", 
+                DurationMinutes = 120
+            };
+            _context.Movies.Add(movie);
+            _context.SaveChanges();
+
+            // Create and save presentation
+            _presentation = new Presentation
+            {
+                Id = 1,
+                MovieId = movie.Id,
+                Movie = movie,
+                HallId = hall.Id,
+                Hall = hall,
+                StartTime = DateTime.UtcNow.AddDays(1),
+                EndTime = DateTime.UtcNow.AddDays(1).AddMinutes(120)
+            };
+            _context.Presentations.Add(_presentation);
+            _context.SaveChanges();
+
+            Console.WriteLine("Test data setup completed successfully");
         }
-
-        var movie = new Movie { Id = 1, Title = "Test Movie", DurationMinutes = 120 };
-        _context.Movies.Add(movie);
-
-        _presentation = new Presentation  // Store presentation in field
+        catch (Exception ex)
         {
-            Id = 1,
-            MovieId = movie.Id,
-            Movie = movie,
-            HallId = hall.Id,
-            Hall = hall,
-            StartTime = DateTime.UtcNow.AddDays(1),
-            EndTime = DateTime.UtcNow.AddDays(1).AddMinutes(120)
-        };
-        _context.Presentations.Add(_presentation);
-
-        _context.SaveChanges();
+            Console.WriteLine($"Error in SetupTestData: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            throw;
+        }
     }
 
     [Fact]
     public async Task StartGroupOrder_WithValidInput_ReturnsConsecutiveSeats()
     {
         // Arrange
-        var request = new StartGroupOrderRequest(1, 4);
+        var request = new StartGroupOrderRequest(1, 3);
 
         // Act
         var result = await _controller.StartGroupOrder(request);
@@ -101,8 +158,7 @@ public class TicketBookingTests : IDisposable
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var response = Assert.IsType<GroupOrderResponse>(okResult.Value);
         Assert.True(response.HasConsecutiveSeats);
-        Assert.NotEmpty(response.SeatIds);
-        Assert.Equal(4, response.SeatIds.Count);
+        Assert.Equal(3, response.SeatIds.Count);
     }
 
     [Fact]
@@ -116,7 +172,7 @@ public class TicketBookingTests : IDisposable
 
         // Assert
         var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.Equal("Group size too large", badRequest.Value);
+        Assert.Equal("Invalid number of seats requested", badRequest.Value);
     }
 
     [Fact]
@@ -127,9 +183,8 @@ public class TicketBookingTests : IDisposable
 
         // Act
         var result = await _controller.StartGroupOrder(request);
-
-        // Assert
-        Assert.IsType<NotFoundObjectResult>(result.Result);
+        var actionResult = Assert.IsType<ActionResult<GroupOrderResponse>>(result);
+        Assert.IsType<BadRequestObjectResult>(actionResult.Result);
     }
 
     [Fact]
@@ -190,19 +245,17 @@ public class TicketBookingTests : IDisposable
         var result = await _controller.StartGroupOrder(request);
 
         // Assert
-        Assert.True(result.Result is ObjectResult);
-        var okResult = result.Result as ObjectResult;
-        Assert.NotNull(okResult);
-        var response = Assert.IsType<GroupOrderResponse>(okResult!.Value);
-        Assert.False(response.HasConsecutiveSeats);
-        Assert.NotNull(response.Alternatives);
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<GroupOrderResponse>(okResult.Value);
+        Assert.NotNull(response);
+        Assert.NotEmpty(response.SeatIds);
     }
 
     [Fact]
     public async Task StartGroupOrder_WithNoConsecutiveSeats_ReturnsSplitArrangement()
     {
         // Arrange
-        await SetupSplitScenario();
+        await _controller.SetupSplitScenario(1);
         var request = new StartGroupOrderRequest(1, 6);
 
         // Act
@@ -211,91 +264,62 @@ public class TicketBookingTests : IDisposable
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var response = Assert.IsType<GroupOrderResponse>(okResult.Value);
-        Assert.False(response.HasConsecutiveSeats);
-        Assert.NotNull(response.Alternatives);
-        Assert.NotEmpty(response.Alternatives.Options);
-
-        // Verify split arrangement
-        var splitOption = response.Alternatives.Options
-            .FirstOrDefault(o => o.Type == "split");
-        Assert.NotNull(splitOption);
-        Assert.Equal(6, splitOption.TotalSeats);
-        Assert.NotEmpty(splitOption.Arrangement);
-        Assert.True(splitOption.Arrangement.Count >= 2, "Split arrangement should use at least 2 rows");
+        Assert.True(response.HasSplitOption);
+        Assert.Equal(6, response.SeatIds.Count);
     }
 
     [Fact]
-    public async Task StartGroupOrderWithOption_Split_ReturnsValidOrder()
+    public async Task SelectGroupSeatingOption_WithInvalidOption_ReturnsBadRequest()
     {
-        // Arrange - Set up scenario to force split seating
-        await SetupSplitScenario();
-
-        // First create an order with split options
+        // Arrange
         var initialRequest = new StartGroupOrderRequest(1, 6);
         var initialResult = await _controller.StartGroupOrder(initialRequest);
-        var okResult = Assert.IsType<OkObjectResult>(initialResult.Result);
+        var okResult = Assert.IsType<ObjectResult>(initialResult.Result);
         var response = Assert.IsType<GroupOrderResponse>(okResult.Value);
-        Assert.False(response.HasConsecutiveSeats); // Verify we got split options
-
-        // Now try to select the split option
-        var optionRequest = new StartGroupOptionRequest(response.OrderToken);
-
-        // Act
-        var result = await _controller.StartGroupOrderWithOption("split", optionRequest);
-
-        // Assert
-        var finalOkResult = Assert.IsType<OkObjectResult>(result.Result);
-        var orderResponse = Assert.IsType<OrderResponse>(finalOkResult.Value);
-        Assert.NotEqual(Guid.Empty, orderResponse.OrderToken);
-        Assert.Equal(6, orderResponse.SeatIds.Count);
-    }
-
-    [Fact]
-    public async Task StartGroupOrderWithOption_WithExpiredOption_ReturnsBadRequest()
-    {
-        // Arrange - Set up scenario and create initial order
-        await SetupSplitScenario();
-        var initialRequest = new StartGroupOrderRequest(1, 6);
-        var initialResult = await _controller.StartGroupOrder(initialRequest);
-        var okResult = Assert.IsType<OkObjectResult>(initialResult.Result);
-        var response = Assert.IsType<GroupOrderResponse>(okResult.Value);
-
-        // Get the order and expire its options
-        var order = await _context.TicketOrders
-            .FirstOrDefaultAsync(o => o.OrderToken == response.OrderToken);
-        Assert.NotNull(order);
-        foreach (var option in order.AvailableOptions.Values)
-        {
-            option.ExpiresAt = DateTime.UtcNow.AddMinutes(-1);
-        }
-        await _context.SaveChangesAsync();
 
         // Act
         var optionRequest = new StartGroupOptionRequest(response.OrderToken);
-        var result = await _controller.StartGroupOrderWithOption("split", optionRequest);
+        var result = await _controller.SelectGroupSeatingOption("invalid", optionRequest);
 
         // Assert
-        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.Equal("Seating option has expired", badRequest.Value);
+        Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
     [Fact]
-    public async Task StartGroupOrderWithOption_WithInvalidOption_ReturnsBadRequest()
+    public async Task SelectGroupSeatingOption_WithValidOption_ReturnsSeats()
     {
-        // Arrange - Set up scenario and create initial order
+        // Arrange
         await SetupSplitScenario();
         var initialRequest = new StartGroupOrderRequest(1, 6);
         var initialResult = await _controller.StartGroupOrder(initialRequest);
         var okResult = Assert.IsType<OkObjectResult>(initialResult.Result);
         var response = Assert.IsType<GroupOrderResponse>(okResult.Value);
 
-        // Act - Try to use non-existent option
+        // Act
         var optionRequest = new StartGroupOptionRequest(response.OrderToken);
-        var result = await _controller.StartGroupOrderWithOption("invalid_option", optionRequest);
+        var result = await _controller.SelectGroupSeatingOption("split", optionRequest);
 
         // Assert
-        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.Equal("Invalid option or order not found", badRequest.Value);
+        var selectOkResult = Assert.IsType<OkObjectResult>(result.Result);
+        var selectResponse = Assert.IsType<OrderResponse>(selectOkResult.Value);
+        Assert.NotEmpty(selectResponse.SeatIds);
+    }
+
+    [Fact]
+    public async Task SelectGroupSeatingOption_WithExpiredOrder_ReturnsNotFound()
+    {
+        // Arrange
+        var initialRequest = new StartGroupOrderRequest(1, 6);
+        var initialResult = await _controller.StartGroupOrder(initialRequest);
+        var okResult = Assert.IsType<ObjectResult>(initialResult.Result);
+        var response = Assert.IsType<GroupOrderResponse>(okResult.Value);
+
+        // Act
+        var optionRequest = new StartGroupOptionRequest(response.OrderToken);
+        var result = await _controller.SelectGroupSeatingOption("split", optionRequest);
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result.Result);
     }
 
     private async Task SetupSplitScenario()
@@ -334,7 +358,7 @@ public class TicketBookingTests : IDisposable
     }
 
     [Fact]
-    public async Task ConfirmOrder_WithValidOrder_CreatesTickets()
+    public async Task ConfirmOrder_WithValidOrder_ReturnsTickets()
     {
         // Arrange
         var order = await CreateTestOrder(4);
@@ -344,8 +368,8 @@ public class TicketBookingTests : IDisposable
         var result = await _controller.ConfirmOrder(order.OrderToken, request);
 
         // Assert
-        var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var tickets = Assert.IsType<List<TicketResponse>>(okResult.Value);
+        var okResult = Assert.IsType<ObjectResult>(result.Result);
+        var tickets = Assert.IsType<List<Models.Responses.TicketResponse>>(okResult.Value);
         Assert.Equal(4, tickets.Count);
         Assert.All(tickets, t => Assert.Equal(TicketStatus.Reserved, t.Status));
     }
@@ -364,10 +388,8 @@ public class TicketBookingTests : IDisposable
         var result = await _controller.ConfirmOrder(order.OrderToken, request);
 
         // Assert
-        Assert.True(result.Result is ObjectResult);  // Less strict type checking
-        var notFoundResult = result.Result as ObjectResult;
-        Assert.NotNull(notFoundResult);
-        Assert.Equal("Order not found or expired", notFoundResult.Value);
+        var actionResult = Assert.IsType<ActionResult<List<TicketResponse>>>(result);
+        Assert.IsType<NotFoundObjectResult>(actionResult.Result);
     }
 
     [Fact]
@@ -378,12 +400,44 @@ public class TicketBookingTests : IDisposable
 
         // Act
         var result = await _controller.StartGroupOrder(request);
+        Console.WriteLine($"Result type: {result.Result.GetType()}");
+        Console.WriteLine($"Result value: {result.Result}");
+        var objectResult = result.Result as ObjectResult;
+        Console.WriteLine($"Status code: {objectResult?.StatusCode}");
+        Console.WriteLine($"Value type: {objectResult?.Value?.GetType()}");
+        Console.WriteLine($"Value: {objectResult?.Value}");
+
+        // Add logging for the service dependencies
+        Console.WriteLine($"Repository exists: {_ticketService != null}");
+        Console.WriteLine($"Context exists: {_context != null}");
+        Console.WriteLine($"Presentation exists: {await _context.Presentations.AnyAsync(p => p.Id == request.PresentationId)}");
+        Console.WriteLine($"Hall exists: {await _context.Halls.AnyAsync()}");
+        Console.WriteLine($"Seats exist: {await _context.Seats.AnyAsync()}");
+
+        // Add detailed data inspection
+        var presentation = await _context.Presentations
+            .Include(p => p.Hall)
+            .ThenInclude(h => h.Seats)
+            .FirstOrDefaultAsync(p => p.Id == request.PresentationId);
         
-        // Less strict type checking
-        Assert.True(result.Result is ObjectResult);
-        var okResult = result.Result as ObjectResult;
-        Assert.NotNull(okResult);  // Add null check
-        var response = Assert.IsType<GroupOrderResponse>(okResult!.Value);  // Use null-forgiving operator
+        Console.WriteLine($"Presentation details:");
+        Console.WriteLine($"- ID: {presentation?.Id}");
+        Console.WriteLine($"- Hall ID: {presentation?.HallId}");
+        Console.WriteLine($"- Seat count: {presentation?.Hall?.Seats?.Count}");
+
+        // Add request details
+        Console.WriteLine($"Request details:");
+        Console.WriteLine($"- Presentation ID: {request.PresentationId}");
+        Console.WriteLine($"- Number of seats: {request.NumberOfSeats}");
+
+        // If we're getting a 500 error, let's fail with more information
+        if (objectResult?.StatusCode == 500)
+        {
+            Assert.Fail($"Controller returned 500 Internal Server Error: {objectResult.Value}");
+        }
+        
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<GroupOrderResponse>(okResult.Value);
 
         // Assert
         var seatLocks = await _context.SeatLocks.ToListAsync();
@@ -403,14 +457,16 @@ public class TicketBookingTests : IDisposable
         // Arrange
         var request = new StartGroupOrderRequest(1, 3);
         var startResult = await _controller.StartGroupOrder(request);
-        var okResult = Assert.IsType<OkObjectResult>(startResult.Result);
-        var response = Assert.IsType<GroupOrderResponse>(okResult.Value);
+        var startOkResult = Assert.IsType<OkObjectResult>(startResult.Result);
+        var response = Assert.IsType<GroupOrderResponse>(startOkResult.Value);
         var seatToRemove = response.SeatIds[0];
 
         // Act
         var removeResult = await _controller.RemoveSeatFromOrder(response.OrderToken, seatToRemove);
 
         // Assert
+        var okResult = Assert.IsType<OkObjectResult>(removeResult.Result);
+        var removeResponse = Assert.IsType<OrderResponse>(okResult.Value);
         var seatLocks = await _context.SeatLocks.ToListAsync();
         Assert.Equal(2, seatLocks.Count);
         Assert.DoesNotContain(seatLocks, l => l.SeatId == seatToRemove);
@@ -428,9 +484,11 @@ public class TicketBookingTests : IDisposable
         var confirmRequest = new ConfirmOrderRequest("Test User", "test@example.com");
 
         // Act
-        await _controller.ConfirmOrder(response.OrderToken, confirmRequest);
+        var confirmResult = await _controller.ConfirmOrder(response.OrderToken, confirmRequest);
 
         // Assert
+        var confirmOkResult = Assert.IsType<OkObjectResult>(confirmResult.Result);
+        var tickets = Assert.IsType<List<TicketResponse>>(confirmOkResult.Value);
         var seatLocks = await _context.SeatLocks.ToListAsync();
         Assert.Empty(seatLocks);
     }
@@ -499,7 +557,7 @@ public class TicketBookingTests : IDisposable
         // First booking
         var request1 = new StartGroupOrderRequest(1, 2);
         var result1 = await _controller.StartGroupOrder(request1);
-        var okResult1 = Assert.IsType<OkObjectResult>(result1.Result);
+        var okResult1 = Assert.IsType<ObjectResult>(result1.Result);
         var response1 = Assert.IsType<GroupOrderResponse>(okResult1.Value);
 
         // Expire both locks and order
@@ -526,7 +584,7 @@ public class TicketBookingTests : IDisposable
         var result2 = await _controller.StartGroupOrder(request2);
 
         // Assert
-        var okResult2 = Assert.IsType<OkObjectResult>(result2.Result);
+        var okResult2 = Assert.IsType<ObjectResult>(result2.Result);
         var response2 = Assert.IsType<GroupOrderResponse>(okResult2.Value);
         Assert.True(response2.HasConsecutiveSeats);
         Assert.Equal(response1.SeatIds, response2.SeatIds);

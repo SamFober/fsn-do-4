@@ -39,8 +39,24 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddHostedService<OrderCleanupService>();
 builder.Services.AddMemoryCache(); // For seat locking
+builder.Services.AddScoped<WebApi.Interfaces.Repositories.ITicketRepository, WebApi.Repositories.TicketRepository>();
+builder.Services.AddScoped<WebApi.Interfaces.Services.ITicketService, WebApi.Services.TicketService>();
+
+// Add CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", builder =>
+    {
+        builder.AllowAnyOrigin()
+               .AllowAnyMethod()
+               .AllowAnyHeader();
+    });
+});
 
 var app = builder.Build();
+
+// Use CORS
+app.UseCors("AllowAll");
 
 // Add this section to seed the database
 using (var scope = app.Services.CreateScope())

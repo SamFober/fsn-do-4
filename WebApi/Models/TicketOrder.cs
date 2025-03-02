@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using WebApi.Models.Responses;
 
 namespace WebApi.Models
 {
@@ -26,23 +27,6 @@ namespace WebApi.Models
         // Navigation properties
         public TicketOrder Order { get; set; } = null!;
         public Seat Seat { get; set; } = null!;
-    }
-
-    public class SeatingOption
-    {
-        public string Type { get; set; } = string.Empty;
-        public List<int> SeatIds { get; set; } = new();
-        public DateTime ExpiresAt { get; set; }
-
-        // Parameterless constructor for JSON deserialization
-        public SeatingOption() { }
-
-        public SeatingOption(string type, List<int> seatIds, DateTime expiresAt)
-        {
-            Type = type;
-            SeatIds = seatIds;
-            ExpiresAt = expiresAt;
-        }
     }
 
     public enum OrderStatus

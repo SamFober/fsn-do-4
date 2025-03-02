@@ -1,0 +1,578 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using WebApi.Interfaces.Repositories;
+using WebApi.Interfaces.Services;
+using WebApi.Models;
+using WebApi.Models.Requests;
+using WebApi.Models.Responses;
+using WebApi.Exceptions;
+
+namespace WebApi.Services
+{
+    public class TicketService : ITicketService
+    {
+        private readonly ITicketRepository _repository;
+        private readonly ILogger<TicketService> _logger;
+
+        public TicketService(
+            ITicketRepository repository,
+            ILogger<TicketService> logger)
+        {
+            _repository = repository;
+            _logger = logger;
+        }
+
+        public async Task<OrderResponse> StartOrder(StartOrderRequest request)
+        {
+            try
+            {
+                var availableSeats = await _repository.GetAvailableSeats(request.PresentationId, true);
+                if (!availableSeats.Any())
+                {
+                    throw new NoSeatsAvailableException("No seats available");
+                }
+
+                var orderToken = Guid.NewGuid();
+                var selectedSeat = availableSeats.First();
+
+                var seatLock = new SeatLock
+                {
+                    SeatId = selectedSeat.Id,
+                    OrderToken = orderToken,
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(10)
+                };
+
+                if (!await _repository.AddSeatLocks(new List<SeatLock> { seatLock }))
+                {
+                    throw new SeatNotAvailableException("Failed to lock selected seat");
+                }
+
+                var order = new TicketOrder
+                {
+                    OrderToken = orderToken,
+                    PresentationId = request.PresentationId,
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+                    Status = OrderStatus.Pending,
+                    Items = new List<TicketOrderItem>
+                    {
+                        new()
+                        {
+                            SeatId = selectedSeat.Id,
+                            CreatedAt = DateTime.UtcNow
+                        }
+                    }
+                };
+
+                if (!await _repository.SaveOrder(order))
+                {
+                    throw new Exception("Failed to save order");
+                }
+
+                return new OrderResponse(order.OrderToken, new List<int> { selectedSeat.Id });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error starting order");
+                throw;
+            }
+        }
+
+        public async Task<GroupOrderResponse> StartGroupOrder(StartGroupOrderRequest request)
+        {
+            try
+            {
+                if (request.NumberOfSeats <= 0 || request.NumberOfSeats > 20)
+                {
+                    throw new ArgumentException("Invalid number of seats requested");
+                }
+
+                var options = new Dictionary<string, SeatingOption>();
+                var orderToken = Guid.NewGuid();
+
+                // First try to find consecutive seats
+                var consecutiveSeats = await FindConsecutiveSeats(request.PresentationId, request.NumberOfSeats);
+                if (consecutiveSeats.Any())
+                {
+                    var consecutiveGroups = await GetSplitArrangement(consecutiveSeats);
+                    options.Add("consecutive", new SeatingOption(
+                        "Consecutive seats together",
+                        consecutiveSeats,
+                        DateTime.UtcNow.AddMinutes(10),
+                        consecutiveGroups
+                    ));
+                }
+
+                // Try consecutive seats with one less person if no exact match found
+                if (request.NumberOfSeats > 1 && !consecutiveSeats.Any())
+                {
+                    var smallerConsecutive = await FindConsecutiveSeats(request.PresentationId, request.NumberOfSeats - 1);
+                    if (smallerConsecutive.Any())
+                    {
+                        var smallerGroups = await GetSplitArrangement(smallerConsecutive);
+                        options.Add("smaller_consecutive", new SeatingOption(
+                            $"Consecutive seats for {request.NumberOfSeats - 1} people",
+                            smallerConsecutive,
+                            DateTime.UtcNow.AddMinutes(10),
+                            smallerGroups
+                        ));
+                    }
+                }
+
+                // If no consecutive options, try split seating
+                if (!options.ContainsKey("consecutive"))
+                {
+                    var splitSeats = await FindBestSplitSeats(request.PresentationId, request.NumberOfSeats);
+                    if (splitSeats.Any())
+                    {
+                        var splitGroups = await GetSplitArrangement(splitSeats);
+                        options.Add("split", new SeatingOption(
+                            "Split seating arrangement",
+                            splitSeats,
+                            DateTime.UtcNow.AddMinutes(10),
+                            splitGroups
+                        ));
+                    }
+                }
+
+                if (!options.Any())
+                {
+                    throw new NoSeatsAvailableException("No seats available");
+                }
+
+                // Create initial order without locking seats
+                var order = new TicketOrder
+                {
+                    OrderToken = orderToken,
+                    PresentationId = request.PresentationId,
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+                    Status = OrderStatus.Pending,
+                    AvailableOptions = options
+                };
+
+                if (!await _repository.SaveOrder(order))
+                {
+                    throw new Exception("Failed to save order");
+                }
+
+                return new GroupOrderResponse
+                {
+                    OrderToken = orderToken,
+                    HasConsecutiveSeats = options.ContainsKey("consecutive"),
+                    AvailableOptions = options,
+                    SeatIds = options.Values.FirstOrDefault()?.SeatIds ?? new List<int>()
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error starting group order");
+                throw;
+            }
+        }
+
+        public async Task<OrderResponse> SelectGroupSeatingOption(string option, StartGroupOptionRequest request)
+        {
+            try
+            {
+                var order = await _repository.GetOrderByToken(request.OrderToken);
+                if (order == null || order.Status != OrderStatus.Pending)
+                {
+                    throw new OrderNotFoundException("Order not found or expired");
+                }
+
+                if (!order.AvailableOptions.TryGetValue(option, out var seatingOption))
+                {
+                    throw new ArgumentException("Invalid seating option");
+                }
+
+                // Verify seats are still available
+                if (!await _repository.AreSeatAvailable(order.PresentationId, seatingOption.SeatIds, order.OrderToken))
+                {
+                    throw new SeatNotAvailableException("Selected seats are no longer available");
+                }
+
+                // Lock the seats
+                var seatLocks = seatingOption.SeatIds.Select(seatId => new SeatLock
+                {
+                    SeatId = seatId,
+                    OrderToken = order.OrderToken,
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(10)
+                }).ToList();
+
+                if (!await _repository.AddSeatLocks(seatLocks))
+                {
+                    throw new SeatNotAvailableException("Failed to lock selected seats");
+                }
+
+                // Update order with selected seats
+                order.Items = seatingOption.SeatIds.Select(seatId => new TicketOrderItem
+                {
+                    SeatId = seatId,
+                    CreatedAt = DateTime.UtcNow
+                }).ToList();
+
+                if (!await _repository.SaveOrder(order))
+                {
+                    throw new Exception("Failed to save order");
+                }
+
+                return new OrderResponse(order.OrderToken, seatingOption.SeatIds);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error selecting seating option");
+                throw;
+            }
+        }
+
+        public async Task<List<TicketResponse>> ConfirmOrder(Guid orderToken, ConfirmOrderRequest request)
+        {
+            var order = await _repository.GetOrderByToken(orderToken, true);
+            if (order == null || order.Status != OrderStatus.Pending)
+            {
+                throw new OrderNotFoundException("Order not found or expired");
+            }
+
+            if (!await _repository.AreSeatAvailable(order.PresentationId, 
+                order.Items.Select(i => i.SeatId).ToList(), order.OrderToken))
+            {
+                throw new SeatNotAvailableException("Some selected seats are no longer available");
+            }
+
+            var tickets = order.Items.Select(item => new Ticket
+            {
+                PresentationId = order.PresentationId,
+                SeatId = item.SeatId,
+                CustomerName = request.CustomerName,
+                CustomerEmail = request.CustomerEmail,
+                Status = TicketStatus.Reserved,
+                PurchaseDate = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                Presentation = order.Presentation!,
+                Seat = item.Seat
+            }).ToList();
+
+            order.Status = OrderStatus.Confirmed;
+            await _repository.SaveOrder(order);
+
+            var createdTickets = await _repository.CreateTickets(tickets);
+            
+            return createdTickets.Select(t => new TicketResponse(
+                t.Id,
+                t.Presentation.Movie.Title,
+                t.Presentation.Hall.Name,
+                t.Presentation.StartTime,
+                t.Presentation.EndTime,
+                t.Seat.RowNumber,
+                t.Seat.SeatNumber,
+                t.CustomerName,
+                t.CustomerEmail,
+                t.Status,
+                t.PurchaseDate
+            )).ToList();
+        }
+
+        public async Task<OrderResponse> AddSeatsToOrder(Guid orderToken, AddSeatsRequest request)
+        {
+            try
+            {
+                var order = await _repository.GetOrderByToken(orderToken, true);
+                if (order == null || order.Status != OrderStatus.Pending)
+                {
+                    throw new OrderNotFoundException("Order not found or expired");
+                }
+
+                // Validate seats exist and are available
+                if (!await _repository.AreSeatAvailable(order.PresentationId, request.SeatIds, order.OrderToken))
+                {
+                    throw new SeatNotAvailableException("Some selected seats are no longer available");
+                }
+
+                // Check for duplicates
+                var existingSeatIds = order.Items.Select(i => i.SeatId).ToHashSet();
+                if (request.SeatIds.Any(id => existingSeatIds.Contains(id)))
+                {
+                    throw new ArgumentException("One or more seats are already in your order");
+                }
+
+                // Lock new seats
+                var seatLocks = request.SeatIds.Select(seatId => new SeatLock
+                {
+                    SeatId = seatId,
+                    OrderToken = orderToken,
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(10)
+                }).ToList();
+
+                if (!await _repository.AddSeatLocks(seatLocks))
+                {
+                    throw new SeatNotAvailableException("Failed to lock selected seats");
+                }
+
+                // Add new seats to order
+                var newItems = request.SeatIds.Select(seatId => new TicketOrderItem
+                {
+                    SeatId = seatId,
+                    CreatedAt = DateTime.UtcNow
+                });
+                order.Items.AddRange(newItems);
+
+                if (!await _repository.SaveOrder(order))
+                {
+                    throw new Exception("Failed to save order");
+                }
+
+                return new OrderResponse(order.OrderToken, order.Items.Select(i => i.SeatId).ToList());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding seats to order");
+                throw;
+            }
+        }
+
+        public async Task<OrderResponse> RemoveSeatFromOrder(Guid orderToken, int seatId)
+        {
+            try
+            {
+                var order = await _repository.GetOrderByToken(orderToken, true);
+                if (order == null || order.Status != OrderStatus.Pending)
+                {
+                    throw new OrderNotFoundException("Order not found or expired");
+                }
+
+                var itemToRemove = order.Items.FirstOrDefault(i => i.SeatId == seatId);
+                if (itemToRemove == null)
+                {
+                    throw new ArgumentException("Seat not found in order");
+                }
+
+                // Remove seat from order
+                order.Items.Remove(itemToRemove);
+
+                // Get and remove seat locks through repository
+                var locks = await _repository.GetExpiredLocks();
+                var seatLocks = locks.Where(l => l.OrderToken == orderToken && l.SeatId == seatId).ToList();
+                await _repository.RemoveSeatLocks(seatLocks);
+
+                if (!await _repository.SaveOrder(order))
+                {
+                    throw new Exception("Failed to save order");
+                }
+
+                return new OrderResponse(order.OrderToken, order.Items.Select(i => i.SeatId).ToList());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error removing seat from order");
+                throw;
+            }
+        }
+
+        public async Task<List<int>> FindConsecutiveSeats(int presentationId, int numberOfSeats)
+        {
+            var availableSeats = await _repository.GetAvailableSeats(presentationId, true);
+            
+            // Group seats by row
+            var seatsByRow = availableSeats
+                .OrderBy(s => s.RowNumber)
+                .GroupBy(s => s.RowNumber);
+
+            foreach (var row in seatsByRow)
+            {
+                var consecutiveSeats = FindConsecutiveInRow(row.ToList(), numberOfSeats);
+                if (consecutiveSeats.Any())
+                {
+                    return consecutiveSeats.Select(s => s.Id).ToList();
+                }
+            }
+
+            return new List<int>();
+        }
+
+        public async Task<List<int>> FindBestSplitSeats(int presentationId, int numberOfSeats)
+        {
+            var availableSeats = await _repository.GetAvailableSeats(presentationId, true);
+            
+            // Try to find seats in adjacent rows
+            var seatsByRow = availableSeats
+                .OrderBy(s => s.RowNumber)
+                .GroupBy(s => s.RowNumber)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            var result = new List<Seat>();
+            foreach (var row in seatsByRow.OrderBy(kvp => kvp.Key))
+            {
+                var seatsNeeded = numberOfSeats - result.Count;
+                if (seatsNeeded <= 0) break;
+
+                var seatsInRow = row.Value
+                    .OrderBy(s => Math.Abs(s.SeatNumber - (row.Value.First().SeatNumber + row.Value.Last().SeatNumber) / 2))
+                    .Take(seatsNeeded);
+
+                result.AddRange(seatsInRow);
+            }
+
+            return result.Select(s => s.Id).ToList();
+        }
+
+        private List<Seat> FindConsecutiveInRow(List<Seat> rowSeats, int count)
+        {
+            var orderedSeats = rowSeats.OrderBy(s => s.SeatNumber).ToList();
+            
+            for (int i = 0; i <= orderedSeats.Count - count; i++)
+            {
+                var consecutive = true;
+                for (int j = 0; j < count - 1; j++)
+                {
+                    if (orderedSeats[i + j + 1].SeatNumber != orderedSeats[i + j].SeatNumber + 1)
+                    {
+                        consecutive = false;
+                        break;
+                    }
+                }
+                
+                if (consecutive)
+                {
+                    return orderedSeats.Skip(i).Take(count).ToList();
+                }
+            }
+            
+            return new List<Seat>();
+        }
+
+        private List<List<Seat>> FindBestSplitOptions(List<Seat> availableSeats, int numberOfSeats)
+        {
+            var options = new List<List<Seat>>();
+            var seatsByRow = availableSeats
+                .GroupBy(s => s.RowNumber)
+                .ToDictionary(g => g.Key, g => g.OrderBy(s => s.SeatNumber).ToList());
+
+            // Try to minimize splits
+            for (int splitCount = 2; splitCount <= Math.Min(numberOfSeats, 4); splitCount++)
+            {
+                var splitOption = TryFindSplitOption(seatsByRow, numberOfSeats, splitCount);
+                if (splitOption.Any())
+                {
+                    options.Add(splitOption);
+                }
+            }
+
+            return options;
+        }
+
+        private List<Seat> TryFindSplitOption(Dictionary<int, List<Seat>> seatsByRow, int totalSeats, int splits)
+        {
+            var seatsPerGroup = totalSeats / splits;
+            var remainder = totalSeats % splits;
+            var result = new List<Seat>();
+
+            foreach (var row in seatsByRow.OrderBy(r => r.Key))
+            {
+                var availableInRow = row.Value.Count;
+                if (availableInRow >= seatsPerGroup)
+                {
+                    result.AddRange(row.Value.Take(seatsPerGroup + (remainder > 0 ? 1 : 0)));
+                    if (remainder > 0) remainder--;
+                    
+                    if (result.Count == totalSeats)
+                        return result;
+                }
+            }
+
+            return new List<Seat>();
+        }
+
+        private Dictionary<string, SeatingOption> CreateSeatingOptions(List<List<Seat>> options, Guid orderToken)
+        {
+            var result = new Dictionary<string, SeatingOption>();
+            for (int i = 0; i < options.Count; i++)
+            {
+                var option = options[i];
+                var arrangement = option
+                    .GroupBy(s => s.RowNumber)
+                    .Select(g => new RowGroup(
+                        g.Key,
+                        g.Select(s => s.Id).ToList(),
+                        $"{g.Count()} seats in row {g.Key}"
+                    ))
+                    .ToList();
+
+                result.Add($"option_{i + 1}", new SeatingOption(
+                    $"Split seating option {i + 1}",
+                    option.Select(s => s.Id).ToList(),
+                    DateTime.UtcNow.AddMinutes(10),
+                    arrangement
+                ));
+            }
+            return result;
+        }
+
+        private async Task<bool> TryLockSeats(List<int> seatIds, Guid orderToken, int presentationId)
+        {
+            // First check if seats are available
+            if (!await _repository.AreSeatAvailable(presentationId, seatIds, orderToken))
+            {
+                return false;
+            }
+
+            // Create locks for the seats
+            var seatLocks = seatIds.Select(seatId => new SeatLock
+            {
+                SeatId = seatId,
+                OrderToken = orderToken,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(10)
+            }).ToList();
+
+            return await _repository.AddSeatLocks(seatLocks);
+        }
+
+        private async Task<TicketOrder> CreateOrder(int presentationId, List<int> seatIds, Guid orderToken)
+        {
+            var order = new TicketOrder
+            {
+                OrderToken = orderToken,
+                PresentationId = presentationId,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+                Status = OrderStatus.Pending,
+                Items = seatIds.Select(seatId => new TicketOrderItem
+                {
+                    SeatId = seatId,
+                    CreatedAt = DateTime.UtcNow
+                }).ToList()
+            };
+
+            if (!await _repository.SaveOrder(order))
+            {
+                throw new Exception("Failed to save order");
+            }
+
+            return order;
+        }
+
+        private async Task<List<RowGroup>> GetSplitArrangement(List<int> seatIds)
+        {
+            var seats = await _repository.GetSeatsByIds(seatIds);
+            
+            return seats
+                .GroupBy(s => s.RowNumber)
+                .OrderBy(g => g.Key)
+                .Select(g => new RowGroup(
+                    g.Key,
+                    g.Select(s => s.Id).ToList(),
+                    $"{g.Count()} seat{(g.Count() > 1 ? "s" : "")} in row {g.Key}"
+                ))
+                .ToList();
+        }
+    }
+} 

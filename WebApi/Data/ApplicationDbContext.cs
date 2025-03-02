@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using WebApi.Models;
+using WebApi.Models.Responses;
 
 public class ApplicationDbContext : DbContext
 {
