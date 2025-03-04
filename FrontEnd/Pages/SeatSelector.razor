@@ -1,0 +1,118 @@
+@page "/seat-selector/{presentationId:int}"
+
+@using FrontEnd.Models // Ensure this matches the namespace of your Seat class
+
+@inject HttpClient Http
+
+<h3>Seat Selector for @presentation.Movie.Title in @presentation.Hall.Name</h3>
+
+@if (presentation == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (presentation.Hall.Seats.Count == 0)
+{
+    <p>No seats available for this presentation.</p>
+}
+else
+{
+    <div>
+        @foreach (var seat in presentation.Hall.Seats)
+        {
+            <div>
+                <span>Row: @seat.RowNumber, Seat: @seat.SeatNumber</span>
+                <button @onclick="() => SelectSeat(seat)" disabled="!seat.IsAvailable">Select</button>
+            </div>
+        }
+    </div>
+}
+
+<button @onclick="StartOrder">Start Order</button>
+<button @onclick="StartGroupOrder">Start Group Order</button>
+
+@if (message != null)
+{
+    <p>@message</p>
+}
+
+@code {
+    [Parameter]
+    public int PresentationId { get; set; }
+
+    private Presentation? presentation; // Change to Presentation model
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Fetch the presentation data using the existing route
+            presentation = await Http.GetFromJsonAsync<Presentation>($"api/presentations/{PresentationId}");
+            
+            // Check if presentation was retrieved successfully
+            if (presentation == null || presentation.Hall.Seats.Count == 0)
+            {
+                message = "No seats available for this presentation.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error fetching seats: {ex.Message}";
+        }
+    }
+
+    private async Task SelectSeat(Seat seat)
+    {
+        // Call the existing API to handle seat selection
+        var response = await Http.PostAsJsonAsync($"api/tickets/orders/{seat.Id}/select", new { PresentationId });
+
+        if (response.IsSuccessStatusCode)
+        {
+            message = "Seat selected successfully!";
+            // Optionally refresh the seat list or update the UI
+            presentation = await Http.GetFromJsonAsync<Presentation>($"api/presentations/{PresentationId}");
+        }
+        else
+        {
+            // Extract error message from the response
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            message = $"Failed to select seat: {errorMessage}";
+        }
+    }
+
+    private async Task StartOrder()
+    {
+        // Call the existing API to start a new order
+        var response = await Http.PostAsJsonAsync("api/tickets/orders/start", new { PresentationId });
+
+        if (response.IsSuccessStatusCode)
+        {
+            message = "Order started successfully!";
+            // Handle further logic, e.g., navigate to order details
+        }
+        else
+        {
+            // Extract error message from the response
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            message = $"Failed to start order: {errorMessage}";
+        }
+    }
+
+    private async Task StartGroupOrder()
+    {
+        // Call the existing API to start a new group order
+        var response = await Http.PostAsJsonAsync("api/tickets/orders/start-group", new { PresentationId, NumberOfSeats = 5 }); // Example number of seats
+
+        if (response.IsSuccessStatusCode)
+        {
+            message = "Group order started successfully!";
+            // Handle further logic, e.g., navigate to group order details
+        }
+        else
+        {
+            // Extract error message from the response
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            message = $"Failed to start group order: {errorMessage}";
+        }
+    }
+} 

@@ -153,5 +153,58 @@ namespace WebApi.Controllers
                 capacity // All seats available initially
             ));
         }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<object>> GetPresentation(int id)
+        {
+            var presentation = await _context.Presentations
+                .Include(p => p.Hall)
+                .Include(p => p.Movie)
+                .Include(p => p.Tickets)
+                .FirstOrDefaultAsync(p => p.Id == id);
+
+            if (presentation == null)
+            {
+                Console.WriteLine($"Presentation with ID {id} not found.");
+                return NotFound();
+            }
+
+            // Return a simplified object
+            var response = new
+            {
+                presentation.Id,
+                MovieTitle = presentation.Movie.Title,
+                HallName = presentation.Hall.Name,
+                presentation.StartTime,
+                presentation.EndTime,
+                presentation.Price
+            };
+
+            Console.WriteLine($"Fetched Presentation: {id}, Hall: {presentation.Hall.Name}, Movie: {presentation.Movie.Title}");
+            return Ok(response);
+        }
+
+        private async Task<List<Seat>> GetSeatsForPresentation(int presentationId)
+        {
+            // Get the hall associated with the presentation
+            var hall = await _context.Halls
+                .Include(h => h.Seats) // Include seats associated with the hall
+                .FirstOrDefaultAsync(h => h.Id == presentationId); // Adjust this to get the correct hall
+
+            if (hall == null)
+            {
+                return new List<Seat>(); // Return an empty list if the hall is not found
+            }
+
+            // Return the seats directly with availability status
+            return hall.Seats.Select(s => new Seat
+            {
+                Id = s.Id,
+                RowNumber = s.RowNumber,
+                SeatNumber = s.SeatNumber,
+                IsAvailable = s.IsAvailable, // Ensure availability is included
+                Hall = s.Hall // Set the Hall property
+            }).ToList();
+        }
     }
 } 

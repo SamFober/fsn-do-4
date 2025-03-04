@@ -24,9 +24,15 @@ public class ApplicationDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // Configure Seat entity
         modelBuilder.Entity<Seat>()
             .HasIndex(s => new { s.HallId, s.RowNumber, s.SeatNumber })
             .IsUnique();
+
+        modelBuilder.Entity<Seat>()
+            .HasOne(s => s.Hall)
+            .WithMany(h => h.Seats) // Ensure this is set to the collection in Hall
+            .HasForeignKey(s => s.HallId);
 
         modelBuilder.Entity<Ticket>()
             .HasIndex(t => new { t.PresentationId, t.SeatId })

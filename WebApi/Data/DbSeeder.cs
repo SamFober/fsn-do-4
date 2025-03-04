@@ -7,10 +7,9 @@ namespace WebApi.Data
     {
         public static async Task Initialize(ApplicationDbContext context)
         {
-            // Check each entity type separately
+            // Seed halls
             if (!await context.Halls.AnyAsync())
             {
-                // Add halls
                 var halls = new[]
                 {
                     new Hall { Name = "Hall 1", Rows = 8, SeatsPerRow = 15 },
@@ -34,8 +33,10 @@ namespace WebApi.Data
                             seats.Add(new Seat
                             {
                                 Hall = hall,
+                                HallId = hall.Id, // Set HallId directly
                                 RowNumber = row,
                                 SeatNumber = seatNum,
+                                IsAvailable = true,
                                 CreatedAt = DateTime.UtcNow
                             });
                         }

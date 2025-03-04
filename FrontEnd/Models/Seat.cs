@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using WebApi.Models;
+using FrontEnd.Models;
 
-namespace WebApi.Models
+namespace FrontEnd.Models
 {
     public class Seat
     {
@@ -19,6 +19,6 @@ namespace WebApi.Models
         public DateTime CreatedAt { get; set; }
 
         public required Hall Hall { get; set; }
-        public ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
+        public ICollection<Ticket> Tickets { get; set; }
     }
 } 
