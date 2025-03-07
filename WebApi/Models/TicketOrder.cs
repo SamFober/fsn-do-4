@@ -12,9 +12,10 @@ namespace WebApi.Models
         public DateTime CreatedAt { get; set; }
         public DateTime ExpiresAt { get; set; } // Hold seats for X minutes
         public OrderStatus Status { get; set; }
+        public int RequestedSeats { get; set; } // Number of seats originally requested
         public virtual Presentation? Presentation { get; set; }
-        public virtual List<TicketOrderItem> Items { get; set; } = new();
         public Dictionary<string, SeatingOption> AvailableOptions { get; set; } = new();
+        public ICollection<TicketOrderItem> Items { get; set; } = new List<TicketOrderItem>();
     }
 
     public class TicketOrderItem

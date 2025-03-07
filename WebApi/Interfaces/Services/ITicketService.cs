@@ -16,5 +16,6 @@ namespace WebApi.Interfaces.Services
         Task<OrderResponse> RemoveSeatFromOrder(Guid orderToken, int seatId);
         Task<List<TicketResponse>> ConfirmOrder(Guid orderToken, ConfirmOrderRequest request);
         Task<OrderResponse> SelectGroupSeatingOption(string option, StartGroupOptionRequest request);
+        Task CancelOrder(Guid orderToken);
     }
 } 

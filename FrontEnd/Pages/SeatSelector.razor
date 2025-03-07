@@ -14,8 +14,18 @@
 }
 @if (!orderStarted)
 {
-    <button @onclick="StartOrder">Start Single Order</button>
-    <button @onclick="StartGroupOrder">Start Group Order</button>
+    @if (presentation?.Rows.Any(r => r.Seats.Any(s => s.IsAvailable)) == true)
+    {
+        <button @onclick="StartOrder" class="btn btn-primary">Start Single Order</button>
+        <button @onclick="ShowGroupOrderModal" class="btn btn-primary">Start Group Order</button>
+    }
+    else
+    {
+        <div class="alert alert-info text-center" role="alert">
+            <h4 class="alert-heading">Sorry, this showing is fully booked!</h4>
+            <p>All seats for this presentation of "@(presentation?.Title)" have been reserved. Please check other showtimes or browse our other exciting movies.</p>
+        </div>
+    }
 }
 else
 {
@@ -61,9 +71,98 @@ else
 
     @if (selectedSeats.Count > 0)
     {
-        <button @onclick="ConfirmTickets">Confirm Tickets</button>
+        <button @onclick="ConfirmTickets" class="btn btn-success">Confirm Tickets</button>
+        <button @onclick="CancelOrder" class="btn btn-danger">Cancel Order</button>
     }
 }
+
+<!-- Bootstrap Modal for Group Order -->
+<div class="modal fade" id="groupOrderModal" tabindex="-1" aria-labelledby="groupOrderModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="groupOrderModalLabel">Start Group Order</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if (!string.IsNullOrEmpty(groupOrderError))
+                {
+                    <div class="alert alert-warning" role="alert">
+                        @groupOrderError
+                    </div>
+                }
+                <div class="form-group">
+                    <label for="numberOfSeats">How many seats do you need? (Maximum @maxAvailableSeats available)</label>
+                    <input type="number" class="form-control" id="numberOfSeats" @bind="numberOfSeats" min="1" max="@maxAvailableSeats" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" @onclick="StartGroupOrder">Start Group Order</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add this modal for seating options -->
+<div class="modal fade" id="seatingOptionsModal" tabindex="-1" aria-labelledby="seatingOptionsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="seatingOptionsModalLabel">Select Seating Option</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if (availableOptions != null)
+                {
+                    @foreach (var option in availableOptions)
+                    {
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="radio" name="seatingOption" 
+                                   value="@option.Key" @onchange="@(e => selectedOption = option.Key)" 
+                                   checked="@(selectedOption == option.Key)" />
+                            <label class="form-check-label">
+                                @option.Value.Description
+                                <div class="small text-muted">
+                                    @foreach (var group in option.Value.Groups)
+                                    {
+                                        <div>@group.Description</div>
+                                    }
+                                </div>
+                            </label>
+                        </div>
+                    }
+                }
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" @onclick="CancelOrder">Cancel Order</button>
+                <button type="button" class="btn btn-primary" @onclick="ConfirmSeatingOption">Confirm Selection</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add this modal for single option confirmation -->
+<div class="modal fade" id="singleOptionConfirmModal" tabindex="-1" aria-labelledby="singleOptionConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="singleOptionConfirmModalLabel">Confirm Seating Arrangement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if (singleOptionMessage != null)
+                {
+                    <p>@singleOptionMessage</p>
+                }
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" @onclick="CancelOrder">Cancel Order</button>
+                <button type="button" class="btn btn-primary" @onclick="ConfirmSingleOption">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 @code {
     [Parameter]
@@ -76,11 +175,15 @@ else
     private List<Seat> selectedSeats = new List<Seat>();
     private string? orderToken;
     private int? preselectedSeatId;
+    private Dictionary<string, SeatingOption>? availableOptions;
+    private string? selectedOption;
+    private string? singleOptionMessage;
+    private GroupOrderResponse? pendingGroupOrder;
+    private string? groupOrderError;
+    private int maxAvailableSeats;
 
     protected override async Task OnInitializedAsync()
     {
-        // Add JavaScript to handle page unload warning
-        <!-- await JSRuntime.InvokeVoidAsync("addUnloadWarning"); -->
 
         try
         {
@@ -139,19 +242,101 @@ else
         }
     }
 
+    private async Task ShowGroupOrderModal()
+    {
+        // Clear any previous error message
+        groupOrderError = null;
+
+        // Calculate maximum available seats
+        maxAvailableSeats = presentation?.Rows
+            .SelectMany(r => r.Seats)
+            .Count(s => s.IsAvailable) ?? 0;
+
+        // Ensure numberOfSeats doesn't exceed maxAvailableSeats
+        if (numberOfSeats > maxAvailableSeats)
+        {
+            numberOfSeats = maxAvailableSeats;
+        }
+
+        await JSRuntime.InvokeVoidAsync("showModal", "groupOrderModal");
+    }
+
     private async Task StartGroupOrder()
     {
-        Console.WriteLine("StartGroupOrder called");
+        Console.WriteLine($"StartGroupOrder called with {numberOfSeats} seats");
         try
         {
+            // Clear any previous error message
+            groupOrderError = null;
+
+            // First check how many seats are actually available
+            var availableSeats = presentation?.Rows
+                .SelectMany(r => r.Seats)
+                .Where(s => s.IsAvailable)
+                .ToList() ?? new List<Seat>();
+
+            var availableSeatsCount = availableSeats.Count;
+            Console.WriteLine($"Available seats: {availableSeatsCount}");
+
+            if (availableSeatsCount == 0)
+            {
+                groupOrderError = "No seats are available for this presentation.";
+                return;
+            }
+
+            if (numberOfSeats > availableSeatsCount)
+            {
+                groupOrderError = $"Only {availableSeatsCount} seats are available. You requested {numberOfSeats} seats.";
+                return;
+            }
+
+            if (numberOfSeats <= 0 || numberOfSeats > 20)
+            {
+                groupOrderError = "Please select between 1 and 20 seats.";
+                return;
+            }
+
+            // Hide the modal only if there are no errors
+            await JSRuntime.InvokeVoidAsync("hideModal", "groupOrderModal");
+
+            // Call the API to start a group order with the specified number of seats
             var response = await Http.PostAsJsonAsync("api/tickets/orders/start-group", new { presentationId = PresentationId, numberOfSeats });
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<GroupOrderResponse>();
-                orderToken = result.OrderToken;
-                orderStarted = true;
-                message = "Group order started.";
-                Console.WriteLine($"Group order started successfully. Order Token: {orderToken}");
+                pendingGroupOrder = result;
+                availableOptions = result.AvailableOptions;
+
+                if (availableOptions != null)
+                {
+                    if (availableOptions.Count > 1)
+                    {
+                        // Show the options modal for multiple options
+                        selectedOption = availableOptions.Keys.First();
+                        await JSRuntime.InvokeVoidAsync("showModal", "seatingOptionsModal");
+                    }
+                    else if (availableOptions.Count == 1)
+                    {
+                        // Handle single option case
+                        var option = availableOptions.First();
+                        selectedOption = option.Key;
+
+                        if (option.Key != "consecutive")
+                        {
+                            // Show confirmation modal for split or smaller consecutive
+                            singleOptionMessage = option.Key == "split" 
+                                ? "The only available option is to split your group. Would you like to proceed with split seating?"
+                                : $"We can offer {numberOfSeats - 1} consecutive seats. Would you like to proceed with fewer seats?";
+                            
+                            await JSRuntime.InvokeVoidAsync("showModal", "singleOptionConfirmModal");
+                        }
+                        else
+                        {
+                            // Automatically confirm consecutive seating
+                            await SelectSeatingOption(option.Key);
+                        }
+                    }
+                }
             }
             else
             {
@@ -171,21 +356,31 @@ else
     {
         try
         {
+            // Store the IDs of seats that were previously selected
+            var selectedSeatIds = selectedSeats.Select(s => s.Id).ToList();
+            
+            // Fetch updated seat information
             presentation = await Http.GetFromJsonAsync<Presentation>($"api/presentations/{PresentationId}/seats");
+            
             if (presentation == null || presentation.Rows.Count == 0)
             {
                 message = "No seats available for this presentation.";
+                return;
             }
-            else
+            
+            // Clear and rebuild the selectedSeats list with the updated seat objects
+            selectedSeats.Clear();
+            
+            // For each previously selected seat ID, find the seat in the refreshed data
+            foreach (var seatId in selectedSeatIds)
             {
-                // Check if previously selected seats are still available
-                foreach (var row in presentation.Rows)
+                var updatedSeat = presentation.Rows
+                    .SelectMany(r => r.Seats)
+                    .FirstOrDefault(s => s.Id == seatId);
+                
+                if (updatedSeat != null)
                 {
-                    foreach (var seat in row.Seats)
-                    {
-                        // If the seat is in the selectedSeats list, mark it as selected
-                        seat.IsSelected = selectedSeats.Any(s => s.Id == seat.Id);
-                    }
+                    selectedSeats.Add(updatedSeat);
                 }
             }
         }
@@ -205,6 +400,14 @@ else
 
         if (isSelected)
         {
+            // Check if this is the last selected seat
+            if (selectedSeats.Count == 1)
+            {
+                message = "Warning: At least one seat must be selected.";
+                Console.WriteLine("Attempted to deselect the last seat - operation prevented");
+                return;
+            }
+
             // If the seat is already selected, remove it from the list
             selectedSeats.Remove(existingSeat);
             Console.WriteLine($"Seat {seat.SeatNumber} unselected.");
@@ -282,6 +485,115 @@ else
         {
             var errorMessage = await confirmationResponse.Content.ReadAsStringAsync();
             message = $"Failed to confirm tickets: {errorMessage}";
+        }
+    }
+
+    private async Task ConfirmSeatingOption()
+    {
+        if (selectedOption != null)
+        {
+            await JSRuntime.InvokeVoidAsync("hideModal", "seatingOptionsModal");
+            await SelectSeatingOption(selectedOption);
+        }
+    }
+
+    private async Task ConfirmSingleOption()
+    {
+        if (selectedOption != null)
+        {
+            await JSRuntime.InvokeVoidAsync("hideModal", "singleOptionConfirmModal");
+            await SelectSeatingOption(selectedOption);
+        }
+    }
+
+    private async Task SelectSeatingOption(string option)
+    {
+        try
+        {
+            if (pendingGroupOrder?.OrderToken == null)
+            {
+                message = "No pending group order found.";
+                return;
+            }
+
+            var request = new { OrderToken = pendingGroupOrder.OrderToken };
+            var response = await Http.PostAsJsonAsync($"api/tickets/orders/select-option/{option}", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<OrderResponse>();
+                orderToken = result.OrderToken;
+                orderStarted = true;
+
+                // Now we can add the selected seats
+                if (result.SeatIds != null && result.SeatIds.Any())
+                {
+                    var selectedSeatsFromResponse = presentation.Rows
+                        .SelectMany(r => r.Seats)
+                        .Where(s => result.SeatIds.Contains(s.Id))
+                        .ToList();
+
+                    selectedSeats.Clear();
+                    selectedSeats.AddRange(selectedSeatsFromResponse);
+                    message = $"Group order started with {selectedSeats.Count} seats selected.";
+                }
+
+                // Load all seats to refresh the UI
+                await LoadSeats();
+            }
+            else
+            {
+                var errorMessage = await response.Content.ReadAsStringAsync();
+                message = $"Failed to select seating option: {errorMessage}";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error selecting seating option: {ex.Message}";
+            Console.WriteLine(message);
+        }
+    }
+
+    private async Task CancelOrder()
+    {
+        try
+        {
+            string? tokenToCancel = orderToken ?? pendingGroupOrder?.OrderToken;
+            if (tokenToCancel != null)
+            {
+                // Hide any open modals first
+                await JSRuntime.InvokeVoidAsync("hideModal", "seatingOptionsModal");
+                await JSRuntime.InvokeVoidAsync("hideModal", "singleOptionConfirmModal");
+                await JSRuntime.InvokeVoidAsync("hideModal", "groupOrderModal");
+
+                // Call the API to cancel the order
+                var response = await Http.PostAsync($"api/tickets/orders/{tokenToCancel}/cancel", null);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    // Clear local state
+                    orderToken = null;
+                    pendingGroupOrder = null;
+                    selectedSeats.Clear();
+                    orderStarted = false;
+                    availableOptions = null;
+                    selectedOption = null;
+                    message = "Order cancelled successfully.";
+
+                    // Refresh the seats to show updated availability
+                    await LoadSeats();
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    message = $"Failed to cancel order: {error}";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error cancelling order: {ex.Message}";
+            Console.WriteLine($"Error cancelling order: {ex}");
         }
     }
 } 

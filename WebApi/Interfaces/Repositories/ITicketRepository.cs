@@ -19,5 +19,7 @@ namespace WebApi.Interfaces.Repositories
         Task<List<SeatLock>> GetLocksByOrderAndSeat(Guid orderToken, int seatId);
         Task<Presentation?> GetPresentationById(int presentationId);
         Task UpdateSeatAvailability(List<int> seatIds, bool isAvailable);
+        Task CancelOrder(Guid orderToken);
+        Task<List<SeatLock>> GetSeatLocksByOrderToken(Guid orderToken);
     }
 } 

@@ -159,7 +159,8 @@ namespace WebApi.Services
                     CreatedAt = DateTime.UtcNow,
                     ExpiresAt = DateTime.UtcNow.AddMinutes(10),
                     Status = OrderStatus.Pending,
-                    AvailableOptions = options
+                    AvailableOptions = options,
+                    RequestedSeats = request.NumberOfSeats // Store the original requested number of seats
                 };
 
                 if (!await _repository.SaveOrder(order))
@@ -200,24 +201,44 @@ namespace WebApi.Services
                     throw new ArgumentException("Invalid seating option");
                 }
 
-                // Verify seats are still available
+                // For smaller_consecutive option, we expect fewer seats than originally requested
+                if (option == "smaller_consecutive")
+                {
+                    // This option is valid as long as it provides the advertised number of seats
+                    if (seatingOption.SeatIds.Count != order.RequestedSeats - 1)
+                    {
+                        throw new ArgumentException($"Selected option provides {seatingOption.SeatIds.Count} seats, but expected {order.RequestedSeats - 1} seats");
+                    }
+                }
+                else
+                {
+                    // For all other options, verify we get the full number of requested seats
+                    if (seatingOption.SeatIds.Count != order.RequestedSeats)
+                    {
+                        throw new ArgumentException($"Selected option provides {seatingOption.SeatIds.Count} seats, but {order.RequestedSeats} were requested");
+                    }
+                }
+
+                // Get all currently locked seats for this order
+                var existingLocks = await _repository.GetSeatLocksByOrderToken(order.OrderToken);
+                
+                // Find seats that were locked but not selected in the chosen option
+                var seatsToUnlock = existingLocks
+                    .Where(l => !seatingOption.SeatIds.Contains(l.SeatId))
+                    .ToList();
+
+                // Remove locks for unselected seats
+                if (seatsToUnlock.Any())
+                {
+                    await _repository.RemoveSeatLocks(seatsToUnlock);
+                    // Make unselected seats available again
+                    await _repository.UpdateSeatAvailability(seatsToUnlock.Select(l => l.SeatId).ToList(), true);
+                }
+
+                // Verify seats are still available (excluding our own remaining locks)
                 if (!await _repository.AreSeatAvailable(order.PresentationId, seatingOption.SeatIds, order.OrderToken))
                 {
                     throw new SeatNotAvailableException("Selected seats are no longer available");
-                }
-
-                // Lock the seats
-                var seatLocks = seatingOption.SeatIds.Select(seatId => new SeatLock
-                {
-                    SeatId = seatId,
-                    OrderToken = order.OrderToken,
-                    CreatedAt = DateTime.UtcNow,
-                    ExpiresAt = DateTime.UtcNow.AddMinutes(10)
-                }).ToList();
-
-                if (!await _repository.AddSeatLocks(seatLocks))
-                {
-                    throw new SeatNotAvailableException("Failed to lock selected seats");
                 }
 
                 // Update order with selected seats
@@ -232,7 +253,7 @@ namespace WebApi.Services
                     throw new Exception("Failed to save order");
                 }
 
-                // After successfully locking the seats, update their availability
+                // After successfully updating the order, update seat availability for selected seats
                 await _repository.UpdateSeatAvailability(seatingOption.SeatIds, false);
 
                 return new OrderResponse(order.OrderToken, seatingOption.SeatIds);
@@ -252,12 +273,16 @@ namespace WebApi.Services
                 throw new OrderNotFoundException("Order not found or expired");
             }
 
-            if (!await _repository.AreSeatAvailable(order.PresentationId, 
-                order.Items.Select(i => i.SeatId).ToList(), order.OrderToken))
+            // Get the seat IDs from the order items
+            var seatIds = order.Items.Select(i => i.SeatId).ToList();
+
+            // Verify seats are still available (excluding our own locks)
+            if (!await _repository.AreSeatAvailable(order.PresentationId, seatIds, orderToken))
             {
                 throw new SeatNotAvailableException("Some selected seats are no longer available");
             }
 
+            // Create tickets for the order
             var tickets = order.Items.Select(item => new Ticket
             {
                 PresentationId = order.PresentationId,
@@ -272,9 +297,11 @@ namespace WebApi.Services
                 Seat = item.Seat
             }).ToList();
 
+            // Update order status
             order.Status = OrderStatus.Confirmed;
             await _repository.SaveOrder(order);
 
+            // Create the tickets
             var createdTickets = await _repository.CreateTickets(tickets);
             
             return createdTickets.Select(t => new TicketResponse(
@@ -330,12 +357,14 @@ namespace WebApi.Services
                 }
 
                 // Add new seats to order
-                var newItems = request.SeatIds.Select(seatId => new TicketOrderItem
+                foreach (var seatId in request.SeatIds)
                 {
-                    SeatId = seatId,
-                    CreatedAt = DateTime.UtcNow
-                });
-                order.Items.AddRange(newItems);
+                    order.Items.Add(new TicketOrderItem
+                    {
+                        SeatId = seatId,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
 
                 if (!await _repository.SaveOrder(order))
                 {
@@ -480,6 +509,24 @@ namespace WebApi.Services
                     $"{g.Count()} seat{(g.Count() > 1 ? "s" : "")} in row {g.Key}"
                 ))
                 .ToList();
+        }
+
+        /// <summary>
+        /// Cancels a pending order and releases any locked seats
+        /// </summary>
+        /// <param name="orderToken">The unique identifier for the order</param>
+        /// <exception cref="OrderNotFoundException">Thrown when the order is not found</exception>
+        public async Task CancelOrder(Guid orderToken)
+        {
+            try
+            {
+                await _repository.CancelOrder(orderToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error cancelling order {OrderToken}", orderToken);
+                throw;
+            }
         }
     }
 } 

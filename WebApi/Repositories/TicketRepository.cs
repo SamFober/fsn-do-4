@@ -7,6 +7,7 @@ using WebApi.Data;
 using WebApi.Interfaces.Repositories;
 using WebApi.Models;
 using Microsoft.Extensions.Logging;
+using WebApi.Exceptions;
 
 namespace WebApi.Repositories
 {
@@ -292,6 +293,13 @@ namespace WebApi.Repositories
                 .ToListAsync();
         }
 
+        public async Task<List<SeatLock>> GetLocksByOrder(Guid orderToken)
+        {
+            return await _context.SeatLocks
+                .Where(l => l.OrderToken == orderToken)
+                .ToListAsync();
+        }
+
         public async Task<Presentation?> GetPresentationById(int id)
         {
             return await _context.Presentations
@@ -308,6 +316,42 @@ namespace WebApi.Repositories
                 seat.IsAvailable = isAvailable; // Update the seat availability
             }
             await _context.SaveChangesAsync(); // Save changes to the database
+        }
+
+        public async Task CancelOrder(Guid orderToken)
+        {
+            var order = await GetOrderByToken(orderToken);
+            if (order == null)
+            {
+                throw new OrderNotFoundException($"Order with token {orderToken} not found");
+            }
+
+            // Get all seat IDs that need to be made available again
+            var seatIds = new HashSet<int>();
+            
+            // Add seats from order items
+            seatIds.UnionWith(order.Items.Select(i => i.SeatId));
+            
+            // Add seats from all available options
+            seatIds.UnionWith(order.AvailableOptions.Values.SelectMany(o => o.SeatIds));
+
+            // Get and remove all seat locks for this order
+            var seatLocks = await GetLocksByOrder(orderToken);
+            await RemoveSeatLocks(seatLocks);
+
+            // Update order status to cancelled
+            order.Status = OrderStatus.Cancelled;
+            await SaveOrder(order);
+
+            // Make seats available again
+            await UpdateSeatAvailability(seatIds.ToList(), true);
+        }
+
+        public async Task<List<SeatLock>> GetSeatLocksByOrderToken(Guid orderToken)
+        {
+            return await _context.SeatLocks
+                .Where(l => l.OrderToken == orderToken)
+                .ToListAsync();
         }
     }
 } 

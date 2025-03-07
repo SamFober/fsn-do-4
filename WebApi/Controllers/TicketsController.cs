@@ -69,6 +69,13 @@ namespace WebApi.Controllers
 
                 await _context.SaveChangesAsync();
 
+                // Reset all seats to available first
+                foreach (var seat in presentation.Hall.Seats)
+                {
+                    seat.IsAvailable = true;
+                }
+                await _context.SaveChangesAsync();
+
                 // Get all seats in the hall
                 var allSeats = presentation.Hall.Seats
                     .OrderBy(s => s.RowNumber)
@@ -89,6 +96,13 @@ namespace WebApi.Controllers
                 ).Concat(
                     row5.Where(s => !seatsToLeaveEmpty.Contains(s.SeatNumber)) // Add row 5 seats that should be booked
                 ).ToList();
+
+                // Set IsAvailable = false for all seats that will be booked
+                foreach (var seat in seatsToBook)
+                {
+                    seat.IsAvailable = false;
+                }
+                await _context.SaveChangesAsync();
 
                 var tickets = seatsToBook.Select(seat => new Ticket
                 {
@@ -277,11 +291,13 @@ namespace WebApi.Controllers
                     return BadRequest("No seats available");
                 }
 
-                // Lock the seats for the group order
-                var seatIds = response.Seats?.Select(s => s.Id).ToList() ?? new List<int>();
-                var orderToken = response.OrderToken; // Assuming you have an order token in the response
-                var success = await TryLockSeats(seatIds, orderToken, request.PresentationId);
+                // Lock all potential seats across all options
+                var allPotentialSeatIds = response.AvailableOptions.Values
+                    .SelectMany(o => o.SeatIds)
+                    .Distinct()
+                    .ToList();
 
+                var success = await TryLockSeats(allPotentialSeatIds, response.OrderToken, request.PresentationId);
                 if (!success)
                 {
                     return BadRequest("Failed to lock seats");
@@ -317,11 +333,50 @@ namespace WebApi.Controllers
         {
             try
             {
+                // Get the order to find all locked seats
+                var order = await _context.TicketOrders
+                    .FirstOrDefaultAsync(o => o.OrderToken == request.OrderToken);
+                
+                if (order == null)
+                {
+                    return NotFound("Order not found or expired");
+                }
+
+                // Get all currently locked seats for this order
+                var lockedSeats = await _context.SeatLocks
+                    .Where(l => l.OrderToken == request.OrderToken)
+                    .ToListAsync();
+
                 var response = await _ticketService.SelectGroupSeatingOption(option, request);
                 if (response == null)
                 {
                     return NotFound("Order not found or expired");
                 }
+
+                // Find seats that were locked but not selected in the chosen option
+                var seatsToUnlock = lockedSeats
+                    .Where(l => !response.SeatIds.Contains(l.SeatId))
+                    .ToList();
+
+                if (seatsToUnlock.Any())
+                {
+                    // Remove locks for unselected seats
+                    _context.SeatLocks.RemoveRange(seatsToUnlock);
+                    await _context.SaveChangesAsync();
+
+                    // Make unselected seats available again
+                    var seatIdsToMakeAvailable = seatsToUnlock.Select(l => l.SeatId).ToList();
+                    var seatsToMakeAvailable = await _context.Seats
+                        .Where(s => seatIdsToMakeAvailable.Contains(s.Id))
+                        .ToListAsync();
+
+                    foreach (var seat in seatsToMakeAvailable)
+                    {
+                        seat.IsAvailable = true;
+                    }
+                    await _context.SaveChangesAsync();
+                }
+
                 return Ok(response);
             }
             catch (OrderNotFoundException)
@@ -367,6 +422,34 @@ namespace WebApi.Controllers
             catch (ArgumentException ex)
             {
                 return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Cancels a pending order and releases any locked seats
+        /// </summary>
+        /// <param name="orderToken">The unique identifier for the order</param>
+        /// <returns>Success message if the order was cancelled</returns>
+        /// <response code="200">Order successfully cancelled</response>
+        /// <response code="404">If the order is not found or already expired</response>
+        [HttpPost("orders/{orderToken}/cancel")]
+        [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<string>> CancelOrder(Guid orderToken)
+        {
+            try
+            {
+                await _ticketService.CancelOrder(orderToken);
+                return Ok("Order cancelled successfully");
+            }
+            catch (OrderNotFoundException)
+            {
+                return NotFound("Order not found or expired");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error cancelling order");
+                return StatusCode(500, "An error occurred while cancelling the order");
             }
         }
 
