@@ -1,56 +1,92 @@
 @page "/seat-selector/{presentationId:int}"
 
-@using FrontEnd.Models // Ensure this matches the namespace of your Seat class
+@using FrontEnd.Models
+@using FrontEnd.Models.Responses
+@using Microsoft.JSInterop
 
 @inject HttpClient Http
+@inject IJSRuntime JSRuntime
 
-<h3>Seat Selector for @presentation.Movie.Title in @presentation.Hall.Name</h3>
-
-@if (presentation == null)
-{
-    <p><em>Loading...</em></p>
-}
-else if (presentation.Hall.Seats.Count == 0)
-{
-    <p>No seats available for this presentation.</p>
-}
-else
-{
-    <div>
-        @foreach (var seat in presentation.Hall.Seats)
-        {
-            <div>
-                <span>Row: @seat.RowNumber, Seat: @seat.SeatNumber</span>
-                <button @onclick="() => SelectSeat(seat)" disabled="!seat.IsAvailable">Select</button>
-            </div>
-        }
-    </div>
-}
-
-<button @onclick="StartOrder">Start Order</button>
-<button @onclick="StartGroupOrder">Start Group Order</button>
-
+<h3>Seat Selector for @(presentation?.Title ?? "Unknown Movie") in @(presentation?.HallName ?? "Unknown Hall")</h3>
 @if (message != null)
 {
     <p>@message</p>
+}
+@if (!orderStarted)
+{
+    <button @onclick="StartOrder">Start Single Order</button>
+    <button @onclick="StartGroupOrder">Start Group Order</button>
+}
+else
+{
+    @if (presentation == null)
+    {
+        <div>
+            <h4>Loading all seats...</h4>
+        </div>
+    }
+    else
+    {
+        @if (presentation.Rows.Count > 0)
+        {
+            <div>
+                @foreach (var row in presentation.Rows)
+                {
+                    <h4>Row: @row.RowNumber</h4>
+                    <div>
+                        @foreach (var seat in row.Seats)
+                        {
+                            var isSelected = selectedSeats.Any(s => s.Id == seat.Id);
+                            <div>
+                                <span>Seat: @seat.SeatNumber (Available: @seat.IsAvailable)</span>
+                                @if (isSelected)
+                                {
+                                    <button @onclick="() => SelectSeat(seat)" class="btn btn-danger">
+                                        Unselect
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button @onclick="() => SelectSeat(seat)" class="btn btn-primary" disabled="@(!seat.IsAvailable)">
+                                        Select
+                                    </button>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    }
+
+    @if (selectedSeats.Count > 0)
+    {
+        <button @onclick="ConfirmTickets">Confirm Tickets</button>
+    }
 }
 
 @code {
     [Parameter]
     public int PresentationId { get; set; }
 
-    private Presentation? presentation; // Change to Presentation model
+    private Presentation? presentation;
     private string? message;
+    private bool orderStarted = false;
+    private int numberOfSeats = 1;
+    private List<Seat> selectedSeats = new List<Seat>();
+    private string? orderToken;
+    private int? preselectedSeatId;
 
     protected override async Task OnInitializedAsync()
     {
+        // Add JavaScript to handle page unload warning
+        <!-- await JSRuntime.InvokeVoidAsync("addUnloadWarning"); -->
+
         try
         {
-            // Fetch the presentation data using the existing route
-            presentation = await Http.GetFromJsonAsync<Presentation>($"api/presentations/{PresentationId}");
-            
-            // Check if presentation was retrieved successfully
-            if (presentation == null || presentation.Hall.Seats.Count == 0)
+            presentation = await Http.GetFromJsonAsync<Presentation>($"api/presentations/{PresentationId}/seats");
+
+            if (presentation == null || presentation.Rows.Count == 0)
             {
                 message = "No seats available for this presentation.";
             }
@@ -61,58 +97,191 @@ else
         }
     }
 
-    private async Task SelectSeat(Seat seat)
-    {
-        // Call the existing API to handle seat selection
-        var response = await Http.PostAsJsonAsync($"api/tickets/orders/{seat.Id}/select", new { PresentationId });
-
-        if (response.IsSuccessStatusCode)
-        {
-            message = "Seat selected successfully!";
-            // Optionally refresh the seat list or update the UI
-            presentation = await Http.GetFromJsonAsync<Presentation>($"api/presentations/{PresentationId}");
-        }
-        else
-        {
-            // Extract error message from the response
-            var errorMessage = await response.Content.ReadAsStringAsync();
-            message = $"Failed to select seat: {errorMessage}";
-        }
-    }
-
     private async Task StartOrder()
     {
-        // Call the existing API to start a new order
-        var response = await Http.PostAsJsonAsync("api/tickets/orders/start", new { PresentationId });
+        Console.WriteLine("StartOrder called");
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/tickets/orders/start", new { presentationId = PresentationId });
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<OrderResponse>();
+                orderToken = result.OrderToken;
 
-        if (response.IsSuccessStatusCode)
-        {
-            message = "Order started successfully!";
-            // Handle further logic, e.g., navigate to order details
+                if (result.PreselectedSeatId.HasValue)
+                {
+                    var preselectedSeat = presentation.Rows.SelectMany(r => r.Seats).FirstOrDefault(s => s.Id == result.PreselectedSeatId.Value);
+                    if (preselectedSeat != null)
+                    {
+                        selectedSeats.Add(preselectedSeat);
+                        Console.WriteLine($"Preselected seat added: {preselectedSeat.SeatNumber}");
+                    }
+                }
+
+                orderStarted = true;
+                message = "Single order started.";
+                Console.WriteLine($"Single order started successfully. Order Token: {orderToken}");
+
+                // Load all seats immediately after starting the order
+                await LoadSeats();
+            }
+            else
+            {
+                var errorMessage = await response.Content.ReadAsStringAsync();
+                message = $"Failed to start single order: {errorMessage}";
+                Console.WriteLine(message);
+            }
         }
-        else
+        catch (Exception ex)
         {
-            // Extract error message from the response
-            var errorMessage = await response.Content.ReadAsStringAsync();
-            message = $"Failed to start order: {errorMessage}";
+            message = $"Error starting single order: {ex.Message}";
+            Console.WriteLine(message);
         }
     }
 
     private async Task StartGroupOrder()
     {
-        // Call the existing API to start a new group order
-        var response = await Http.PostAsJsonAsync("api/tickets/orders/start-group", new { PresentationId, NumberOfSeats = 5 }); // Example number of seats
-
-        if (response.IsSuccessStatusCode)
+        Console.WriteLine("StartGroupOrder called");
+        try
         {
-            message = "Group order started successfully!";
-            // Handle further logic, e.g., navigate to group order details
+            var response = await Http.PostAsJsonAsync("api/tickets/orders/start-group", new { presentationId = PresentationId, numberOfSeats });
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<GroupOrderResponse>();
+                orderToken = result.OrderToken;
+                orderStarted = true;
+                message = "Group order started.";
+                Console.WriteLine($"Group order started successfully. Order Token: {orderToken}");
+            }
+            else
+            {
+                var errorMessage = await response.Content.ReadAsStringAsync();
+                message = $"Failed to start group order: {errorMessage}";
+                Console.WriteLine(message);
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error starting group order: {ex.Message}";
+            Console.WriteLine(message);
+        }
+    }
+
+    private async Task LoadSeats()
+    {
+        try
+        {
+            presentation = await Http.GetFromJsonAsync<Presentation>($"api/presentations/{PresentationId}/seats");
+            if (presentation == null || presentation.Rows.Count == 0)
+            {
+                message = "No seats available for this presentation.";
+            }
+            else
+            {
+                // Check if previously selected seats are still available
+                foreach (var row in presentation.Rows)
+                {
+                    foreach (var seat in row.Seats)
+                    {
+                        // If the seat is in the selectedSeats list, mark it as selected
+                        seat.IsSelected = selectedSeats.Any(s => s.Id == seat.Id);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error fetching seats: {ex.Message}";
+        }
+    }
+
+    private async Task SelectSeat(Seat seat)
+    {
+        Console.WriteLine($"SelectSeat called for seat {seat.SeatNumber}");
+
+        // Check if the seat is already in our selectedSeats list
+        var existingSeat = selectedSeats.FirstOrDefault(s => s.Id == seat.Id);
+        bool isSelected = existingSeat != null;
+
+        if (isSelected)
+        {
+            // If the seat is already selected, remove it from the list
+            selectedSeats.Remove(existingSeat);
+            Console.WriteLine($"Seat {seat.SeatNumber} unselected.");
+
+            // Call the DELETE API to remove the seat from the order
+            if (!string.IsNullOrEmpty(orderToken))
+            {
+                var response = await Http.DeleteAsync($"api/tickets/orders/{orderToken}/seats/{seat.Id}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    message = $"Seat {seat.SeatNumber} removed from the order.";
+                    Console.WriteLine(message);
+                }
+                else
+                {
+                    var errorMessage = await response.Content.ReadAsStringAsync();
+                    message = $"Failed to remove seat {seat.SeatNumber} from the order: {errorMessage}";
+                    Console.WriteLine(message);
+                }
+            }
         }
         else
         {
-            // Extract error message from the response
-            var errorMessage = await response.Content.ReadAsStringAsync();
-            message = $"Failed to start group order: {errorMessage}";
+            // If the seat is not selected and is available, add it
+            if (seat.IsAvailable)
+            {
+                // Add the seat to our selected list
+                selectedSeats.Add(seat);
+                Console.WriteLine($"Seat {seat.SeatNumber} selected.");
+
+                // Call the API to add the seat to the order
+                if (!string.IsNullOrEmpty(orderToken))
+                {
+                    var response = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/seats", new { seatIds = new List<int> { seat.Id } });
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var result = await response.Content.ReadFromJsonAsync<OrderResponse>();
+                        orderToken = result.OrderToken; // Store the order token for confirmation
+                        message = "Seat selected successfully!";
+                        Console.WriteLine("Seat selected successfully.");
+                    }
+                    else
+                    {
+                        var errorMessage = await response.Content.ReadAsStringAsync();
+                        message = $"Failed to select seat: {errorMessage}";
+                        Console.WriteLine(message);
+                    }
+                }
+            }
+            else
+            {
+                message = "This seat is not available for selection.";
+                Console.WriteLine(message);
+            }
+        }
+
+        // Refetch the seats to get the latest availability
+        await LoadSeats();
+
+        // Update the UI
+        StateHasChanged();
+    }
+
+    private async Task ConfirmTickets()
+    {
+        var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { customerName = "NamHere", customerEmail = "validEmailHere" });
+
+        if (confirmationResponse.IsSuccessStatusCode)
+        {
+            message = "Tickets confirmed successfully!";
+        }
+        else
+        {
+            var errorMessage = await confirmationResponse.Content.ReadAsStringAsync();
+            message = $"Failed to confirm tickets: {errorMessage}";
         }
     }
 } 

@@ -12,13 +12,12 @@ namespace FrontEnd.Models
         }
 
         public int Id { get; set; }
-        public int HallId { get; set; }
         public int RowNumber { get; set; }
         public int SeatNumber { get; set; }
         public bool IsAvailable { get; set; }
+        public bool IsSelected { get; set; }
         public DateTime CreatedAt { get; set; }
 
-        public required Hall Hall { get; set; }
-        public ICollection<Ticket> Tickets { get; set; }
+        public ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
     }
 } 

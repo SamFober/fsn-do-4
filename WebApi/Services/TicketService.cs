@@ -17,13 +17,16 @@ namespace WebApi.Services
     {
         private readonly ITicketRepository _repository;
         private readonly ILogger<TicketService> _logger;
+        private readonly ApplicationDbContext _context;
 
         public TicketService(
             ITicketRepository repository,
-            ILogger<TicketService> logger)
+            ILogger<TicketService> logger,
+            ApplicationDbContext context)
         {
             _repository = repository;
             _logger = logger;
+            _context = context;
         }
 
         public async Task<OrderResponse> StartOrder(StartOrderRequest request)
@@ -73,6 +76,9 @@ namespace WebApi.Services
                 {
                     throw new Exception("Failed to save order");
                 }
+
+                // After successfully locking the seats, update their availability
+                await _repository.UpdateSeatAvailability(new List<int> { selectedSeat.Id }, false);
 
                 return new OrderResponse(order.OrderToken, new List<int> { selectedSeat.Id });
             }
@@ -161,6 +167,9 @@ namespace WebApi.Services
                     throw new Exception("Failed to save order");
                 }
 
+                // After successfully locking the seats, update their availability
+                await _repository.UpdateSeatAvailability(options.Values.SelectMany(o => o.SeatIds).ToList(), false);
+
                 return new GroupOrderResponse
                 {
                     OrderToken = orderToken,
@@ -222,6 +231,9 @@ namespace WebApi.Services
                 {
                     throw new Exception("Failed to save order");
                 }
+
+                // After successfully locking the seats, update their availability
+                await _repository.UpdateSeatAvailability(seatingOption.SeatIds, false);
 
                 return new OrderResponse(order.OrderToken, seatingOption.SeatIds);
             }
@@ -330,6 +342,9 @@ namespace WebApi.Services
                     throw new Exception("Failed to save order");
                 }
 
+                // After successfully locking the seats, update their availability
+                await _repository.UpdateSeatAvailability(request.SeatIds, false);
+
                 return new OrderResponse(order.OrderToken, order.Items.Select(i => i.SeatId).ToList());
             }
             catch (Exception ex)
@@ -367,6 +382,9 @@ namespace WebApi.Services
                 {
                     throw new Exception("Failed to save order");
                 }
+
+                // After successfully removing the seat, update its availability
+                await _repository.UpdateSeatAvailability(new List<int> { seatId }, true);
 
                 return new OrderResponse(order.OrderToken, order.Items.Select(i => i.SeatId).ToList());
             }
@@ -447,117 +465,6 @@ namespace WebApi.Services
             }
             
             return new List<Seat>();
-        }
-
-        private List<List<Seat>> FindBestSplitOptions(List<Seat> availableSeats, int numberOfSeats)
-        {
-            var options = new List<List<Seat>>();
-            var seatsByRow = availableSeats
-                .GroupBy(s => s.RowNumber)
-                .ToDictionary(g => g.Key, g => g.OrderBy(s => s.SeatNumber).ToList());
-
-            // Try to minimize splits
-            for (int splitCount = 2; splitCount <= Math.Min(numberOfSeats, 4); splitCount++)
-            {
-                var splitOption = TryFindSplitOption(seatsByRow, numberOfSeats, splitCount);
-                if (splitOption.Any())
-                {
-                    options.Add(splitOption);
-                }
-            }
-
-            return options;
-        }
-
-        private List<Seat> TryFindSplitOption(Dictionary<int, List<Seat>> seatsByRow, int totalSeats, int splits)
-        {
-            var seatsPerGroup = totalSeats / splits;
-            var remainder = totalSeats % splits;
-            var result = new List<Seat>();
-
-            foreach (var row in seatsByRow.OrderBy(r => r.Key))
-            {
-                var availableInRow = row.Value.Count;
-                if (availableInRow >= seatsPerGroup)
-                {
-                    result.AddRange(row.Value.Take(seatsPerGroup + (remainder > 0 ? 1 : 0)));
-                    if (remainder > 0) remainder--;
-                    
-                    if (result.Count == totalSeats)
-                        return result;
-                }
-            }
-
-            return new List<Seat>();
-        }
-
-        private Dictionary<string, SeatingOption> CreateSeatingOptions(List<List<Seat>> options, Guid orderToken)
-        {
-            var result = new Dictionary<string, SeatingOption>();
-            for (int i = 0; i < options.Count; i++)
-            {
-                var option = options[i];
-                var arrangement = option
-                    .GroupBy(s => s.RowNumber)
-                    .Select(g => new RowGroup(
-                        g.Key,
-                        g.Select(s => s.Id).ToList(),
-                        $"{g.Count()} seats in row {g.Key}"
-                    ))
-                    .ToList();
-
-                result.Add($"option_{i + 1}", new SeatingOption(
-                    $"Split seating option {i + 1}",
-                    option.Select(s => s.Id).ToList(),
-                    DateTime.UtcNow.AddMinutes(10),
-                    arrangement
-                ));
-            }
-            return result;
-        }
-
-        private async Task<bool> TryLockSeats(List<int> seatIds, Guid orderToken, int presentationId)
-        {
-            // First check if seats are available
-            if (!await _repository.AreSeatAvailable(presentationId, seatIds, orderToken))
-            {
-                return false;
-            }
-
-            // Create locks for the seats
-            var seatLocks = seatIds.Select(seatId => new SeatLock
-            {
-                SeatId = seatId,
-                OrderToken = orderToken,
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(10)
-            }).ToList();
-
-            return await _repository.AddSeatLocks(seatLocks);
-        }
-
-        private async Task<TicketOrder> CreateOrder(int presentationId, List<int> seatIds, Guid orderToken)
-        {
-            var order = new TicketOrder
-            {
-                OrderToken = orderToken,
-                PresentationId = presentationId,
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(10),
-                Status = OrderStatus.Pending,
-                Items = seatIds.Select(seatId => new TicketOrderItem
-                {
-                    SeatId = seatId,
-                    CreatedAt = DateTime.UtcNow
-                }).ToList()
-            };
-
-            if (!await _repository.SaveOrder(order))
-            {
-                throw new Exception("Failed to save order");
-            }
-
-            return order;
         }
 
         private async Task<List<RowGroup>> GetSplitArrangement(List<int> seatIds)

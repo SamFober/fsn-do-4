@@ -300,6 +300,14 @@ namespace WebApi.Repositories
                 .FirstOrDefaultAsync(p => p.Id == id);
         }
 
-        // Implement other methods...
+        public async Task UpdateSeatAvailability(List<int> seatIds, bool isAvailable)
+        {
+            var seats = await _context.Seats.Where(s => seatIds.Contains(s.Id)).ToListAsync();
+            foreach (var seat in seats)
+            {
+                seat.IsAvailable = isAvailable; // Update the seat availability
+            }
+            await _context.SaveChangesAsync(); // Save changes to the database
+        }
     }
 } 

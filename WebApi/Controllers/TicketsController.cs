@@ -197,16 +197,37 @@ namespace WebApi.Controllers
         [HttpDelete("orders/{orderToken}/seats/{seatId}")]
         [ProducesResponseType(typeof(OrderResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<OrderResponse>> RemoveSeatFromOrder(Guid orderToken, int seatId)
+        public async Task<ActionResult<OrderResponse>> RemoveSeatFromOrder(string orderToken, int seatId)
         {
+            Guid orderTokenGuid;
+            if (!Guid.TryParse(orderToken, out orderTokenGuid))
+            {
+                return BadRequest("Invalid order token format.");
+            }
+
+            var response = new OrderResponse(); // Create a new response object
             try
             {
-                var response = await _ticketService.RemoveSeatFromOrder(orderToken, seatId);
-                if (response == null)
+                var seat = await _context.Seats.FindAsync(seatId);
+                if (seat != null)
                 {
-                    return NotFound("Order not found");
+                    // Logic to remove the seat from the order
+                    var orderResponse = await _ticketService.RemoveSeatFromOrder(orderTokenGuid, seatId); // Use the Guid
+
+                    if (orderResponse.IsSuccess)
+                    {
+                        // Remove the seat from the seat lock
+                        var seatLock = await _context.SeatLocks
+                            .FirstOrDefaultAsync(sl => sl.SeatId == seat.Id && sl.OrderToken == orderTokenGuid);
+                        if (seatLock != null)
+                        {
+                            _context.SeatLocks.Remove(seatLock);
+                            await _context.SaveChangesAsync(); // Save changes to the database
+                        }
+                        string message = $"Seat {seat.SeatNumber} removed from the order and seat lock.";
+                        return Ok(new { message }); // Return the message in the response
+                    }
                 }
-                return Ok(response);
             }
             catch (OrderNotFoundException)
             {
@@ -216,6 +237,7 @@ namespace WebApi.Controllers
             {
                 return BadRequest(ex.Message);
             }
+            return BadRequest("Failed to remove seat.");
         }
 
         /// <summary>
@@ -372,6 +394,18 @@ namespace WebApi.Controllers
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Now update the seat availability
+                foreach (var seatId in seatIds)
+                {
+                    var seat = await _context.Seats.FindAsync(seatId);
+                    if (seat != null)
+                    {
+                        seat.IsAvailable = false; // Set the seat availability to false
+                        await _context.SaveChangesAsync(); // Save changes to the database
+                    }
+                }
+
                 return true;
             }
             catch (Exception ex)

@@ -40,21 +40,28 @@ namespace WebApi.Controllers
             var presentation = await _context.Presentations
                 .Include(p => p.Movie)
                 .Include(p => p.Hall)
-                    .ThenInclude(h => h.Seats)
                 .Include(p => p.Tickets)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
             if (presentation == null)
             {
-                return NotFound();
+                return NotFound("Presentation not found.");
             }
 
+            // Retrieve occupied seat IDs
             var occupiedSeatIds = presentation.Tickets
                 .Where(t => t.Status != TicketStatus.Cancelled)
                 .Select(t => t.SeatId)
                 .ToHashSet();
 
-            var seatAvailability = presentation.Hall.Seats
+            // Retrieve the seats from the database with the latest availability status
+            var seats = await _context.Seats
+                .AsNoTracking() // Ensure fresh data is retrieved
+                .Where(s => s.HallId == presentation.Hall.Id)
+                .ToListAsync();
+
+            // Calculate seat availability
+            var seatAvailability = seats
                 .OrderBy(s => s.RowNumber)
                 .ThenBy(s => s.SeatNumber)
                 .Select(s => new
@@ -62,7 +69,7 @@ namespace WebApi.Controllers
                     s.Id,
                     s.RowNumber,
                     s.SeatNumber,
-                    IsAvailable = !occupiedSeatIds.Contains(s.Id)
+                    IsAvailable = !occupiedSeatIds.Contains(s.Id) && s.IsAvailable // Check both conditions
                 })
                 .GroupBy(s => s.RowNumber)
                 .Select(g => new
@@ -182,29 +189,6 @@ namespace WebApi.Controllers
 
             Console.WriteLine($"Fetched Presentation: {id}, Hall: {presentation.Hall.Name}, Movie: {presentation.Movie.Title}");
             return Ok(response);
-        }
-
-        private async Task<List<Seat>> GetSeatsForPresentation(int presentationId)
-        {
-            // Get the hall associated with the presentation
-            var hall = await _context.Halls
-                .Include(h => h.Seats) // Include seats associated with the hall
-                .FirstOrDefaultAsync(h => h.Id == presentationId); // Adjust this to get the correct hall
-
-            if (hall == null)
-            {
-                return new List<Seat>(); // Return an empty list if the hall is not found
-            }
-
-            // Return the seats directly with availability status
-            return hall.Seats.Select(s => new Seat
-            {
-                Id = s.Id,
-                RowNumber = s.RowNumber,
-                SeatNumber = s.SeatNumber,
-                IsAvailable = s.IsAvailable, // Ensure availability is included
-                Hall = s.Hall // Set the Hall property
-            }).ToList();
         }
     }
 } 

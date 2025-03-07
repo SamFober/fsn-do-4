@@ -11,9 +11,11 @@ namespace WebApi.Models.Responses
         {
             OrderToken = orderToken;
             SeatIds = seatIds;
+            IsSuccess = true;
         }
 
         public virtual Guid OrderToken { get; set; }
         public virtual List<int> SeatIds { get; set; } = new();
+        public bool IsSuccess { get; set; }
     }
 } 
