@@ -16,8 +16,7 @@
 {
     @if (presentation?.Rows.Any(r => r.Seats.Any(s => s.IsAvailable)) == true)
     {
-        <button @onclick="StartOrder" class="btn btn-primary">Start Single Order</button>
-        <button @onclick="ShowGroupOrderModal" class="btn btn-primary">Start Group Order</button>
+        <button @onclick="ShowOrderModal" class="btn btn-primary">Select Seats</button>
     }
     else
     {
@@ -76,12 +75,12 @@ else
     }
 }
 
-<!-- Bootstrap Modal for Group Order -->
-<div class="modal fade" id="groupOrderModal" tabindex="-1" aria-labelledby="groupOrderModalLabel" aria-hidden="true">
+<!-- Rename the modal to be more generic -->
+<div class="modal fade" id="orderModal" tabindex="-1" aria-labelledby="orderModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="groupOrderModalLabel">Start Group Order</h5>
+                <h5 class="modal-title" id="orderModalLabel">Select Number of Seats</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -98,7 +97,7 @@ else
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" @onclick="StartGroupOrder">Start Group Order</button>
+                <button type="button" class="btn btn-primary" @onclick="ProcessOrder">Continue</button>
             </div>
         </div>
     </div>
@@ -200,49 +199,7 @@ else
         }
     }
 
-    private async Task StartOrder()
-    {
-        Console.WriteLine("StartOrder called");
-        try
-        {
-            var response = await Http.PostAsJsonAsync("api/tickets/orders/start", new { presentationId = PresentationId });
-            if (response.IsSuccessStatusCode)
-            {
-                var result = await response.Content.ReadFromJsonAsync<OrderResponse>();
-                orderToken = result.OrderToken;
-
-                if (result.PreselectedSeatId.HasValue)
-                {
-                    var preselectedSeat = presentation.Rows.SelectMany(r => r.Seats).FirstOrDefault(s => s.Id == result.PreselectedSeatId.Value);
-                    if (preselectedSeat != null)
-                    {
-                        selectedSeats.Add(preselectedSeat);
-                        Console.WriteLine($"Preselected seat added: {preselectedSeat.SeatNumber}");
-                    }
-                }
-
-                orderStarted = true;
-                message = "Single order started.";
-                Console.WriteLine($"Single order started successfully. Order Token: {orderToken}");
-
-                // Load all seats immediately after starting the order
-                await LoadSeats();
-            }
-            else
-            {
-                var errorMessage = await response.Content.ReadAsStringAsync();
-                message = $"Failed to start single order: {errorMessage}";
-                Console.WriteLine(message);
-            }
-        }
-        catch (Exception ex)
-        {
-            message = $"Error starting single order: {ex.Message}";
-            Console.WriteLine(message);
-        }
-    }
-
-    private async Task ShowGroupOrderModal()
+    private async Task ShowOrderModal()
     {
         // Clear any previous error message
         groupOrderError = null;
@@ -258,7 +215,102 @@ else
             numberOfSeats = maxAvailableSeats;
         }
 
-        await JSRuntime.InvokeVoidAsync("showModal", "groupOrderModal");
+        // Default to 1 seat if not set
+        if (numberOfSeats < 1)
+        {
+            numberOfSeats = 1;
+        }
+
+        await JSRuntime.InvokeVoidAsync("showModal", "orderModal");
+    }
+
+    private async Task ProcessOrder()
+    {
+        // Check if the user selected a valid number of seats
+        if (numberOfSeats <= 0 || numberOfSeats > maxAvailableSeats)
+        {
+            groupOrderError = $"Please select between 1 and {maxAvailableSeats} seats.";
+            return;
+        }
+
+        // Hide the modal
+        await JSRuntime.InvokeVoidAsync("hideModal", "orderModal");
+
+        // Start single or group order based on the number of seats
+        if (numberOfSeats == 1)
+        {
+            await StartOrder();
+        }
+        else
+        {
+            await StartGroupOrder();
+        }
+    }
+
+    private async Task StartOrder()
+    {
+        Console.WriteLine("StartOrder called");
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/tickets/orders/start", new { presentationId = PresentationId });
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<OrderResponse>();
+                orderToken = result.OrderToken;
+                orderStarted = true;
+                
+                // Handle pre-selected seats from the SeatIds array
+                if (result.SeatIds != null && result.SeatIds.Any())
+                {
+                    var preselectedSeats = presentation.Rows
+                        .SelectMany(r => r.Seats)
+                        .Where(s => result.SeatIds.Contains(s.Id))
+                        .ToList();
+                    
+                    if (preselectedSeats.Any())
+                    {
+                        selectedSeats.Clear();
+                        selectedSeats.AddRange(preselectedSeats);
+                        
+                        if (preselectedSeats.Count == 1)
+                        {
+                            var seat = preselectedSeats.First();
+                            message = $"Order started with pre-selected seat Row {seat.RowNumber}, Seat {seat.SeatNumber}.";
+                        }
+                        else
+                        {
+                            message = $"Order started with {preselectedSeats.Count} pre-selected seats.";
+                        }
+                        
+                        Console.WriteLine($"Preselected seats added: {string.Join(", ", preselectedSeats.Select(s => s.SeatNumber))}");
+                    }
+                    else
+                    {
+                        message = "Order started. Please select your seats.";
+                    }
+                }
+                else 
+                {
+                    message = "Order started. Please select your seats.";
+                }
+                
+                Console.WriteLine($"Order started successfully. Order Token: {orderToken}");
+
+                // Load all seats immediately after starting the order
+                await LoadSeats();
+            }
+            else
+            {
+                var errorMessage = await response.Content.ReadAsStringAsync();
+                message = $"Failed to start order: {errorMessage}";
+                Console.WriteLine(message);
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error starting order: {ex.Message}";
+            Console.WriteLine(message);
+        }
     }
 
     private async Task StartGroupOrder()
@@ -297,7 +349,7 @@ else
             }
 
             // Hide the modal only if there are no errors
-            await JSRuntime.InvokeVoidAsync("hideModal", "groupOrderModal");
+            await JSRuntime.InvokeVoidAsync("hideModal", "orderModal");
 
             // Call the API to start a group order with the specified number of seats
             var response = await Http.PostAsJsonAsync("api/tickets/orders/start-group", new { presentationId = PresentationId, numberOfSeats });
@@ -564,7 +616,7 @@ else
                 // Hide any open modals first
                 await JSRuntime.InvokeVoidAsync("hideModal", "seatingOptionsModal");
                 await JSRuntime.InvokeVoidAsync("hideModal", "singleOptionConfirmModal");
-                await JSRuntime.InvokeVoidAsync("hideModal", "groupOrderModal");
+                await JSRuntime.InvokeVoidAsync("hideModal", "orderModal");
 
                 // Call the API to cancel the order
                 var response = await Http.PostAsync($"api/tickets/orders/{tokenToCancel}/cancel", null);
