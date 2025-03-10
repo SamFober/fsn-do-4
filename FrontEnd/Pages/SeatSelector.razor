@@ -3,41 +3,73 @@
 @using FrontEnd.Models
 @using FrontEnd.Models.Responses
 @using Microsoft.JSInterop
+@using System.Timers
 
+@implements IDisposable
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
 
-<div class="cinema-container">
-    <h3 class="cinema-title">@(presentation?.Title ?? "Unknown Movie") - @(presentation?.HallName ?? "Unknown Hall")</h3>
-    
-    @if (message != null)
-    {
-        <div class="alert @(message.Contains("Error") || message.Contains("Failed") ? "alert-danger" : "alert-info")">
-            @message
+<div class="cinema-container cinema-dark-mode" id="cinemaContainer">
+    <div class="sticky-header-wrapper">
+        <div class="sticky-progress-container">
+            <div class="booking-progress-wrapper">
+                <button @onclick="CancelOrder" class="cancel-button">
+                    <span>← Cancel</span>
+                </button>
+                
+                <div class="booking-progress">
+                    <div class="progress-step @(activeStep == 1 ? "active" : "")">
+                        <div class="step-circle">1</div>
+                        <div class="step-label">Choose Seats</div>
+                    </div>
+                    <div class="progress-connector"></div>
+                    <div class="progress-step @(activeStep == 2 ? "active" : "")">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">Payment</div>
+                    </div>
+                    <div class="progress-connector"></div>
+                    <div class="progress-step @(activeStep == 3 ? "active" : "")">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">Confirmation</div>
+                    </div>
+                </div>
+                
+                @if (orderExpirationTime.HasValue)
+                {
+                    <div class="order-timer @(timeRemaining.TotalMinutes < 2 ? "order-timer-warning" : "")">
+                        <div class="timer-content">
+                            <div class="countdown">@(timeRemaining.Minutes.ToString("D2")):@(timeRemaining.Seconds.ToString("D2"))</div>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="sticky-title-container">
+                <h3 class="cinema-title sticky-title">@(presentation?.Title ?? "Unknown Movie") - @(presentation?.HallName ?? "Unknown Hall")</h3>
+            </div>
         </div>
-    }
+    </div>
     
-    @if (!orderStarted)
-    {
-        @if (presentation?.Rows.Any(r => r.Seats.Any(s => s.IsAvailable)) == true)
+    <div class="content-with-header-space">
+        @if (message != null)
         {
-            <div class="text-center my-4">
-                <button @onclick="ShowOrderModal" class="btn btn-primary btn-lg">Select Seats</button>
+            <div class="cinema-alert @(message.Contains("Error") || message.Contains("Failed") ? "cinema-alert-danger" : "cinema-alert-success") @(isMessageFading ? "fade-out" : "")" @key="message">
+                <div class="cinema-alert-icon">
+                    @if (message.Contains("Error") || message.Contains("Failed"))
+                    {
+                        <span>❌</span>
+                    }
+                    else
+                    {
+                        <span>✓</span>
+                    }
+                </div>
+                <div class="cinema-alert-message">@message</div>
             </div>
         }
-        else
-        {
-            <div class="alert alert-info text-center" role="alert">
-                <h4 class="alert-heading">Sorry, this showing is fully booked!</h4>
-                <p>All seats for this presentation of "@(presentation?.Title)" have been reserved. Please check other showtimes or browse our other exciting movies.</p>
-            </div>
-        }
-    }
-    else
-    {
+        
         @if (presentation == null)
         {
-            <div class="text-center">
+            <div class="text-center loading-container seat-selection-section">
                 <h4>Loading all seats...</h4>
                 <div class="spinner-border" role="status">
                     <span class="visually-hidden">Loading...</span>
@@ -48,7 +80,7 @@
         {
             @if (presentation.Rows.Count > 0)
             {
-                <div class="cinema-layout">
+                <div class="cinema-layout seat-selection-section">
                     <div class="seating-container">
                         <div class="seat-map">
                             @foreach (var row in presentation.Rows.OrderBy(r => r.RowNumber))
@@ -70,8 +102,10 @@
                                 </div>
                             }
                         </div>
-                        <div class="screen">
-                            <div class="screen-text">SCREEN</div>
+                        <div class="screen-container">
+                            <div class="screen">
+                                <div class="screen-text">SCREEN</div>
+                            </div>
                         </div>
                     </div>
                     
@@ -93,73 +127,116 @@
                     @if (selectedSeats.Count > 0)
                     {
                         <div class="order-summary">
-                            <h4>Selected Seats:</h4>
-                            <ul class="seat-list">
-                                @foreach (var seat in selectedSeats.OrderBy(s => s.RowNumber).ThenBy(s => s.SeatNumber))
+                            <div id="ticketTypeSection" class="ticket-type-section">
+                                <h4>Select Ticket Types:</h4>
+                                <p class="ticket-instruction-text">Please select a ticket type for each seat</p>
+                                
+                                @for (int i = 0; i < selectedSeats.Count; i++)
                                 {
-                                    <li>Row @seat.RowNumber, Seat @seat.SeatNumber</li>
+                                    var seat = selectedSeats.OrderBy(s => s.RowNumber).ThenBy(s => s.SeatNumber).ElementAt(i);
+                                    var index = i;
+                                    
+                                    <div class="ticket-type-row">
+                                        <div class="ticket-seat-info">Row @seat.RowNumber, Seat @seat.SeatNumber</div>
+                                        <div class="ticket-type-selector">
+                                            <select class="form-select" value="@(ticketTypes.ContainsKey(seat.Id) ? ticketTypes[seat.Id] : "adult")" 
+                                                   @onchange="@(e => SelectTicketType(seat.Id, e.Value.ToString()))">
+                                                <option value="adult">Adult - €12.50</option>
+                                                <option value="child">Child - €8.50</option>
+                                                <option value="senior">Senior - €10.50</option>
+                                                <option value="student">Student - €9.50</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                 }
-                            </ul>
+                                
+                                <div class="price-summary">
+                                    <div class="price-details">
+                                        @foreach (var ticketGroup in ticketTypes.GroupBy(t => t.Value).OrderBy(g => g.Key))
+                                        {
+                                            <div class="price-row">
+                                                <span>@GetTicketTypeName(ticketGroup.Key) (@ticketGroup.Count())</span>
+                                                <span>€@((GetTicketTypePrice(ticketGroup.Key) * ticketGroup.Count()).ToString("F2"))</span>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="price-total">
+                                        <span>Total</span>
+                                        <span>€@CalculateTotalPrice().ToString("F2")</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <div class="action-buttons">
-                                <button @onclick="ConfirmTickets" class="btn btn-success">Confirm Tickets</button>
-                                <button @onclick="CancelOrder" class="btn btn-danger">Cancel Order</button>
+                                <button @onclick="ConfirmTickets" class="cinema-btn cinema-btn-primary">Confirm Tickets</button>
+                                <button @onclick="CancelOrder" class="cinema-btn cinema-btn-danger">Cancel Order</button>
                             </div>
                         </div>
                     }
                 </div>
             }
         }
-    }
+    </div>
 </div>
 
-<!-- Rename the modal to be more generic -->
-<div class="modal fade" id="orderModal" tabindex="-1" aria-labelledby="orderModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="orderModalLabel">Select Number of Seats</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                @if (!string.IsNullOrEmpty(groupOrderError))
-                {
-                    <div class="alert alert-warning" role="alert">
-                        @groupOrderError
+<!-- Replace the fullscreen modal with an overlay modal -->
+<div class="overlay-modal @(showSeatSelectionModal ? "show" : "")" id="seatSelectionModal">
+    <div class="overlay-modal-content">
+        <div class="overlay-modal-header">
+            <h3 class="modal-title">Select Seats for @(presentation?.Title ?? "Unknown Movie")</h3>
+        </div>
+        <div class="overlay-modal-body">
+            @if (!string.IsNullOrEmpty(groupOrderError))
+            {
+                <div class="cinema-alert cinema-alert-danger">
+                    <div class="cinema-alert-icon">
+                        <span>❌</span>
                     </div>
-                }
-                <div class="form-group">
-                    <label for="numberOfSeats">How many seats do you need? (Maximum @maxAvailableSeats available)</label>
-                    <input type="number" class="form-control" id="numberOfSeats" @bind="numberOfSeats" min="1" max="@maxAvailableSeats" />
+                    <div class="cinema-alert-message">@groupOrderError</div>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" @onclick="ProcessOrder">Continue</button>
+            }
+            
+            <div class="overlay-form-container">
+                <div class="form-group seat-selection-form">
+                    <h2 class="seat-selection-title">How many seats would you like to book?</h2>
+                    <div class="seat-counter">
+                        <button class="btn-adjust" @onclick="DecrementSeats" disabled="@(numberOfSeats <= 1)">-</button>
+                        <input type="number" class="form-control seat-count-input" id="numberOfSeats" @bind="numberOfSeats" min="1" max="@maxAvailableSeats" />
+                        <button class="btn-adjust" @onclick="IncrementSeats" disabled="@(numberOfSeats >= maxAvailableSeats)">+</button>
+                    </div>
+                    <div class="seat-info">
+                        <p>Maximum available: @maxAvailableSeats seats</p>
+                    </div>
+                </div>
+                
+                <div class="action-buttons overlay-modal-buttons">
+                    <button @onclick="ProcessOrder" class="btn start-order-btn continue-btn">Continue</button>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Add this modal for seating options -->
-<div class="modal fade" id="seatingOptionsModal" tabindex="-1" aria-labelledby="seatingOptionsModalLabel" aria-hidden="true">
+<div class="modal fade cinema-modal" id="seatingOptionsModal" tabindex="-1" aria-labelledby="seatingOptionsModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="seatingOptionsModalLabel">Select Seating Option</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-content cinema-modal-content">
+            <div class="modal-header cinema-modal-header">
+                <h5 class="modal-title">Select Seating Option</h5>
+                <button type="button" class="btn-close cinema-close-btn" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body cinema-modal-body">
                 @if (availableOptions != null)
                 {
                     @foreach (var option in availableOptions)
                     {
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="radio" name="seatingOption" 
+                        <div class="cinema-radio-option mb-3">
+                            <input class="cinema-radio-input" type="radio" name="seatingOption" 
                                    value="@option.Key" @onchange="@(e => selectedOption = option.Key)" 
                                    checked="@(selectedOption == option.Key)" />
-                            <label class="form-check-label">
+                            <label class="cinema-radio-label">
                                 @option.Value.Description
-                                <div class="small text-muted">
+                                <div class="cinema-option-details">
                                     @foreach (var group in option.Value.Groups)
                                     {
                                         <div>@group.Description</div>
@@ -170,31 +247,31 @@
                     }
                 }
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-danger" @onclick="CancelOrder">Cancel Order</button>
-                <button type="button" class="btn btn-primary" @onclick="ConfirmSeatingOption">Confirm Selection</button>
+            <div class="modal-footer cinema-modal-footer">
+                <button type="button" class="cinema-btn cinema-btn-danger" @onclick="CancelOrder">Cancel Order</button>
+                <button type="button" class="cinema-btn cinema-btn-primary" @onclick="ConfirmSeatingOption">Confirm Selection</button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Add this modal for single option confirmation -->
-<div class="modal fade" id="singleOptionConfirmModal" tabindex="-1" aria-labelledby="singleOptionConfirmModalLabel" aria-hidden="true">
+<div class="modal fade cinema-modal" id="singleOptionConfirmModal" tabindex="-1" aria-labelledby="singleOptionConfirmModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="singleOptionConfirmModalLabel">Confirm Seating Arrangement</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-content cinema-modal-content">
+            <div class="modal-header cinema-modal-header">
+                <h5 class="modal-title">Confirm Seating Arrangement</h5>
+                <button type="button" class="btn-close cinema-close-btn" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body cinema-modal-body">
                 @if (singleOptionMessage != null)
                 {
-                    <p>@singleOptionMessage</p>
+                    <p class="cinema-message">@singleOptionMessage</p>
                 }
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-danger" @onclick="CancelOrder">Cancel Order</button>
-                <button type="button" class="btn btn-primary" @onclick="ConfirmSingleOption">Confirm</button>
+            <div class="modal-footer cinema-modal-footer">
+                <button type="button" class="cinema-btn cinema-btn-danger" @onclick="CancelOrder">Cancel Order</button>
+                <button type="button" class="cinema-btn cinema-btn-primary" @onclick="ConfirmSingleOption">Confirm</button>
             </div>
         </div>
     </div>
@@ -205,12 +282,45 @@
         max-width: 1000px;
         margin: 0 auto;
         padding: 20px;
+        transition: background-color 0.3s ease, color 0.3s ease;
+        position: relative;
+        overflow-x: visible;
+    }
+    
+    .cinema-dark-mode {
+        background-color: #0f1730;
+        color: white;
+        border-radius: 0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        padding: 25px;
+        margin-top: 0;
     }
     
     .cinema-title {
         text-align: center;
         margin-bottom: 20px;
         font-weight: bold;
+    }
+    
+    .content-with-header-space {
+        padding-top: 100px;
+    }
+    
+    .sticky-title-container {
+        width: 100%;
+        text-align: center;
+        padding: 10px 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .sticky-title {
+        margin: 0;
+        font-size: 1.3rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 950px;
+        margin: 0 auto;
     }
     
     .cinema-layout {
@@ -229,7 +339,7 @@
     
     .seat-map {
         margin-bottom: 40px;
-        transform: rotateX(10deg);
+        transform: rotateX(12deg);
         transform-origin: bottom;
     }
     
@@ -237,7 +347,7 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
     }
     
     .row-label {
@@ -251,13 +361,13 @@
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
+        gap: 5px;
     }
     
     .seat {
-        width: 30px;
-        height: 28px;
-        margin: 3px;
-        border-radius: 5px 5px 0 0;
+        width: 32px;
+        height: 30px;
+        border-radius: 6px 6px 0 0;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -267,6 +377,19 @@
         font-size: 0.75rem;
         color: white;
         text-shadow: 0 0 1px rgba(0,0,0,0.5);
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 3px rgba(0,0,0,0.3);
+    }
+    
+    .seat:after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 3px;
+        right: 3px;
+        height: 3px;
+        background-color: rgba(0,0,0,0.2);
+        border-radius: 0 0 2px 2px;
     }
     
     .seat-number {
@@ -282,12 +405,21 @@
     }
     
     .seat-available:hover {
-        background-color: #b3a800;
+        background-color: #9e9100;
+        transform: scale(1.1);
+        z-index: 10;
     }
     
     .seat-selected {
         background-color: #28a745;
         border: 1px solid #218838;
+        transform: scale(1.05);
+        z-index: 5;
+    }
+    
+    .seat-selected:hover {
+        transform: scale(1.15);
+        z-index: 10;
     }
     
     .seat-unavailable {
@@ -297,31 +429,52 @@
         opacity: 0.6;
     }
     
+    .screen-container {
+        width: 100%;
+        perspective: 500px;
+        margin-top: 40px;
+    }
+    
     .screen {
         height: 70px;
-        background-color: #151d4a;
-        width: 80%;
+        background: linear-gradient(180deg, #151d4a 0%, #0a0e24 100%);
+        width: 90%;
         margin: 0 auto;
-        margin-top: 50px;
         transform: rotateX(-30deg);
         transform-origin: top;
-        box-shadow: 0 3px 10px rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 15px rgba(255, 255, 255, 0.2);
         border-radius: 50%;
         display: flex;
         justify-content: center;
         align-items: center;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .screen:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 5px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
     }
     
     .screen-text {
         color: rgba(255, 255, 255, 0.7);
         font-size: 1.5rem;
         letter-spacing: 3px;
+        text-shadow: 0 0 8px rgba(255,255,255,0.4);
     }
     
     .seat-legend {
         display: flex;
         justify-content: center;
         margin: 30px 0;
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 15px;
+        border-radius: 8px;
     }
     
     .legend-item {
@@ -335,35 +488,660 @@
         height: 24px;
         border-radius: 5px 5px 0 0;
         margin-right: 8px;
+        box-shadow: 0 2px 3px rgba(0,0,0,0.3);
     }
     
     .order-summary {
         margin-top: 20px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        padding: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        padding: 25px;
         width: 100%;
-        max-width: 500px;
+        max-width: 600px;
+        background-color: rgba(19, 26, 44, 0.6);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     }
     
-    .seat-list {
-        list-style-type: none;
-        padding: 0;
-        margin-bottom: 20px;
+    .ticket-type-section {
+        margin-top: 5px;
+        padding-top: 0;
+        border-top: none;
     }
     
-    .seat-list li {
-        display: inline-block;
-        margin-right: 10px;
-        margin-bottom: 5px;
-        background-color: #f8f9fa;
-        padding: 5px 10px;
-        border-radius: 3px;
+    .ticket-type-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        padding: 12px 15px;
+        background-color: rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
+        transition: all 0.2s ease;
+    }
+    
+    .ticket-type-row:hover {
+        background-color: rgba(255, 255, 255, 0.12);
+    }
+    
+    .ticket-seat-info {
+        font-weight: 500;
+        font-size: 1rem;
+    }
+    
+    .ticket-type-selector {
+        width: 220px;
+    }
+    
+    .form-select {
+        background-color: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        padding: 10px 15px;
+        border-radius: 6px;
+        appearance: auto;
+        font-size: 0.95rem;
+    }
+    
+    .form-select:focus {
+        outline: none;
+        border-color: rgba(255, 255, 255, 0.4);
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+    }
+    
+    .form-select option {
+        background-color: #121a2b;
+        color: white;
+        padding: 8px;
+    }
+    
+    .price-summary {
+        margin-top: 25px;
+        padding: 20px;
+        background-color: rgba(0, 0, 0, 0.25);
+        border-radius: 8px;
+    }
+    
+    .price-details {
+        margin-bottom: 15px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .price-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 1rem;
+    }
+    
+    .price-total {
+        display: flex;
+        justify-content: space-between;
+        font-weight: bold;
+        font-size: 1.2rem;
     }
     
     .action-buttons {
         display: flex;
         justify-content: space-between;
+        gap: 15px;
+        margin-top: 25px;
+    }
+    
+    .action-buttons button {
+        flex: 1;
+        padding: 12px 10px;
+        border-radius: 6px;
+        font-weight: 500;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .action-buttons button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    .order-timer {
+        display: flex;
+        align-items: center;
+        background-color: rgba(0, 0, 0, 0.5);
+        padding: 6px 12px;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        margin-left: 20px;
+        min-width: auto;
+    }
+    
+    .order-timer-warning {
+        background-color: rgba(255, 193, 7, 0.2);
+        border-color: rgba(255, 193, 7, 0.3);
+        animation: pulse 2s infinite;
+    }
+    
+    @@keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+    }
+    
+    .timer-content {
+        display: flex;
+        justify-content: center;
+        font-size: 0.9rem;
+        color: white;
+    }
+    
+    .countdown {
+        font-weight: bold;
+        letter-spacing: 1px;
+    }
+    
+    .cancel-button {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 0.9rem;
+        cursor: pointer;
+        padding: 5px;
+        margin-right: 20px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+    
+    .cancel-button:hover {
+        color: #f5c518;
+    }
+    
+    .start-order-btn {
+        padding: 12px 30px;
+        font-size: 1.2rem;
+        border-radius: 8px;
+        background-color: #f5c518;
+        border-color: #d6aa15;
+        color: #000;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+    }
+    
+    .start-order-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        background-color: #ffcc1d;
+    }
+    
+    .loading-container {
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 30px;
+        border-radius: 8px;
+        margin: 40px auto;
+        max-width: 400px;
+    }
+    
+    @@media (max-width: 768px) {
+        .seat {
+            width: 26px;
+            height: 24px;
+            font-size: 0.6rem;
+        }
+        
+        .row-label {
+            width: 20px;
+            font-size: 0.8rem;
+        }
+        
+        .screen {
+            height: 50px;
+        }
+        
+        .screen-text {
+            font-size: 1.2rem;
+        }
+        
+        .progress-step {
+            width: 80px;
+        }
+        
+        .progress-step:not(:last-child):after {
+            width: 40px;
+            right: -25px;
+        }
+        
+        .step-number {
+            width: 30px;
+            height: 30px;
+            font-size: 1rem;
+        }
+        
+        .step-label {
+            font-size: 0.7rem;
+        }
+    }
+    
+    .cinema-alert {
+        display: flex;
+        align-items: center;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 15px auto;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        transition: all 0.5s ease;
+        animation: fadeIn 0.5s ease;
+        width: 100%;
+        opacity: 1;
+    }
+    
+    .cinema-alert.fade-out {
+        opacity: 0;
+        transform: translateY(-10px);
+        height: 0;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+    
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .cinema-alert-success {
+        background-color: rgba(40, 167, 69, 0.2);
+        border-left: 4px solid #28a745;
+        color: #e2e2e2;
+    }
+    
+    .cinema-alert-danger {
+        background-color: rgba(220, 53, 69, 0.2);
+        border-left: 4px solid #dc3545;
+        color: #e2e2e2;
+    }
+    
+    .cinema-alert-icon {
+        font-size: 1.2rem;
+        margin-right: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+    }
+    
+    .cinema-alert-message {
+        flex: 1;
+        font-weight: 500;
+    }
+
+    @@media (max-width: 1000px) {
+        .sticky-header-wrapper {
+            margin-left: -20px;
+            margin-right: -20px;
+        }
+    }
+    
+    .seat-selection-section {
+        margin-top: 20px;
+    }
+
+    .overlay-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        z-index: 2000;
+        overflow-y: auto;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .overlay-modal.show {
+        display: flex;
+        opacity: 1;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .overlay-modal-content {
+        background-color: #0f1730;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        max-width: 950px;
+        width: 100%;
+        margin: 20px;
+        animation: modalFadeIn 0.4s ease-out;
+    }
+    
+    @@keyframes modalFadeIn {
+        from { transform: translateY(-50px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    
+    .overlay-modal-header {
+        padding: 20px 25px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        text-align: center;
+    }
+    
+    .overlay-modal-header h3 {
+        color: white;
+        font-weight: bold;
+        font-size: 1.8rem;
+        margin: 0;
+    }
+    
+    .overlay-modal-body {
+        padding: 40px 25px;
+    }
+    
+    .overlay-form-container {
+        text-align: center;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+    
+    .seat-selection-form {
+        margin-bottom: 40px;
+    }
+    
+    .seat-selection-title {
+        font-size: 1.6rem;
+        margin-bottom: 30px;
+        font-weight: 500;
+        color: white;
+    }
+    
+    .seat-counter {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 25px;
+    }
+    
+    .seat-count-input {
+        width: 120px;
+        height: 80px;
+        text-align: center;
+        background-color: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        font-size: 2rem;
+        padding: 10px;
+        margin: 0 15px;
+        border-radius: 8px;
+        font-weight: bold;
+    }
+    
+    .btn-adjust {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background-color: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        font-size: 2rem;
+        line-height: 1;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-adjust:hover:not(:disabled) {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    .btn-adjust:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .seat-info {
+        color: white;
+        font-size: 1.1rem;
+        margin-top: 10px;
+    }
+    
+    .overlay-modal-buttons {
+        justify-content: center;
+        margin-top: 20px;
+    }
+    
+    .overlay-modal-buttons button {
+        padding: 15px 40px;
+        border-radius: 8px;
+        font-weight: 500;
+        min-width: 220px;
+        font-size: 1.2rem;
+    }
+    
+    .continue-btn {
+        font-size: 1.1rem;
+    }
+
+    /* Sticky header styles */
+    .sticky-header-wrapper {
+        margin: 0;
+        background-color: #000;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .sticky-progress-container {
+        background-color: #000;
+        padding: 10px 0 0 0;
+        width: 100%;
+        margin: 0 auto;
+    }
+    
+    .booking-progress-wrapper {
+        width: 100%;
+        max-width: 1200px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: relative;
+        padding: 0 20px;
+    }
+    
+    .booking-progress {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 0 auto;
+        gap: 15px;
+    }
+    
+    .progress-step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: relative;
+        color: rgba(255, 255, 255, 0.5);
+        z-index: 2;
+    }
+    
+    .progress-connector {
+        height: 1px;
+        width: 45px;
+        background-color: rgba(255, 255, 255, 0.3);
+        margin-top: 15px;
+        position: relative;
+        z-index: 1;
+    }
+    
+    .progress-step.active {
+        color: white;
+    }
+    
+    .progress-step.active + .progress-connector {
+        background-color: #f5c518;
+    }
+    
+    .progress-step.active .step-circle {
+        background-color: #f5c518;
+        border-color: #d6aa15;
+    }
+    
+    .step-circle {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background-color: rgba(255, 255, 255, 0.1);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        margin-bottom: 6px;
+        font-weight: bold;
+        font-size: 1rem;
+    }
+    
+    .step-label {
+        font-size: 0.8rem;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .ticket-instruction-text {
+        color: #f5c518;
+        font-weight: 500;
+        margin-bottom: 1rem;
+        font-size: 1.05rem;
+        padding: 8px 12px;
+        background-color: rgba(245, 197, 24, 0.1);
+        border-left: 3px solid #f5c518;
+        border-radius: 0 4px 4px 0;
+    }
+    
+    /* Cinema themed buttons */
+    .cinema-btn {
+        border: none;
+        padding: 12px 20px;
+        border-radius: 6px;
+        font-weight: 500;
+        font-size: 1.1rem;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    }
+    
+    .cinema-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+    }
+    
+    .cinema-btn:active {
+        transform: translateY(1px);
+    }
+    
+    .cinema-btn-primary {
+        background-color: #f5c518;
+        color: #0f1730;
+        border: 1px solid #d6aa15;
+    }
+    
+    .cinema-btn-primary:hover {
+        background-color: #ffcf2d;
+    }
+    
+    .cinema-btn-danger {
+        background-color: rgba(220, 53, 69, 0.8);
+        color: white;
+        border: 1px solid #c82333;
+    }
+    
+    .cinema-btn-danger:hover {
+        background-color: rgba(220, 53, 69, 1);
+    }
+
+    /* Cinema themed modals */
+    .cinema-modal .modal-dialog {
+        max-width: 550px;
+    }
+    
+    .cinema-modal-content {
+        background-color: #0f1730;
+        color: white;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+    }
+    
+    .cinema-modal-header {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 20px 25px;
+    }
+    
+    .cinema-modal-header .modal-title {
+        font-weight: 600;
+        font-size: 1.5rem;
+        color: white;
+    }
+    
+    .cinema-close-btn {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        padding: 8px;
+        margin: -8px;
+        filter: invert(1) brightness(0.8);
+    }
+    
+    .cinema-modal-body {
+        padding: 25px;
+        font-size: 1.1rem;
+    }
+    
+    .cinema-message {
+        line-height: 1.6;
+        margin-bottom: 0;
+    }
+    
+    .cinema-modal-footer {
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 15px 25px;
+        gap: 12px;
+    }
+    
+    .cinema-radio-option {
+        display: flex;
+        padding: 12px 15px;
+        background-color: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .cinema-radio-option:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .cinema-radio-input {
+        margin-right: 10px;
+        margin-top: 3px;
+        transform: scale(1.2);
+        accent-color: #f5c518;
+    }
+    
+    .cinema-radio-label {
+        font-weight: 500;
+        cursor: pointer;
+        flex-grow: 1;
+    }
+    
+    .cinema-option-details {
+        margin-top: 5px;
+        font-size: 0.9rem;
+        color: rgba(255, 255, 255, 0.7);
     }
 </style>
 
@@ -373,7 +1151,6 @@
 
     private Presentation? presentation;
     private string? message;
-    private bool orderStarted = false;
     private int numberOfSeats = 1;
     private List<Seat> selectedSeats = new List<Seat>();
     private string? orderToken;
@@ -384,50 +1161,259 @@
     private GroupOrderResponse? pendingGroupOrder;
     private string? groupOrderError;
     private int maxAvailableSeats;
+    
+    // Timer properties
+    private DateTime? orderExpirationTime;
+    private Timer expirationTimer = new Timer(1000);
+    private Timer validationTimer = new Timer(30000);
+    private TimeSpan timeRemaining = TimeSpan.Zero;
+    
+    private Dictionary<int, string> ticketTypes = new Dictionary<int, string>();
+    private int activeStep = 1;
+    
+    private Timer messageTimer = new Timer(5000); // 5 seconds
+    private bool isMessageFading = false;
+    private Timer fadeTimer = new Timer(400); // For the fade out transition
+    
+    // Static instance management for JS Interop
+    private static SeatSelector _instance;
+    
+    // Modal visibility control
+    private bool showSeatSelectionModal = true;
+    
+    protected override void OnInitialized()
+    {
+        _instance = this;
+        expirationTimer.Elapsed += TimerTick;
+        validationTimer.Elapsed += ValidateOrderWithBackend;
+        messageTimer.AutoReset = false;
+        messageTimer.Elapsed += StartMessageFadeOut;
+        fadeTimer.AutoReset = false; 
+        fadeTimer.Elapsed += CompleteMessageFadeOut;
+    }
+    
+    private void StartMessageFadeOut(object? sender, ElapsedEventArgs e)
+    {
+        InvokeAsync(() => 
+        {
+            isMessageFading = true;
+            StateHasChanged();
+            fadeTimer.Start();
+        });
+    }
+    
+    private void CompleteMessageFadeOut(object? sender, ElapsedEventArgs e)
+    {
+        InvokeAsync(() => 
+        {
+            message = null;
+            isMessageFading = false;
+            StateHasChanged();
+        });
+    }
+    
+    private void SetMessage(string newMessage)
+    {
+        // Stop any existing fade process
+        fadeTimer.Stop();
+        messageTimer.Stop();
+        
+        // Reset message state
+        isMessageFading = false;
+        message = newMessage;
+        
+        // Start the message timer
+        messageTimer.Start();
+    }
+    
+    private void TimerTick(object? sender, ElapsedEventArgs e)
+    {
+        if (orderExpirationTime.HasValue)
+        {
+            timeRemaining = orderExpirationTime.Value - DateTime.UtcNow;
+            if (timeRemaining.TotalSeconds <= 0)
+            {
+                expirationTimer.Stop();
+                validationTimer.Stop();
+                
+                // Order has expired, reset the state
+                InvokeAsync(async () => 
+                {
+                    // Call the backend to ensure the order is marked as expired there too
+                    await ExpireOrder();
+                    
+                    SetMessage("Your order has expired. Please start a new order.");
+                    orderExpirationTime = null;
+                    orderToken = null;
+                    pendingGroupOrder = null;
+                    selectedSeats.Clear();
+                    
+                    // Refresh the seats to show updated availability
+                    await LoadSeats();
+                    
+                    StateHasChanged();
+                });
+            }
+            else
+            {
+                InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+    
+    private async void ValidateOrderWithBackend(object? sender, ElapsedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(orderToken) && pendingGroupOrder?.OrderToken == null)
+        {
+            return; // No active order to validate
+        }
+        
+        try
+        {
+            string currentToken = orderToken ?? pendingGroupOrder?.OrderToken?.ToString() ?? string.Empty;
+            
+            if (string.IsNullOrEmpty(currentToken))
+            {
+                return;
+            }
+            
+            // Call the API to check if the order is still valid
+            var response = await Http.GetAsync($"api/tickets/orders/{currentToken}/check");
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                // Order is no longer valid, reset the state
+                await InvokeAsync(async () => 
+                {
+                    expirationTimer.Stop();
+                    validationTimer.Stop();
+                    
+                    SetMessage("Your order has expired or is no longer valid. Please start a new order.");
+                    orderExpirationTime = null;
+                    orderToken = null;
+                    pendingGroupOrder = null;
+                    selectedSeats.Clear();
+                    
+                    // Refresh the seats to show updated availability
+                    await LoadSeats();
+                    
+                    StateHasChanged();
+                });
+            }
+            else
+            {
+                // Order is still valid, potentially update expiration time based on response
+                var result = await response.Content.ReadFromJsonAsync<OrderStatusResponse>();
+                
+                if (result != null && result.ExpiresAt.HasValue)
+                {
+                    await InvokeAsync(() => 
+                    {
+                        // Update our local expiration time to match the server
+                        orderExpirationTime = result.ExpiresAt.Value;
+                        timeRemaining = orderExpirationTime.Value - DateTime.UtcNow;
+                        StateHasChanged();
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error validating order: {ex.Message}");
+            // Don't invalidate the order on connection errors
+        }
+    }
+    
+    private async Task ExpireOrder()
+    {
+        string? tokenToExpire = orderToken ?? pendingGroupOrder?.OrderToken;
+        if (tokenToExpire != null)
+        {
+            try
+            {
+                // Just notify the backend that the order is expired from client side
+                await Http.PostAsync($"api/tickets/orders/{tokenToExpire}/expire", null);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error expiring order: {ex.Message}");
+                // Continue with local expiration even if server call fails
+            }
+        }
+    }
+    
+    public void Dispose()
+    {
+        expirationTimer.Elapsed -= TimerTick;
+        validationTimer.Elapsed -= ValidateOrderWithBackend;
+        messageTimer.Elapsed -= StartMessageFadeOut;
+        fadeTimer.Elapsed -= CompleteMessageFadeOut;
+        expirationTimer.Dispose();
+        validationTimer.Dispose();
+        messageTimer.Dispose();
+        fadeTimer.Dispose();
+        if (_instance == this)
+        {
+            _instance = null;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
-
         try
         {
             presentation = await Http.GetFromJsonAsync<Presentation>($"api/presentations/{PresentationId}/seats");
 
             if (presentation == null || presentation.Rows.Count == 0)
             {
-                message = "No seats available for this presentation.";
+                SetMessage("No seats available for this presentation.");
+            }
+            else
+            {
+                // Calculate maximum available seats
+                maxAvailableSeats = presentation.Rows
+                    .SelectMany(r => r.Seats)
+                    .Count(s => s.IsAvailable);
+                
+                // Set a default value for numberOfSeats
+                numberOfSeats = Math.Min(2, maxAvailableSeats);
+
+                // If no seats are available, show a message
+                if (maxAvailableSeats == 0)
+                {
+                    SetMessage("Sorry, this showing is fully booked! Please check other showtimes.");
+                    showSeatSelectionModal = false;
+                }
+                else
+                {
+                    // Initialize the modal
+                    showSeatSelectionModal = true;
+                    groupOrderError = null;
+                }
             }
         }
         catch (Exception ex)
         {
-            message = $"Error fetching seats: {ex.Message}";
+            SetMessage($"Error fetching seats: {ex.Message}");
         }
     }
 
-    private async Task ShowOrderModal()
+    private void IncrementSeats()
     {
-        // Clear any previous error message
-        groupOrderError = null;
-
-        // Calculate maximum available seats
-        maxAvailableSeats = presentation?.Rows
-            .SelectMany(r => r.Seats)
-            .Count(s => s.IsAvailable) ?? 0;
-
-        // Ensure numberOfSeats doesn't exceed maxAvailableSeats
-        if (numberOfSeats > maxAvailableSeats)
+        if (numberOfSeats < maxAvailableSeats)
         {
-            numberOfSeats = maxAvailableSeats;
+            numberOfSeats++;
         }
-
-        // Default to 1 seat if not set
-        if (numberOfSeats < 1)
-        {
-            numberOfSeats = 1;
-        }
-
-        await JSRuntime.InvokeVoidAsync("showModal", "orderModal");
     }
-
+    
+    private void DecrementSeats()
+    {
+        if (numberOfSeats > 1)
+        {
+            numberOfSeats--;
+        }
+    }
+    
     private async Task ProcessOrder()
     {
         // Check if the user selected a valid number of seats
@@ -437,8 +1423,8 @@
             return;
         }
 
-        // Hide the modal
-        await JSRuntime.InvokeVoidAsync("hideModal", "orderModal");
+        // Hide the modal only
+        showSeatSelectionModal = false;
 
         // Start single or group order based on the number of seats
         if (numberOfSeats == 1)
@@ -456,12 +1442,20 @@
         Console.WriteLine("StartOrder called");
         try
         {
+            // Hide the modal during the API call
+            showSeatSelectionModal = false;
+            
             var response = await Http.PostAsJsonAsync("api/tickets/orders/start", new { presentationId = PresentationId });
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<OrderResponse>();
                 orderToken = result.OrderToken;
-                orderStarted = true;
+                
+                // Set the expiration time (10 minutes from now)
+                orderExpirationTime = DateTime.UtcNow.AddMinutes(10);
+                timeRemaining = TimeSpan.FromMinutes(10);
+                expirationTimer.Start();
+                validationTimer.Start();
                 
                 // Handle pre-selected seats from the SeatIds array
                 if (result.SeatIds != null && result.SeatIds.Any())
@@ -479,23 +1473,23 @@
                         if (preselectedSeats.Count == 1)
                         {
                             var seat = preselectedSeats.First();
-                            message = $"Order started with pre-selected seat Row {seat.RowNumber}, Seat {seat.SeatNumber}.";
+                            SetMessage($"Order started with pre-selected seat Row {seat.RowNumber}, Seat {seat.SeatNumber}.");
                         }
                         else
                         {
-                            message = $"Order started with {preselectedSeats.Count} pre-selected seats.";
+                            SetMessage($"Order started with {preselectedSeats.Count} pre-selected seats.");
                         }
                         
                         Console.WriteLine($"Preselected seats added: {string.Join(", ", preselectedSeats.Select(s => s.SeatNumber))}");
                     }
                     else
                     {
-                        message = "Order started. Please select your seats.";
+                        SetMessage("Order started. Please select your seats.");
                     }
                 }
                 else 
                 {
-                    message = "Order started. Please select your seats.";
+                    SetMessage("Order started. Please select your seats.");
                 }
                 
                 Console.WriteLine($"Order started successfully. Order Token: {orderToken}");
@@ -506,14 +1500,20 @@
             else
             {
                 var errorMessage = await response.Content.ReadAsStringAsync();
-                message = $"Failed to start order: {errorMessage}";
-                Console.WriteLine(message);
+                SetMessage($"Failed to start order: {errorMessage}");
+                Console.WriteLine($"Failed to start order: {errorMessage}");
+                
+                // Show the modal again if there was an error
+                showSeatSelectionModal = true;
             }
         }
         catch (Exception ex)
         {
-            message = $"Error starting order: {ex.Message}";
-            Console.WriteLine(message);
+            SetMessage($"Error starting order: {ex.Message}");
+            Console.WriteLine($"Error starting order: {ex.Message}");
+            
+            // Show the modal again if there was an error
+            showSeatSelectionModal = true;
         }
     }
 
@@ -537,23 +1537,23 @@
             if (availableSeatsCount == 0)
             {
                 groupOrderError = "No seats are available for this presentation.";
+                showSeatSelectionModal = true;
                 return;
             }
 
             if (numberOfSeats > availableSeatsCount)
             {
                 groupOrderError = $"Only {availableSeatsCount} seats are available. You requested {numberOfSeats} seats.";
+                showSeatSelectionModal = true;
                 return;
             }
 
             if (numberOfSeats <= 0 || numberOfSeats > 20)
             {
                 groupOrderError = "Please select between 1 and 20 seats.";
+                showSeatSelectionModal = true;
                 return;
             }
-
-            // Hide the modal only if there are no errors
-            await JSRuntime.InvokeVoidAsync("hideModal", "orderModal");
 
             // Call the API to start a group order with the specified number of seats
             var response = await Http.PostAsJsonAsync("api/tickets/orders/start-group", new { presentationId = PresentationId, numberOfSeats });
@@ -562,6 +1562,12 @@
                 var result = await response.Content.ReadFromJsonAsync<GroupOrderResponse>();
                 pendingGroupOrder = result;
                 availableOptions = result.AvailableOptions;
+                
+                // Set the expiration time (10 minutes from now)
+                orderExpirationTime = DateTime.UtcNow.AddMinutes(10);
+                timeRemaining = TimeSpan.FromMinutes(10);
+                expirationTimer.Start();
+                validationTimer.Start();
 
                 if (availableOptions != null)
                 {
@@ -597,14 +1603,20 @@
             else
             {
                 var errorMessage = await response.Content.ReadAsStringAsync();
-                message = $"Failed to start group order: {errorMessage}";
-                Console.WriteLine(message);
+                SetMessage($"Failed to start group order: {errorMessage}");
+                Console.WriteLine($"Failed to start group order: {errorMessage}");
+                
+                // Show the modal again if there was an error
+                showSeatSelectionModal = true;
             }
         }
         catch (Exception ex)
         {
-            message = $"Error starting group order: {ex.Message}";
-            Console.WriteLine(message);
+            SetMessage($"Error starting group order: {ex.Message}");
+            Console.WriteLine($"Error starting group order: {ex.Message}");
+            
+            // Show the modal again if there was an error
+            showSeatSelectionModal = true;
         }
     }
 
@@ -620,7 +1632,7 @@
             
             if (presentation == null || presentation.Rows.Count == 0)
             {
-                message = "No seats available for this presentation.";
+                SetMessage("No seats available for this presentation.");
                 return;
             }
             
@@ -642,7 +1654,7 @@
         }
         catch (Exception ex)
         {
-            message = $"Error fetching seats: {ex.Message}";
+            SetMessage($"Error fetching seats: {ex.Message}");
         }
     }
 
@@ -659,7 +1671,7 @@
             // Check if this is the last selected seat
             if (selectedSeats.Count == 1)
             {
-                message = "Warning: At least one seat must be selected.";
+                SetMessage("Warning: At least one seat must be selected.");
                 Console.WriteLine("Attempted to deselect the last seat - operation prevented");
                 return;
             }
@@ -668,6 +1680,12 @@
             selectedSeats.Remove(existingSeat);
             Console.WriteLine($"Seat {seat.SeatNumber} unselected.");
 
+            // Remove the ticket type for this seat
+            if (ticketTypes.ContainsKey(seat.Id))
+            {
+                ticketTypes.Remove(seat.Id);
+            }
+
             // Call the DELETE API to remove the seat from the order
             if (!string.IsNullOrEmpty(orderToken))
             {
@@ -675,14 +1693,14 @@
 
                 if (response.IsSuccessStatusCode)
                 {
-                    message = $"Seat {seat.SeatNumber} removed from the order.";
-                    Console.WriteLine(message);
+                    SetMessage($"Seat {seat.SeatNumber} removed from the order.");
+                    Console.WriteLine($"Seat {seat.SeatNumber} removed from the order.");
                 }
                 else
                 {
                     var errorMessage = await response.Content.ReadAsStringAsync();
-                    message = $"Failed to remove seat {seat.SeatNumber} from the order: {errorMessage}";
-                    Console.WriteLine(message);
+                    SetMessage($"Failed to remove seat {seat.SeatNumber} from the order: {errorMessage}");
+                    Console.WriteLine($"Failed to remove seat {seat.SeatNumber} from the order: {errorMessage}");
                 }
             }
         }
@@ -704,21 +1722,21 @@
                     {
                         var result = await response.Content.ReadFromJsonAsync<OrderResponse>();
                         orderToken = result.OrderToken; // Store the order token for confirmation
-                        message = "Seat selected successfully!";
+                        SetMessage("Seat selected successfully!");
                         Console.WriteLine("Seat selected successfully.");
                     }
                     else
                     {
                         var errorMessage = await response.Content.ReadAsStringAsync();
-                        message = $"Failed to select seat: {errorMessage}";
-                        Console.WriteLine(message);
+                        SetMessage($"Failed to select seat: {errorMessage}");
+                        Console.WriteLine($"Failed to select seat: {errorMessage}");
                     }
                 }
             }
             else
             {
-                message = "This seat is not available for selection.";
-                Console.WriteLine(message);
+                SetMessage("This seat is not available for selection.");
+                Console.WriteLine("This seat is not available for selection.");
             }
         }
 
@@ -731,16 +1749,28 @@
 
     private async Task ConfirmTickets()
     {
-        var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { customerName = "NamHere", customerEmail = "validEmailHere" });
+        try {
+            // Stop both timers when tickets are confirmed
+            expirationTimer.Stop();
+            validationTimer.Stop();
+            orderExpirationTime = null;
+            
+            var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { customerName = "NamHere", customerEmail = "validEmailHere" });
 
-        if (confirmationResponse.IsSuccessStatusCode)
-        {
-            message = "Tickets confirmed successfully!";
+            if (confirmationResponse.IsSuccessStatusCode)
+            {
+                SetMessage("Tickets confirmed successfully!");
+            }
+            else
+            {
+                var errorMessage = await confirmationResponse.Content.ReadAsStringAsync();
+                SetMessage($"Failed to confirm tickets: {errorMessage}");
+            }
         }
-        else
+        catch (Exception ex)
         {
-            var errorMessage = await confirmationResponse.Content.ReadAsStringAsync();
-            message = $"Failed to confirm tickets: {errorMessage}";
+            SetMessage($"Error confirming tickets: {ex.Message}");
+            Console.WriteLine($"Error confirming tickets: {ex}");
         }
     }
 
@@ -768,7 +1798,7 @@
         {
             if (pendingGroupOrder?.OrderToken == null)
             {
-                message = "No pending group order found.";
+                SetMessage("No pending group order found.");
                 return;
             }
 
@@ -779,8 +1809,7 @@
             {
                 var result = await response.Content.ReadFromJsonAsync<OrderResponse>();
                 orderToken = result.OrderToken;
-                orderStarted = true;
-
+                
                 // Now we can add the selected seats
                 if (result.SeatIds != null && result.SeatIds.Any())
                 {
@@ -791,7 +1820,16 @@
 
                     selectedSeats.Clear();
                     selectedSeats.AddRange(selectedSeatsFromResponse);
-                    message = $"Group order started with {selectedSeats.Count} seats selected.";
+                    SetMessage($"Group order started with {selectedSeats.Count} seats selected.");
+                    
+                    // Initialize ticket types for all seats in the group order
+                    foreach (var seat in selectedSeats)
+                    {
+                        if (!ticketTypes.ContainsKey(seat.Id))
+                        {
+                            ticketTypes.Add(seat.Id, "adult");
+                        }
+                    }
                 }
 
                 // Load all seats to refresh the UI
@@ -800,13 +1838,13 @@
             else
             {
                 var errorMessage = await response.Content.ReadAsStringAsync();
-                message = $"Failed to select seating option: {errorMessage}";
+                SetMessage($"Failed to select seating option: {errorMessage}");
             }
         }
         catch (Exception ex)
         {
-            message = $"Error selecting seating option: {ex.Message}";
-            Console.WriteLine(message);
+            SetMessage($"Error selecting seating option: {ex.Message}");
+            Console.WriteLine($"Error selecting seating option: {ex.Message}");
         }
     }
 
@@ -817,39 +1855,155 @@
             string? tokenToCancel = orderToken ?? pendingGroupOrder?.OrderToken;
             if (tokenToCancel != null)
             {
-                // Hide any open modals first
+                // Hide any open modals
+                showSeatSelectionModal = false;
                 await JSRuntime.InvokeVoidAsync("hideModal", "seatingOptionsModal");
                 await JSRuntime.InvokeVoidAsync("hideModal", "singleOptionConfirmModal");
-                await JSRuntime.InvokeVoidAsync("hideModal", "orderModal");
 
                 // Call the API to cancel the order
                 var response = await Http.PostAsync($"api/tickets/orders/{tokenToCancel}/cancel", null);
                 
                 if (response.IsSuccessStatusCode)
                 {
+                    // Stop both timers
+                    expirationTimer.Stop();
+                    validationTimer.Stop();
+                    orderExpirationTime = null;
+                    
                     // Clear local state
                     orderToken = null;
                     pendingGroupOrder = null;
                     selectedSeats.Clear();
-                    orderStarted = false;
                     availableOptions = null;
                     selectedOption = null;
-                    message = "Order cancelled successfully.";
+                    SetMessage("Order cancelled successfully.");
 
                     // Refresh the seats to show updated availability
                     await LoadSeats();
+                    
+                    // Go back to the seat selection modal
+                    showSeatSelectionModal = true;
                 }
                 else
                 {
                     var error = await response.Content.ReadAsStringAsync();
-                    message = $"Failed to cancel order: {error}";
+                    SetMessage($"Failed to cancel order: {error}");
                 }
+            }
+            else
+            {
+                // If there's no active order yet, just show the modal again
+                showSeatSelectionModal = true;
             }
         }
         catch (Exception ex)
         {
-            message = $"Error cancelling order: {ex.Message}";
+            SetMessage($"Error cancelling order: {ex.Message}");
             Console.WriteLine($"Error cancelling order: {ex}");
         }
+    }
+
+    private void SelectTicketType(int seatId, string ticketType)
+    {
+        if (ticketTypes.ContainsKey(seatId))
+        {
+            ticketTypes[seatId] = ticketType;
+        }
+        else
+        {
+            ticketTypes.Add(seatId, ticketType);
+        }
+        
+        StateHasChanged();
+    }
+    
+    private string GetTicketTypeName(string type)
+    {
+        return type switch
+        {
+            "adult" => "Adult",
+            "child" => "Child",
+            "senior" => "Senior",
+            "student" => "Student",
+            _ => "Regular"
+        };
+    }
+    
+    private decimal GetTicketTypePrice(string type)
+    {
+        return type switch
+        {
+            "adult" => 12.50m,
+            "child" => 8.50m,
+            "senior" => 10.50m,
+            "student" => 9.50m,
+            _ => 12.50m
+        };
+    }
+    
+    private decimal CalculateTotalPrice()
+    {
+        decimal total = 0;
+        
+        // Ensure we have ticket types for all selected seats
+        foreach (var seat in selectedSeats)
+        {
+            string ticketType = ticketTypes.ContainsKey(seat.Id) ? ticketTypes[seat.Id] : "adult";
+            
+            if (!ticketTypes.ContainsKey(seat.Id))
+            {
+                ticketTypes.Add(seat.Id, ticketType);
+            }
+            
+            total += GetTicketTypePrice(ticketType);
+        }
+        
+        return total;
+    }
+    
+    // When seats change, ensure we have ticket types for each seat
+    protected override void OnParametersSet()
+    {
+        InitializeTicketTypes();
+    }
+    
+    private void InitializeTicketTypes()
+    {
+        // Initialize default ticket types for all selected seats
+        foreach (var seat in selectedSeats)
+        {
+            if (!ticketTypes.ContainsKey(seat.Id))
+            {
+                ticketTypes.Add(seat.Id, "adult");
+            }
+        }
+        
+        // Remove ticket types for seats that are no longer selected
+        var seatIds = selectedSeats.Select(s => s.Id).ToList();
+        var keysToRemove = ticketTypes.Keys.Where(k => !seatIds.Contains(k)).ToList();
+        
+        foreach (var key in keysToRemove)
+        {
+            ticketTypes.Remove(key);
+        }
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("initScrollTracking");
+        }
+    }
+    
+    [JSInvokable]
+    public static Task UpdateProgressStep(int step)
+    {
+        if (_instance != null && _instance.activeStep != step)
+        {
+            _instance.activeStep = step;
+            _instance.StateHasChanged();
+        }
+        return Task.CompletedTask;
     }
 } 

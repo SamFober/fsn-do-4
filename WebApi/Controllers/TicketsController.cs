@@ -453,6 +453,84 @@ namespace WebApi.Controllers
             }
         }
 
+        [HttpGet("orders/{orderToken}/check")]
+        [ProducesResponseType(typeof(OrderStatusResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<OrderStatusResponse>> CheckOrderStatus(Guid orderToken)
+        {
+            try
+            {
+                var order = await _context.TicketOrders
+                    .FirstOrDefaultAsync(o => o.OrderToken == orderToken);
+                    
+                if (order == null)
+                {
+                    return NotFound("Order not found");
+                }
+                
+                // If the order is expired according to our database timestamp
+                if (order.ExpiresAt < DateTime.UtcNow || order.Status == OrderStatus.Expired || order.Status == OrderStatus.Cancelled)
+                {
+                    // Automatically expire the order if it hasn't been explicitly expired yet
+                    if (order.Status == OrderStatus.Pending)
+                    {
+                        await _ticketService.CancelOrder(orderToken);
+                        order.Status = OrderStatus.Expired;
+                        await _context.SaveChangesAsync();
+                    }
+                    
+                    return NotFound("Order expired");
+                }
+                
+                // Order is valid
+                return Ok(new OrderStatusResponse
+                {
+                    OrderToken = orderToken,
+                    IsValid = true,
+                    ExpiresAt = order.ExpiresAt,
+                    Status = order.Status.ToString()
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking order status");
+                return StatusCode(500, "An error occurred while checking order status");
+            }
+        }
+
+        [HttpPost("orders/{orderToken}/expire")]
+        [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<string>> ExpireOrder(Guid orderToken)
+        {
+            try
+            {
+                var order = await _context.TicketOrders
+                    .FirstOrDefaultAsync(o => o.OrderToken == orderToken);
+                    
+                if (order == null)
+                {
+                    return NotFound("Order not found");
+                }
+                
+                // Only expire pending orders
+                if (order.Status == OrderStatus.Pending)
+                {
+                    await _ticketService.CancelOrder(orderToken);
+                    order.Status = OrderStatus.Expired;
+                    await _context.SaveChangesAsync();
+                    return Ok("Order expired successfully");
+                }
+                
+                return Ok("Order already processed");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error expiring order");
+                return StatusCode(500, "An error occurred while expiring the order");
+            }
+        }
+
         private async Task<bool> TryLockSeats(List<int> seatIds, Guid orderToken, int presentationId)
         {
             try

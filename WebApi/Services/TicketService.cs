@@ -323,32 +323,33 @@ namespace WebApi.Services
         {
             try
             {
-                var order = await _repository.GetOrderByToken(orderToken, true);
+                var order = await _repository.GetOrderByToken(orderToken);
+
                 if (order == null || order.Status != OrderStatus.Pending)
                 {
                     throw new OrderNotFoundException("Order not found or expired");
                 }
 
-                // Validate seats exist and are available
-                if (!await _repository.AreSeatAvailable(order.PresentationId, request.SeatIds, order.OrderToken))
+                // Verify seats are part of the presentation
+                var presentation = await _repository.GetPresentationById(order.PresentationId);
+                if (presentation == null)
                 {
-                    throw new SeatNotAvailableException("Some selected seats are no longer available");
+                    throw new Exception("Presentation not found");
                 }
 
-                // Check for duplicates
-                var existingSeatIds = order.Items.Select(i => i.SeatId).ToHashSet();
-                if (request.SeatIds.Any(id => existingSeatIds.Contains(id)))
+                // Verify seats are available
+                if (!await _repository.AreSeatAvailable(order.PresentationId, request.SeatIds, orderToken))
                 {
-                    throw new ArgumentException("One or more seats are already in your order");
+                    throw new SeatNotAvailableException("One or more seats are not available");
                 }
 
-                // Lock new seats
+                // Create locks for the seats using the order's existing expiration time
                 var seatLocks = request.SeatIds.Select(seatId => new SeatLock
                 {
                     SeatId = seatId,
                     OrderToken = orderToken,
                     CreatedAt = DateTime.UtcNow,
-                    ExpiresAt = DateTime.UtcNow.AddMinutes(10)
+                    ExpiresAt = order.ExpiresAt // Use order's expiration time instead of a new one
                 }).ToList();
 
                 if (!await _repository.AddSeatLocks(seatLocks))
@@ -356,7 +357,7 @@ namespace WebApi.Services
                     throw new SeatNotAvailableException("Failed to lock selected seats");
                 }
 
-                // Add new seats to order
+                // Add the seats to the order
                 foreach (var seatId in request.SeatIds)
                 {
                     order.Items.Add(new TicketOrderItem
@@ -371,10 +372,9 @@ namespace WebApi.Services
                     throw new Exception("Failed to save order");
                 }
 
-                // After successfully locking the seats, update their availability
                 await _repository.UpdateSeatAvailability(request.SeatIds, false);
 
-                return new OrderResponse(order.OrderToken, order.Items.Select(i => i.SeatId).ToList());
+                return new OrderResponse(orderToken, order.Items.Select(i => i.SeatId).ToList());
             }
             catch (Exception ex)
             {
