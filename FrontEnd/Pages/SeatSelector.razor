@@ -7,73 +7,110 @@
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
 
-<h3>Seat Selector for @(presentation?.Title ?? "Unknown Movie") in @(presentation?.HallName ?? "Unknown Hall")</h3>
-@if (message != null)
-{
-    <p>@message</p>
-}
-@if (!orderStarted)
-{
-    @if (presentation?.Rows.Any(r => r.Seats.Any(s => s.IsAvailable)) == true)
+<div class="cinema-container">
+    <h3 class="cinema-title">@(presentation?.Title ?? "Unknown Movie") - @(presentation?.HallName ?? "Unknown Hall")</h3>
+    
+    @if (message != null)
     {
-        <button @onclick="ShowOrderModal" class="btn btn-primary">Select Seats</button>
-    }
-    else
-    {
-        <div class="alert alert-info text-center" role="alert">
-            <h4 class="alert-heading">Sorry, this showing is fully booked!</h4>
-            <p>All seats for this presentation of "@(presentation?.Title)" have been reserved. Please check other showtimes or browse our other exciting movies.</p>
+        <div class="alert @(message.Contains("Error") || message.Contains("Failed") ? "alert-danger" : "alert-info")">
+            @message
         </div>
     }
-}
-else
-{
-    @if (presentation == null)
+    
+    @if (!orderStarted)
     {
-        <div>
-            <h4>Loading all seats...</h4>
-        </div>
-    }
-    else
-    {
-        @if (presentation.Rows.Count > 0)
+        @if (presentation?.Rows.Any(r => r.Seats.Any(s => s.IsAvailable)) == true)
         {
-            <div>
-                @foreach (var row in presentation.Rows)
-                {
-                    <h4>Row: @row.RowNumber</h4>
-                    <div>
-                        @foreach (var seat in row.Seats)
-                        {
-                            var isSelected = selectedSeats.Any(s => s.Id == seat.Id);
-                            <div>
-                                <span>Seat: @seat.SeatNumber (Available: @seat.IsAvailable)</span>
-                                @if (isSelected)
-                                {
-                                    <button @onclick="() => SelectSeat(seat)" class="btn btn-danger">
-                                        Unselect
-                                    </button>
-                                }
-                                else
-                                {
-                                    <button @onclick="() => SelectSeat(seat)" class="btn btn-primary" disabled="@(!seat.IsAvailable)">
-                                        Select
-                                    </button>
-                                }
-                            </div>
-                        }
-                    </div>
-                }
+            <div class="text-center my-4">
+                <button @onclick="ShowOrderModal" class="btn btn-primary btn-lg">Select Seats</button>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-info text-center" role="alert">
+                <h4 class="alert-heading">Sorry, this showing is fully booked!</h4>
+                <p>All seats for this presentation of "@(presentation?.Title)" have been reserved. Please check other showtimes or browse our other exciting movies.</p>
             </div>
         }
     }
-
-    @if (selectedSeats.Count > 0)
+    else
     {
-        <button @onclick="ConfirmTickets" class="btn btn-success">Confirm Tickets</button>
-        <button @onclick="CancelOrder" class="btn btn-danger">Cancel Order</button>
+        @if (presentation == null)
+        {
+            <div class="text-center">
+                <h4>Loading all seats...</h4>
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        }
+        else
+        {
+            @if (presentation.Rows.Count > 0)
+            {
+                <div class="cinema-layout">
+                    <div class="seating-container">
+                        <div class="seat-map">
+                            @foreach (var row in presentation.Rows.OrderBy(r => r.RowNumber))
+                            {
+                                <div class="seat-row">
+                                    <div class="row-label">@row.RowNumber</div>
+                                    <div class="seats">
+                                        @foreach (var seat in row.Seats.OrderBy(s => s.SeatNumber))
+                                        {
+                                            var isSelected = selectedSeats.Any(s => s.Id == seat.Id);
+                                            string seatClass = isSelected ? "seat-selected" : 
+                                                               !seat.IsAvailable ? "seat-unavailable" : "seat-available";
+                                            
+                                            <div class="seat @seatClass" @onclick="() => SelectSeat(seat)" title="Row @row.RowNumber, Seat @seat.SeatNumber">
+                                                <span class="seat-number">@seat.SeatNumber</span>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        <div class="screen">
+                            <div class="screen-text">SCREEN</div>
+                        </div>
+                    </div>
+                    
+                    <div class="seat-legend">
+                        <div class="legend-item">
+                            <div class="seat-sample seat-available"></div>
+                            <span>Available</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="seat-sample seat-selected"></div>
+                            <span>Selected</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="seat-sample seat-unavailable"></div>
+                            <span>Unavailable</span>
+                        </div>
+                    </div>
+                    
+                    @if (selectedSeats.Count > 0)
+                    {
+                        <div class="order-summary">
+                            <h4>Selected Seats:</h4>
+                            <ul class="seat-list">
+                                @foreach (var seat in selectedSeats.OrderBy(s => s.RowNumber).ThenBy(s => s.SeatNumber))
+                                {
+                                    <li>Row @seat.RowNumber, Seat @seat.SeatNumber</li>
+                                }
+                            </ul>
+                            <div class="action-buttons">
+                                <button @onclick="ConfirmTickets" class="btn btn-success">Confirm Tickets</button>
+                                <button @onclick="CancelOrder" class="btn btn-danger">Cancel Order</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        }
     }
-}
+</div>
 
 <!-- Rename the modal to be more generic -->
 <div class="modal fade" id="orderModal" tabindex="-1" aria-labelledby="orderModalLabel" aria-hidden="true">
@@ -162,6 +199,173 @@ else
         </div>
     </div>
 </div>
+
+<style>
+    .cinema-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .cinema-title {
+        text-align: center;
+        margin-bottom: 20px;
+        font-weight: bold;
+    }
+    
+    .cinema-layout {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-top: 20px;
+    }
+    
+    .seating-container {
+        width: 100%;
+        max-width: 800px;
+        margin-bottom: 30px;
+        perspective: 1000px;
+    }
+    
+    .seat-map {
+        margin-bottom: 40px;
+        transform: rotateX(10deg);
+        transform-origin: bottom;
+    }
+    
+    .seat-row {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    
+    .row-label {
+        width: 30px;
+        text-align: center;
+        font-weight: bold;
+        color: #888;
+    }
+    
+    .seats {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .seat {
+        width: 30px;
+        height: 28px;
+        margin: 3px;
+        border-radius: 5px 5px 0 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        font-size: 0.75rem;
+        color: white;
+        text-shadow: 0 0 1px rgba(0,0,0,0.5);
+    }
+    
+    .seat-number {
+        position: absolute;
+        bottom: 2px;
+        font-size: 0.7rem;
+    }
+    
+    .seat-available {
+        background-color: #8B8000;
+        border: 1px solid #665e00;
+        color: white;
+    }
+    
+    .seat-available:hover {
+        background-color: #b3a800;
+    }
+    
+    .seat-selected {
+        background-color: #28a745;
+        border: 1px solid #218838;
+    }
+    
+    .seat-unavailable {
+        background-color: #343a40;
+        border: 1px solid #1d2124;
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+    
+    .screen {
+        height: 70px;
+        background-color: #151d4a;
+        width: 80%;
+        margin: 0 auto;
+        margin-top: 50px;
+        transform: rotateX(-30deg);
+        transform-origin: top;
+        box-shadow: 0 3px 10px rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .screen-text {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 1.5rem;
+        letter-spacing: 3px;
+    }
+    
+    .seat-legend {
+        display: flex;
+        justify-content: center;
+        margin: 30px 0;
+    }
+    
+    .legend-item {
+        display: flex;
+        align-items: center;
+        margin: 0 15px;
+    }
+    
+    .seat-sample {
+        width: 24px;
+        height: 24px;
+        border-radius: 5px 5px 0 0;
+        margin-right: 8px;
+    }
+    
+    .order-summary {
+        margin-top: 20px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 20px;
+        width: 100%;
+        max-width: 500px;
+    }
+    
+    .seat-list {
+        list-style-type: none;
+        padding: 0;
+        margin-bottom: 20px;
+    }
+    
+    .seat-list li {
+        display: inline-block;
+        margin-right: 10px;
+        margin-bottom: 5px;
+        background-color: #f8f9fa;
+        padding: 5px 10px;
+        border-radius: 3px;
+    }
+    
+    .action-buttons {
+        display: flex;
+        justify-content: space-between;
+    }
+</style>
 
 @code {
     [Parameter]
