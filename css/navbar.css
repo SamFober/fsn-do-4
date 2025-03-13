@@ -1,0 +1,104 @@
+/* Navbar */
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 25%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: transparent; /* Transparent background */
+    color: white;
+    padding: 10px 20px;
+    z-index: 1000;
+}
+
+.navbar-logo {
+    width: 150px; /* Adjust the size of the logo */
+    height: auto;
+	border-style: groove;
+}
+
+.nav-links {
+    display: flex;
+    gap: 20px;
+}
+
+.nav-links li {
+    list-style-type: none;
+}
+
+.nav-links a {
+    text-decoration: none;
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    transition: color 0.3s;
+}
+
+.nav-links a:hover {
+    color: #f39c12;
+}
+
+/* Hero Section (Cycling Images) */
+.hero {
+    position: relative;
+    width: 100%;
+    height: 50vh;
+    overflow: hidden;
+}
+
+.image-slider {
+    display: flex;
+    width: 300%;
+    animation: slide 15s infinite;
+}
+
+.slide {
+    width: 33.33%;
+    height: 100vh;
+    background-position: center;
+    background-size: cover;
+    opacity: 0;
+    transition: opacity 1s;
+}
+
+.slide.active {
+    opacity: 1;
+}
+
+@keyframes slide {
+    0% { transform: translateX(0); }
+    33% { transform: translateX(-33.33%); }
+    66% { transform: translateX(-66.66%); }
+    100% { transform: translateX(0); }
+}
+
+/* Sidebar */
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 200px;
+    height: 100%;
+    background-color: #333;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.sidebar .logo {
+    width: 80%;
+    height: auto;
+    margin-bottom: 20px;
+}
+
+.sidebar .cine-text {
+    font-size: 24px;
+    font-weight: bold;
+    line-height: 1.1;
+    text-align: center;
+}

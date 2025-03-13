@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cinemagia - De Magie van Film</title>
+    <link rel="stylesheet" href="css\style.css">
+    <link rel="stylesheet" href="css\navbar.css">
+    <link rel="stylesheet" href="css\footer.css">
+    <link rel="icon" href="img/favicon.ico" type="image/x-icon">
+		<!-- Preload images to prevent flickering -->
+	<link rel="preload" href="img/cycle-images/img-1.jpg" as="image" />
+    <link rel="preload" href="img/cycle-images/img-2.jpg" as="image" />
+    <link rel="preload" href="img/cycle-images/img-3jpg" as="image" />
+</head>
+<body>
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Navigation Bar (Overlay) -->
+        <nav class="navbar">
+            <div class="logo-container">
+                <img src="img/Cinemagia_logo.jpg" alt="Logo" class="navbar-logo"> <!-- Dummy logo -->
+            </div>
+            <ul class="nav-links">
+                <li><a href="#film-posters">AGENDA</a></li>
+                <li><a href="#films">FILMS</a></li>
+                <li><a href="#contact">CONTACT</a></li>
+            </ul>
+        </nav>
+
+        <!-- (Cycling Images) -->
+		<div id="homepage-slider" class="st-slider">
+			<input type="radio" class="cs_anchor radio" name="slider" id="slide1"/>
+			<input type="radio" class="cs_anchor radio" name="slider" id="slide2"/>
+			<input type="radio" class="cs_anchor radio" name="slider" id="slide3"/>
+			<input type="radio" class="cs_anchor radio" name="slider" id="play1" checked=""/>
+			
+				<div class="images">
+					<div class="images-inner">
+						<div class="image-slide">
+							<div class="image bg-yellow" style="background-image: url('img/cycle-images/img-1.jpg');"></div>
+						</div>
+						<div class="image-slide">
+							<div class="image bg-blue" style="background-image: url('img/cycle-images/img-2.jpg');"></div>
+						</div>
+						<div class="image-slide">
+							<div class="image bg-red" style="background-image: url('img/cycle-images/img-3.jpg');"></div>
+						</div>
+					</div>
+				</div>
+					
+				<div class="fake-radio">
+					<label for="slide1" class="radio-btn"></label>
+					<label for="slide2" class="radio-btn"></label>
+					<label for="slide3" class="radio-btn"></label>
+				</div>
+		</div>
+	</div>
+				
+		
+		<!--
+        <header class="hero">
+            <div id="homepage-slider" class="image-slider">
+                <div class="slide active" style="background-image: url('img/cycle-images/img-4.jpg');"></div>
+                <div class="slide" style="background-image: url('img/cycle-images/img-5.jpg');"></div>
+                <div class="slide" style="background-image: url('img/cycle-images/img-6.jpg');"></div>
+            </div>
+        </header>
+		-->
+		
+		<!-- Film Posters Section -->
+<section id="film-posters">
+    <button id="sort-btn">Sort by Earliest Time</button>
+    <div class="film-grid">
+        <h2>Nu te zien</h2>
+        <div class="film-item">
+            <img src="img/poster1.jpg" alt="Film 1">
+            <div class="time-slots">
+                <button class="time-slot-btn">18:00</button>
+                <button class="time-slot-btn">20:30</button>
+                <button class="time-slot-btn">22:45</button>
+            </div>
+        </div>
+        <div class="film-item">
+            <img src="img/poster2.jpg" alt="Film 2">
+            <div class="time-slots">
+                <button class="time-slot-btn">17:00</button>
+                <button class="time-slot-btn">19:45</button>
+                <button class="time-slot-btn">21:30</button>
+            </div>
+        </div>
+        <div class="film-item">
+            <img src="img/poster3.jpg" alt="Film 3">
+            <div class="time-slots">
+                <button class="time-slot-btn">16:30</button>
+                <button class="time-slot-btn">19:00</button>
+                <button class="time-slot-btn">21:15</button>
+            </div>
+        </div>
+        <div class="film-item">
+            <img src="img/poster4.jpg" alt="Film 4">
+            <div class="time-slots">
+                <button class="time-slot-btn">15:45</button>
+                <button class="time-slot-btn">18:15</button>
+                <button class="time-slot-btn">20:45</button>
+            </div>
+        </div>
+        <div class="film-item">
+            <img src="img/poster5.jpg" alt="Film 5">
+            <div class="time-slots">
+                <button class="time-slot-btn">14:30</button>
+                <button class="time-slot-btn">17:30</button>
+                <button class="time-slot-btn">20:00</button>
+            </div>
+        </div>
+        <div class="film-item">
+            <img src="img/poster6.jpg" alt="Film 6">
+            <div class="time-slots">
+                <button class="time-slot-btn">16:00</button>
+                <button class="time-slot-btn">18:45</button>
+                <button class="time-slot-btn">21:15</button>
+            </div>
+        </div>
+        <div class="film-item">
+            <img src="img/poster7.jpg" alt="Film 7">
+            <div class="time-slots">
+                <button class="time-slot-btn">15:00</button>
+                <button class="time-slot-btn">17:45</button>
+                <button class="time-slot-btn">20:30</button>
+            </div>
+        </div>
+        <div class="film-item">
+            <img src="img/poster8.jpg" alt="Film 8">
+            <div class="time-slots">
+                <button class="time-slot-btn">13:30</button>
+                <button class="time-slot-btn">16:15</button>
+                <button class="time-slot-btn">19:00</button>
+            </div>
+        </div>
+        <div class="film-item">
+            <img src="img/poster9.jpeg" alt="Film 9">
+            <div class="time-slots">
+                <button class="time-slot-btn">12:00</button>
+                <button class="time-slot-btn">15:00</button>
+                <button class="time-slot-btn">18:00</button>
+            </div>
+        </div>
+        <div class="film-item">
+            <img src="img/poster10.png" alt="Film 10">
+            <div class="time-slots">
+                <button class="time-slot-btn">11:45</button>
+                <button class="time-slot-btn">14:30</button>
+                <button class="time-slot-btn">17:15</button>
+            </div>
+        </div>
+        <div class="film-item">
+            <img src="img/poster11.jpg" alt="Film 11">
+            <div class="time-slots">
+                <button class="time-slot-btn">13:00</button>
+                <button class="time-slot-btn">16:00</button>
+                <button class="time-slot-btn">19:45</button>
+            </div>
+        </div>
+        <div class="film-item">
+            <img src="img/poster12.jpg" alt="Film 12">
+            <div class="time-slots">
+                <button class="time-slot-btn">10:30</button>
+                <button class="time-slot-btn">13:45</button>
+                <button class="time-slot-btn">17:30</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+	<!-- Footer -->
+	<footer class="footer">
+		<ul class="footer-nav">
+			<li class="footer-item">
+				<a class="footer-link" href="#">Home</a>
+			</li>
+			<li class="footer-item">
+				<a class="footer-link" href="index.html#section-1">
+					Meer informatie
+				</a>
+			</li>
+			<li class="footer-item">
+				<a class="footer-link" href="diensten.html">
+					Onze diensten
+				</a>
+			</li>
+			<li class="footer-item">
+				<a class="footer-link" href="contact.html">Contact</a>
+			</li>
+		</ul>
+		<a href="https://www.cinemagia.nl">
+			<img src="img/Cinemagia_logo.jpg" alt="Logo" class="footer-logo"/>
+		</a>
+		<p class="footer-copyright">
+			&copy; Copyright by
+			<a class="footer-link" target="_blank" href="https://www.premaz.nl/">
+				Cinemagia.
+			</a>
+			Dit is een website voor een schoolopdracht, Cinemagia is een
+			fictief bedrijf.
+			<br />
+			<a class="footer-link" target="_blank" href="pdf-files/Algemene voorwaarden Premaz.pdf">
+				Algemene voorwaarden
+			</a>
+			/
+			<a class="footer-link" target="_blank" href="pdf-files/privacy_statement_16-10-2021.pdf">
+				Privacyverklaring
+			</a>
+		</p>
+	</footer>
+
+    <script src="js/js.js" defer>
+	</script>
+</body>
+</html>
