@@ -42,19 +42,7 @@ namespace WebApi.Services
                 var orderToken = Guid.NewGuid();
                 var selectedSeat = availableSeats.First();
 
-                var seatLock = new SeatLock
-                {
-                    SeatId = selectedSeat.Id,
-                    OrderToken = orderToken,
-                    CreatedAt = DateTime.UtcNow,
-                    ExpiresAt = DateTime.UtcNow.AddMinutes(10)
-                };
-
-                if (!await _repository.AddSeatLocks(new List<SeatLock> { seatLock }))
-                {
-                    throw new SeatNotAvailableException("Failed to lock selected seat");
-                }
-
+                // First, create and save the order
                 var order = new TicketOrder
                 {
                     OrderToken = orderToken,
@@ -75,6 +63,22 @@ namespace WebApi.Services
                 if (!await _repository.SaveOrder(order))
                 {
                     throw new Exception("Failed to save order");
+                }
+
+                // Then create the seat lock
+                var seatLock = new SeatLock
+                {
+                    SeatId = selectedSeat.Id,
+                    PresentationId = request.PresentationId,
+                    OrderToken = orderToken,
+                    TicketOrderId = order.Id,
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(10)
+                };
+
+                if (!await _repository.AddSeatLocks(new List<SeatLock> { seatLock }))
+                {
+                    throw new SeatNotAvailableException("Failed to lock selected seat");
                 }
 
                 // After successfully locking the seats, update their availability
@@ -287,6 +291,7 @@ namespace WebApi.Services
             {
                 PresentationId = order.PresentationId,
                 SeatId = item.SeatId,
+                TicketOrderId = order.Id,
                 CustomerName = request.CustomerName,
                 CustomerEmail = request.CustomerEmail,
                 Status = TicketStatus.Reserved,
@@ -294,7 +299,8 @@ namespace WebApi.Services
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 Presentation = order.Presentation!,
-                Seat = item.Seat
+                Seat = item.Seat,
+                TicketOrder = order
             }).ToList();
 
             // Update order status
@@ -347,7 +353,9 @@ namespace WebApi.Services
                 var seatLocks = request.SeatIds.Select(seatId => new SeatLock
                 {
                     SeatId = seatId,
+                    PresentationId = order.PresentationId,
                     OrderToken = orderToken,
+                    TicketOrderId = order.Id,
                     CreatedAt = DateTime.UtcNow,
                     ExpiresAt = order.ExpiresAt // Use order's expiration time instead of a new one
                 }).ToList();

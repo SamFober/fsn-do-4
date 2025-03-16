@@ -15,6 +15,8 @@ namespace WebApi.Models
         public int RequestedSeats { get; set; } // Number of seats originally requested
         public virtual Presentation? Presentation { get; set; }
         public Dictionary<string, SeatingOption> AvailableOptions { get; set; } = new();
+        public ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
+        public ICollection<SeatLock> SeatLocks { get; set; } = new List<SeatLock>();
         public ICollection<TicketOrderItem> Items { get; set; } = new List<TicketOrderItem>();
     }
 
