@@ -545,6 +545,34 @@ namespace WebApi.Controllers
             }
         }
 
+        /// <summary>
+        /// Gets the ordered tickets in the form of a PDF file.
+        /// </summary>
+        /// <param name="orderToken">The unique identifier for the order</param>
+        /// <returns>A PDF file with the tickets</returns>
+        /// <response code="200">Tickets fetched and created successfully</response>
+        /// <response code="404">If the order is not found or already expired</response>
+        [HttpGet("{orderToken}/download")]
+        [ProducesResponseType(typeof(File), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> DownloadPdfTickets(Guid orderToken)
+        {
+            try
+            {
+                var pdf = await _ticketService.GetTicketsByOrderToken(orderToken);
+                return File(pdf, "application/pdf", orderToken + ".pdf");
+            }
+            catch (OrderNotFoundException)
+            {
+                return NotFound("Order not found or expired");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while creating the tickets");
+                return StatusCode(500, "An error occurred while creating the tickets");
+            }
+        }
+
         private async Task<bool> TryLockSeats(List<int> seatIds, Guid orderToken, int presentationId)
         {
             try

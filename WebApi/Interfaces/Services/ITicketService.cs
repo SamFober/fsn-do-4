@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using WebApi.Models;
 using WebApi.Models.Requests;
 using WebApi.Models.Responses;
 
@@ -17,5 +18,6 @@ namespace WebApi.Interfaces.Services
         Task<List<TicketResponse>> ConfirmOrder(Guid orderToken, ConfirmOrderRequest request);
         Task<OrderResponse> SelectGroupSeatingOption(string option, StartGroupOptionRequest request);
         Task CancelOrder(Guid orderToken);
+        Task<byte[]> GetTicketsByOrderToken(Guid orderToken);
     }
 } 

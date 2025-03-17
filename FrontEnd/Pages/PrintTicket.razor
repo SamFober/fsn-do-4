@@ -916,6 +916,6 @@
 
     private async Task PrintTickets()
     {
-        await JSRuntime.InvokeVoidAsync("openPrintDialog");
+        await JSRuntime.InvokeVoidAsync("openPrintDialog", "http://localhost:5213/api/Tickets/95ebe295-f05c-4e1c-bff0-de08ed4fef94/download");
     }
 }

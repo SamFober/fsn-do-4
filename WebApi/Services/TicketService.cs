@@ -16,15 +16,18 @@ namespace WebApi.Services
     public class TicketService : ITicketService
     {
         private readonly ITicketRepository _repository;
+        private readonly ITicketPdfService _ticketPdfService;
         private readonly ILogger<TicketService> _logger;
         private readonly ApplicationDbContext _context;
 
         public TicketService(
             ITicketRepository repository,
+            ITicketPdfService ticketPdfService,
             ILogger<TicketService> logger,
             ApplicationDbContext context)
         {
             _repository = repository;
+            _ticketPdfService = ticketPdfService;
             _logger = logger;
             _context = context;
         }
@@ -627,6 +630,20 @@ namespace WebApi.Services
                 _logger.LogError(ex, "Error cancelling order {OrderToken}", orderToken);
                 throw;
             }
+        }
+
+        public async Task<byte[]> GetTicketsByOrderToken(Guid orderToken)
+        {
+            var ticketOrder = await _repository.FindTicketOrderByOrderToken(orderToken);
+
+            if (ticketOrder == null)
+            {
+                throw new OrderNotFoundException("No order found with the given order token");
+            }
+
+            var tickets = await _repository.FindTicketsByOrderId(ticketOrder.Id);
+
+            return _ticketPdfService.CreatePdfTicketsAsByteArray(tickets, ticketOrder.OrderToken);
         }
     }
 } 
