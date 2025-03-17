@@ -1,0 +1,3 @@
+﻿function openPrintDialog() {
+    window.print();
+}
