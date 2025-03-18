@@ -19,5 +19,6 @@ namespace WebApi.Interfaces.Services
         Task<OrderResponse> SelectGroupSeatingOption(string option, StartGroupOptionRequest request);
         Task CancelOrder(Guid orderToken);
         Task<byte[]> GetTicketsByOrderToken(Guid orderToken);
+        Task<byte[]> GetTicketsByPhoneBookingCode(string phoneBookingCode);
     }
 } 

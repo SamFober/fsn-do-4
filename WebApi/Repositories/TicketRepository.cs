@@ -372,5 +372,17 @@ namespace WebApi.Repositories
                 .Include(t => t.Seat)
                 .ToListAsync();
         }
+
+        public async Task<List<Ticket>> FindTicketsByPhoneBookingCode(string phoneBookingCode)
+        {
+            return await _context.Tickets
+                .Where(t => t.PhoneBookingCode == phoneBookingCode)
+                .Include(t => t.Presentation)
+                .ThenInclude(p => p.Hall)
+                .Include(t => t.Presentation)
+                .ThenInclude(p => p.Movie)
+                .Include(t => t.Seat)
+                .ToListAsync();
+        }
     }
 } 

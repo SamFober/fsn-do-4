@@ -23,5 +23,6 @@ namespace WebApi.Interfaces.Repositories
         Task<List<SeatLock>> GetSeatLocksByOrderToken(Guid orderToken);
         Task<TicketOrder?> FindTicketOrderByOrderToken(Guid orderToken);
         Task<List<Ticket>> FindTicketsByOrderId(int orderId);
+        Task<List<Ticket>> FindTicketsByPhoneBookingCode(string phoneBookingCode);
     }
 } 

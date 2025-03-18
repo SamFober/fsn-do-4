@@ -645,5 +645,17 @@ namespace WebApi.Services
 
             return _ticketPdfService.CreatePdfTicketsAsByteArray(tickets, ticketOrder.OrderToken);
         }
+
+        public async Task<byte[]> GetTicketsByPhoneBookingCode(string phoneBookingCode)
+        {
+            var tickets = await _repository.FindTicketsByPhoneBookingCode(phoneBookingCode);
+
+            if(tickets.Count() == 0 || tickets == null)
+            {
+                throw new OrderNotFoundException("No tickets found with the given phone booking code.");
+            }
+
+            return _ticketPdfService.CreatePdfTicketsAsByteArray(tickets, Guid.NewGuid());
+        }
     }
 } 
