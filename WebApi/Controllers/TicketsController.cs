@@ -573,6 +573,34 @@ namespace WebApi.Controllers
             }
         }
 
+        /// <summary>
+        /// Gets the ordered tickets in the form of a PDF file.
+        /// </summary>
+        /// <param name="phoneBookingCode">The phone booking code for the tickets</param>
+        /// <returns>A PDF file with the tickets</returns>
+        /// <response code="200">Tickets fetched and created successfully</response>
+        /// <response code="404">If the order is not found or already expired</response>
+        [HttpGet("phone-booking/{phoneBookingCode}/download")]
+        [ProducesResponseType(typeof(File), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> DownloadPdfTickets(string phoneBookingCode)
+        {
+            try
+            {
+                var pdf = await _ticketService.GetTicketsByPhoneBookingCode(phoneBookingCode);
+                return File(pdf, "application/pdf", phoneBookingCode + ".pdf");
+            }
+            catch (OrderNotFoundException)
+            {
+                return NotFound("Order not found or expired");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while creating the tickets");
+                return StatusCode(500, "An error occurred while creating the tickets");
+            }
+        }
+
         private async Task<bool> TryLockSeats(List<int> seatIds, Guid orderToken, int presentationId)
         {
             try
