@@ -6,6 +6,7 @@
 @using System.Timers
 
 @implements IDisposable
+@inject NavigationManager Navigation
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
 
@@ -2137,11 +2138,12 @@
         }
     }
 
-    private async Task GetTickets()
+    private void GetTickets()
     {
-        await JSRuntime.InvokeVoidAsync("openPrintDialog", $"http://localhost:5213/api/Tickets/{orderToken}/download");
+        string url = $"http://localhost:5270/{orderToken}/finish";
+        Navigation.NavigateTo(url, true);
     }
-    
+
     [JSInvokable]
     public static Task UpdateProgressStep(int step)
     {
