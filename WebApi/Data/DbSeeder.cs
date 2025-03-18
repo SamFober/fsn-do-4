@@ -55,6 +55,9 @@ namespace WebApi.Data
                     { 
                         Title = "The Matrix",
                         Description = "A computer programmer discovers a mysterious world.",
+                        PosterUrl = "",
+                        Genre = "Action",
+                        AgeRating = "R",
                         DurationMinutes = 136,
                         ReleaseDate = new DateTime(1999, 3, 31),
                         IsActive = true
@@ -63,6 +66,9 @@ namespace WebApi.Data
                     { 
                         Title = "Inception",
                         Description = "A thief who steals corporate secrets through dream-sharing technology.",
+                        PosterUrl = "",
+                        Genre = "Action",
+                        AgeRating = "R",
                         DurationMinutes = 148,
                         ReleaseDate = new DateTime(2010, 7, 16),
                         IsActive = true

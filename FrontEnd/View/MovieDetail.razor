@@ -1,0 +1,36 @@
+﻿@page "/film/{Id:int}"
+@using FrontEnd.Models
+@inject HttpClient Http
+
+<h1>@(Movie?.Title ?? "Film niet gevonden")</h1>
+
+@if (Movie != null)
+{
+    <img src="@Movie.PosterUrl" alt="@Movie.Title" width="300" />
+    <p><strong>Beschrijving:</strong> @Movie.Description</p>
+    <p><strong>Genre:</strong> @Movie.Genre</p>
+    <p><strong>Leeftijdsclassificatie:</strong> @Movie.AgeRating</p>
+    <p><strong>Duur:</strong> @Movie.DurationMinutes minuten</p>
+    <p><strong>Releasedatum:</strong> @(Movie.ReleaseDate?.ToString("dd-MM-yyyy") ?? "Onbekend")</p>
+}
+else
+{
+    <p>Film niet gevonden...</p>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Movie? Movie { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Movie = await Http.GetFromJsonAsync<Movie>($"api/movies/{Id}");
+        }
+        catch (Exception)
+        {
+            Movie = null;
+        }
+    }
+}

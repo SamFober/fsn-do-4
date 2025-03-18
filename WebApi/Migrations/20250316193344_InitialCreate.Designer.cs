@@ -10,8 +10,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace WebApi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250303035610_FixHallIdRelationship")]
-    partial class FixHallIdRelationship
+    [Migration("20250316193344_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -51,6 +51,10 @@ namespace WebApi.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    b.Property<string>("AgeRating")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
@@ -60,8 +64,16 @@ namespace WebApi.Migrations
                     b.Property<int>("DurationMinutes")
                         .HasColumnType("int");
 
+                    b.Property<string>("Genre")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("PosterUrl")
+                        .IsRequired()
+                        .HasColumnType("longtext");
 
                     b.Property<DateTime?>("ReleaseDate")
                         .HasColumnType("datetime(6)");
@@ -230,6 +242,9 @@ namespace WebApi.Migrations
                         .HasColumnType("char(36)");
 
                     b.Property<int>("PresentationId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RequestedSeats")
                         .HasColumnType("int");
 
                     b.Property<int>("Status")
