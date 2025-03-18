@@ -1,0 +1,65 @@
+@page "/codechecker"
+
+@using System.Net.Http
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@using Microsoft.AspNetCore.Components
+
+<PageTitle>Redeem code</PageTitle>
+
+<div class="d-flex justify-content-center align-items-center vh-100">
+    <div class="text-center">
+        <h3>Enter Code</h3>
+        <input @bind="code" class="form-control mb-3" placeholder="Enter your code" />
+        <button class="btn btn-primary" @onclick="CheckCode">Submit</button>
+        @if (!string.IsNullOrEmpty(alertMessage))
+        {
+            <div class="mt-3">
+                <div class="alert" style="@alertColor">@alertMessage</div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private string? code;
+    private string? alertMessage;
+    private string? alertColor;
+
+    private async Task CheckCode()
+    {
+        if (string.IsNullOrEmpty(code))
+        {
+            alertMessage = "Please enter a code.";
+            alertColor = "color: red;";
+            return;
+        }
+
+        try
+        {
+            var response = await Http.GetAsync($"api/codechecker/check-code?code={code}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                await JSRuntime.InvokeVoidAsync("openPrintDialog", "http://localhost:5213/api/Tickets/95ebe295-f05c-4e1c-bff0-de08ed4fef94/download");
+                alertMessage = "Here are your tickets! Enjoy!";
+                alertColor = "color: green;";
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                alertMessage = "No tickets found.";
+                alertColor = "color: red;";
+            }
+            else
+            {
+                alertMessage = "An unexpected error occurred.";
+                alertColor = "color: orange;";
+            }
+        }
+        catch (Exception)
+        {
+            alertMessage = "Failed to contact the server.";
+            alertColor = "color: red;";
+        }
+    }
+}

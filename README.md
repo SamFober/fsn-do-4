@@ -162,3 +162,41 @@ The API uses standard HTTP status codes:
 - 500: Server error
 
 Error responses include descriptive messages for troubleshooting.
+
+## Seat Selection Algorithm
+
+The system uses a sophisticated algorithm to select the best available seats for customers. The algorithm considers several factors:
+
+### Single Seat Selection
+When selecting a single seat, the algorithm:
+1. Prioritizes seats about 2/3 back from the screen (optimal viewing distance)
+2. Prefers center seats over side seats
+3. Applies penalties for:
+   - Front row seats (especially corners)
+   - Side seats (increasing penalty towards edges)
+   - Extreme viewing angles
+4. Gives bonus points for seats in the ideal viewing zone
+
+### Group Seat Selection
+For multiple seats, the algorithm:
+1. First attempts to find consecutive seats in the same row
+2. Prioritizes rows in this order:
+   - 2/3 back from screen (optimal)
+   - Middle rows
+   - Back rows
+   - Front rows (least preferred)
+3. If consecutive seats aren't available, finds best available split options:
+   - Minimizes the number of splits
+   - Keeps groups as close together as possible
+   - Maintains same seating quality for all group members
+
+### Scoring Factors
+Each seat is scored based on:
+- Distance from screen center (Euclidean distance)
+- Row position relative to optimal viewing distance
+- Side distance from center
+- Viewing angle penalties
+- Front row penalties
+- Corner seat penalties
+
+Lower scores are better, with penalties increasing the score and bonuses decreasing it.
