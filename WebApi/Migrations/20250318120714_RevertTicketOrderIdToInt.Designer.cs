@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -9,9 +10,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace WebApi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250318120714_RevertTicketOrderIdToInt")]
+    partial class RevertTicketOrderIdToInt
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -188,8 +191,8 @@ namespace WebApi.Migrations
                     b.Property<int>("SeatId")
                         .HasColumnType("int");
 
-                    b.Property<Guid>("TicketOrderId")
-                        .HasColumnType("char(36)");
+                    b.Property<int>("TicketOrderId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -202,9 +205,9 @@ namespace WebApi.Migrations
 
             modelBuilder.Entity("WebApi.Models.Ticket", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
@@ -229,8 +232,8 @@ namespace WebApi.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
-                    b.Property<Guid>("TicketOrderId")
-                        .HasColumnType("char(36)");
+                    b.Property<int>("TicketOrderId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime(6)");
@@ -249,9 +252,9 @@ namespace WebApi.Migrations
 
             modelBuilder.Entity("WebApi.Models.TicketOrder", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
+                        .HasColumnType("int");
 
                     b.Property<string>("AvailableOptions")
                         .IsRequired()
@@ -294,8 +297,8 @@ namespace WebApi.Migrations
                     b.Property<int>("SeatId")
                         .HasColumnType("int");
 
-                    b.Property<Guid>("TicketOrderId")
-                        .HasColumnType("char(36)");
+                    b.Property<int>("TicketOrderId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
