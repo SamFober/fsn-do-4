@@ -1,4 +1,4 @@
-@page "/codechecker"
+@page "/redeem"
 
 @using System.Net.Http
 @inject HttpClient Http
@@ -9,7 +9,7 @@
 
 <div class="d-flex justify-content-center align-items-center vh-100">
     <div class="text-center">
-        <h3>Enter Code</h3>
+        <h3>Redeem Tickets</h3>
         <input @bind="code" class="form-control mb-3" placeholder="Enter your code" />
         <button class="btn btn-primary" @onclick="CheckCode">Submit</button>
         @if (!string.IsNullOrEmpty(alertMessage))
@@ -37,11 +37,11 @@
 
         try
         {
-            var response = await Http.GetAsync($"api/codechecker/check-code?code={code}");
+            var response = await Http.GetAsync($"http://localhost:5213/api/Tickets/phone-booking/{code}/download");
 
             if (response.IsSuccessStatusCode)
             {
-                await JSRuntime.InvokeVoidAsync("openPrintDialog", "http://localhost:5213/api/Tickets/95ebe295-f05c-4e1c-bff0-de08ed4fef94/download");
+                await JSRuntime.InvokeVoidAsync("openPrintDialog", $"http://localhost:5213/api/Tickets/phone-booking/{code}/download");
                 alertMessage = "Here are your tickets! Enjoy!";
                 alertColor = "color: green;";
             }
