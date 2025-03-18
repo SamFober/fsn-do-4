@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using WebApi.Data;
-using WebApi.Models;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
 using WebApi.Interfaces.Services;
 using QuestPDF.Infrastructure;
+using WebApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 

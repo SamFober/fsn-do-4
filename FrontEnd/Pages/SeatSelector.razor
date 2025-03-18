@@ -277,6 +277,43 @@
     </div>
 </div>
 
+<div class="modal fade cinema-modal" id="numpadModal" tabindex="-1" aria-labelledby="numpadModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content cinema-modal-content">
+            <div class="modal-header cinema-modal-header">
+                <h5 class="modal-title">Total: €@CalculateTotalPrice().ToString("F2"). Please enter your PIN</h5>
+            </div>
+            <div class="modal-body cinema-modal-body cinema-modal-body-numpad">
+                <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+                <div class="numpad-container">
+                    <div class="numpad-display">@numpadInputValue</div>
+                    <div class="numpad-grid">
+                        @foreach (var num in new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9" })
+                        {
+                            <button class="numpad-button" @onclick="() => NumpadAddNumber(num)">@num</button>
+                        }
+                        <button class="numpad-button" @onclick="@(() => NumpadAddNumber("0"))">0</button>
+                        <button class="numpad-button" @onclick="NumpadRemoveNumber"><i class="material-icons">&#xe14a;</i></button>
+                        <button class="numpad-button numpad-clear" @onclick="NumpadClearInput">AC</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer cinema-modal-footer">
+                <!-- Conditionally change if PIN is confirmed -->
+                @if (!numpadPinConfirmed)
+                {
+                    <button type="button" class="cinema-btn cinema-btn-danger" @onclick="CancelOrder">Cancel Order</button>
+                    <button type="button" class="cinema-btn cinema-btn-primary" @onclick="NumpadConfirmInput">Confirm PIN</button>
+                }
+                else
+                {
+                    <button type="button" class="cinema-btn cinema-btn-primary" @onclick="GetTickets">Get tickets</button>    
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
     .cinema-container {
         max-width: 1000px;
@@ -1099,6 +1136,11 @@
         padding: 25px;
         font-size: 1.1rem;
     }
+
+    .cinema-modal-body-numpad {
+        display: flex;
+        justify-content: center;
+    }
     
     .cinema-message {
         line-height: 1.6;
@@ -1142,6 +1184,62 @@
         margin-top: 5px;
         font-size: 0.9rem;
         color: rgba(255, 255, 255, 0.7);
+    }
+
+    /* Numpad modal */
+    .numpad-container {
+        width: 250px;
+        background: transparent;
+        color: white;
+        border-radius: 10px;
+        padding: 15px;
+        text-align: center;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .numpad-display {
+        height: 50px;
+        font-size: 1.5em;
+        background: transparent;
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        color: white;
+        border: 1px solid white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .numpad-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+
+    .numpad-button {
+        background: transparent;
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 15px;
+        font-size: 1.2em;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.2s ease, transform 0.2s ease;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+        .numpad-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(1.1);
+        }
+
+    .numpad-clear {
+        background: transparent;
+        color: white;
+        border: 1px solid rgba(255, 0, 0, 0.3);
     }
 </style>
 
@@ -1758,8 +1856,11 @@
             var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { customerName = "NamHere", customerEmail = "validEmailHere" });
 
             if (confirmationResponse.IsSuccessStatusCode)
-            {
+            /*{
                 SetMessage("Tickets confirmed successfully!");
+            }*/
+            {
+                await JSRuntime.InvokeVoidAsync("showModal", "numpadModal");
             }
             else
             {
@@ -1859,6 +1960,7 @@
                 showSeatSelectionModal = false;
                 await JSRuntime.InvokeVoidAsync("hideModal", "seatingOptionsModal");
                 await JSRuntime.InvokeVoidAsync("hideModal", "singleOptionConfirmModal");
+                await JSRuntime.InvokeVoidAsync("hideModal", "numpadModal");
 
                 // Call the API to cancel the order
                 var response = await Http.PostAsync($"api/tickets/orders/{tokenToCancel}/cancel", null);
@@ -1877,6 +1979,8 @@
                     availableOptions = null;
                     selectedOption = null;
                     SetMessage("Order cancelled successfully.");
+                    numpadPinConfirmed = false;
+                    NumpadClearInput();
 
                     // Refresh the seats to show updated availability
                     await LoadSeats();
@@ -1994,6 +2098,48 @@
         {
             await JSRuntime.InvokeVoidAsync("initScrollTracking");
         }
+    }
+
+    // Numpad functions
+    private string numpadInputValue = "";
+    private bool numpadPinConfirmed = false;
+
+    private void NumpadAddNumber(string number)
+    {
+        if (numpadInputValue == "Error") NumpadClearInput();
+        if (numpadInputValue.Length < 4)
+            numpadInputValue += number;
+    }
+
+    private void NumpadRemoveNumber()
+    {
+        if (!string.IsNullOrEmpty(numpadInputValue) && numpadInputValue != "Error" && numpadInputValue != "Confirmed")
+        {
+            numpadInputValue = numpadInputValue[..^1];
+        }
+    }
+
+    private void NumpadClearInput() => numpadInputValue = "";
+    public async Task NumpadConfirmInput()
+    {
+        if (numpadInputValue.Length == 4 && numpadInputValue.All(char.IsDigit))
+        {
+            numpadInputValue = "Processing..";
+            StateHasChanged(); 
+            await Task.Delay(2000); 
+            numpadInputValue = "Confirmed";
+
+            numpadPinConfirmed = true;
+        }
+        else
+        {
+            numpadInputValue = "Error";
+        }
+    }
+
+    private async Task GetTickets()
+    {
+        await JSRuntime.InvokeVoidAsync("openPrintDialog", $"http://localhost:5213/api/Tickets/{orderToken}/download");
     }
     
     [JSInvokable]
