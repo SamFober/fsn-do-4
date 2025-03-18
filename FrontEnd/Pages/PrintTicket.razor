@@ -1,4 +1,4 @@
-﻿@page "/{orderToken:string}/finish"
+﻿@page "/{orderToken}/finish"
 @using FrontEnd.Models
 
 @inject HttpClient httpClient
@@ -7,6 +7,28 @@
 
 
 <div class="cinema-container cinema-dark-mode" id="cinemaContainer">
+    <div class="sticky-header-wrapper">
+        <div class="sticky-progress-container">
+            <div class="booking-progress-wrapper">
+                <div class="booking-progress">
+                    <div class="progress-step">
+                        <div class="step-circle">1</div>
+                        <div class="step-label">Choose Seats</div>
+                    </div>
+                    <div class="progress-connector"></div>
+                    <div class="progress-step">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">Payment</div>
+                    </div>
+                    <div class="progress-connector"></div>
+                    <div class="progress-step active">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">Confirmation</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="content-with-header-space">
         @if (message != null)
         {
@@ -947,12 +969,12 @@
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                message = "No tickets found.";
+                message = "Error: No tickets found.";
                 //alertColor = "color: red;";
             }
             else
             {
-                message = "An unexpected error occurred.";
+                message = "Error: unknown";
                 //alertColor = "color: orange;";
             }
     }
