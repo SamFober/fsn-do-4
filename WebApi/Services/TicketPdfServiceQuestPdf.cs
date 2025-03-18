@@ -14,7 +14,13 @@ namespace WebApi.Services
 
         public TicketPdfServiceQuestPdf()
         {
-            headerImageBytes = File.ReadAllBytes("Resources/Images/Cinemagia_logo.jpg");
+            try
+            {
+                headerImageBytes = File.ReadAllBytes("Resources/Images/Cinemagia_logo.jpg");
+            } catch(Exception)
+            {
+                headerImageBytes = Placeholders.Image(10, 10);
+            }
             this.qRCodeGenerator = new QRCodeGenerator();
         }
         public byte[] CreatePdfTicketsAsByteArray(List<Ticket> tickets, Guid orderToken)
