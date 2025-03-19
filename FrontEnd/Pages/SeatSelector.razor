@@ -8,6 +8,7 @@
 @implements IDisposable
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
 
 <div class="cinema-container cinema-dark-mode" id="cinemaContainer">
     <div class="sticky-header-wrapper">
@@ -333,7 +334,7 @@
     .seating-container {
         width: 100%;
         max-width: 800px;
-        margin-bottom: 30px;
+        margin: 0 auto 30px;
         perspective: 1000px;
     }
     
@@ -341,6 +342,7 @@
         margin-bottom: 40px;
         transform: rotateX(12deg);
         transform-origin: bottom;
+        width: 100%;
     }
     
     .seat-row {
@@ -348,20 +350,32 @@
         justify-content: center;
         align-items: center;
         margin-bottom: 10px;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
     }
     
-    .row-label {
-        width: 30px;
-        text-align: center;
-        font-weight: bold;
-        color: #888;
+    .seat-row::-webkit-scrollbar {
+        display: none;
     }
     
     .seats {
         display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
+        flex-wrap: nowrap;
         gap: 5px;
+        padding: 0 10px;
+        min-width: min-content;
+        justify-content: center;
+    }
+    
+    .row-label {
+        flex-shrink: 0;
+        width: 30px;
+        text-align: right;
+        margin-right: 15px;
+        font-weight: 500;
     }
     
     .seat {
@@ -679,43 +693,18 @@
         max-width: 400px;
     }
     
-    @@media (max-width: 768px) {
-        .seat {
-            width: 26px;
-            height: 24px;
-            font-size: 0.6rem;
+    @@media (max-width: 767px) {
+        .seats {
+            justify-content: flex-start;
+        }
+        
+        .seat-row {
+            justify-content: flex-start;
         }
         
         .row-label {
-            width: 20px;
-            font-size: 0.8rem;
-        }
-        
-        .screen {
-            height: 50px;
-        }
-        
-        .screen-text {
-            font-size: 1.2rem;
-        }
-        
-        .progress-step {
-            width: 80px;
-        }
-        
-        .progress-step:not(:last-child):after {
-            width: 40px;
-            right: -25px;
-        }
-        
-        .step-number {
-            width: 30px;
-            height: 30px;
-            font-size: 1rem;
-        }
-        
-        .step-label {
-            font-size: 0.7rem;
+            width: 25px;
+            margin-right: 10px;
         }
     }
     
