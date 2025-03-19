@@ -218,32 +218,32 @@
 </div>
 
 <!-- Add this modal for seating options -->
-<div class="modal fade cinema-modal" id="seatingOptionsModal" tabindex="-1" aria-labelledby="seatingOptionsModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<div class="modal fade cinema-modal" id="seatingOptionsModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="seatingOptionsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content cinema-modal-content">
             <div class="modal-header cinema-modal-header">
                 <h5 class="modal-title">Select Seating Option</h5>
-                <button type="button" class="btn-close cinema-close-btn" data-bs-dismiss="modal" aria-label="Close"></button>
+                <!-- No close button to force user decision -->
             </div>
             <div class="modal-body cinema-modal-body">
                 @if (availableOptions != null)
                 {
                     @foreach (var option in availableOptions)
                     {
-                        <div class="cinema-radio-option mb-3">
+                        <label class="cinema-radio-option mb-3">
                             <input class="cinema-radio-input" type="radio" name="seatingOption" 
                                    value="@option.Key" @onchange="@(e => selectedOption = option.Key)" 
                                    checked="@(selectedOption == option.Key)" />
-                            <label class="cinema-radio-label">
-                                @option.Value.Description
+                            <div class="cinema-radio-content">
+                                <span class="cinema-radio-title">@option.Value.Description</span>
                                 <div class="cinema-option-details">
                                     @foreach (var group in option.Value.Groups)
                                     {
                                         <div>@group.Description</div>
                                     }
                                 </div>
-                            </label>
-                        </div>
+                            </div>
+                        </label>
                     }
                 }
             </div>
@@ -256,12 +256,12 @@
 </div>
 
 <!-- Add this modal for single option confirmation -->
-<div class="modal fade cinema-modal" id="singleOptionConfirmModal" tabindex="-1" aria-labelledby="singleOptionConfirmModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<div class="modal fade cinema-modal" id="singleOptionConfirmModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="singleOptionConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content cinema-modal-content">
             <div class="modal-header cinema-modal-header">
                 <h5 class="modal-title">Confirm Seating Arrangement</h5>
-                <button type="button" class="btn-close cinema-close-btn" data-bs-dismiss="modal" aria-label="Close"></button>
+                <!-- No close button to force user decision -->
             </div>
             <div class="modal-body cinema-modal-body">
                 @if (singleOptionMessage != null)
@@ -1064,84 +1064,96 @@
     }
 
     /* Cinema themed modals */
-    .cinema-modal .modal-dialog {
-        max-width: 550px;
-    }
-    
-    .cinema-modal-content {
+    .cinema-modal .modal-content {
         background-color: #0f1730;
-        color: white;
+        color: #fff;
+        border: 1px solid #2a3b66;
         border-radius: 8px;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
     }
     
-    .cinema-modal-header {
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 20px 25px;
+    .cinema-modal .modal-header {
+        border-bottom: 1px solid #2a3b66;
+        padding: 20px;
+        background-color: #111a33;
     }
     
-    .cinema-modal-header .modal-title {
+    .cinema-modal .modal-title {
+        color: #f5c518;
         font-weight: 600;
         font-size: 1.5rem;
-        color: white;
     }
     
-    .cinema-close-btn {
-        background-color: rgba(255, 255, 255, 0.1);
-        border-radius: 50%;
-        padding: 8px;
-        margin: -8px;
-        filter: invert(1) brightness(0.8);
-    }
-    
-    .cinema-modal-body {
+    .cinema-modal .modal-body {
         padding: 25px;
-        font-size: 1.1rem;
+    }
+    
+    .cinema-modal .modal-footer {
+        border-top: 1px solid #2a3b66;
+        padding: 15px 20px;
+        background-color: #111a33;
     }
     
     .cinema-message {
-        line-height: 1.6;
-        margin-bottom: 0;
-    }
-    
-    .cinema-modal-footer {
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 15px 25px;
-        gap: 12px;
+        font-size: 1.1rem;
+        line-height: 1.5;
+        color: #fff;
     }
     
     .cinema-radio-option {
         display: flex;
-        padding: 12px 15px;
-        background-color: rgba(255, 255, 255, 0.05);
-        border-radius: 8px;
-        margin-bottom: 10px;
-        cursor: pointer;
+        align-items: flex-start;
+        padding: 12px;
+        border-radius: 6px;
         transition: all 0.2s ease;
+        cursor: pointer;
+        border: 1px solid transparent;
+        margin-bottom: 1rem;
+        position: relative;
+        width: 100%;
     }
     
     .cinema-radio-option:hover {
-        background-color: rgba(255, 255, 255, 0.1);
+        background-color: rgba(245, 197, 24, 0.1);
+        border-color: rgba(245, 197, 24, 0.3);
     }
     
     .cinema-radio-input {
-        margin-right: 10px;
-        margin-top: 3px;
-        transform: scale(1.2);
+        margin: 4px 12px 0 0;
+        cursor: pointer;
         accent-color: #f5c518;
     }
     
-    .cinema-radio-label {
-        font-weight: 500;
+    .cinema-radio-content {
+        flex: 1;
         cursor: pointer;
-        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .cinema-radio-title {
+        font-weight: 500;
+        color: #fff;
+        font-size: 1.1rem;
     }
     
     .cinema-option-details {
-        margin-top: 5px;
+        color: #a9b1c5;
         font-size: 0.9rem;
-        color: rgba(255, 255, 255, 0.7);
+    }
+    
+    .cinema-radio-option input[type="radio"]:checked + .cinema-radio-content {
+        color: #f5c518;
+    }
+    
+    .cinema-radio-option input[type="radio"]:checked + .cinema-radio-content .cinema-radio-title {
+        color: #f5c518;
+    }
+    
+    .cinema-radio-option:focus-within {
+        outline: 2px solid #f5c518;
+        outline-offset: -2px;
     }
 </style>
 
@@ -1831,15 +1843,10 @@
                         }
                     }
                 }
+            }
 
-                // Load all seats to refresh the UI
-                await LoadSeats();
-            }
-            else
-            {
-                var errorMessage = await response.Content.ReadAsStringAsync();
-                SetMessage($"Failed to select seating option: {errorMessage}");
-            }
+            // Load all seats to refresh the UI
+            await LoadSeats();
         }
         catch (Exception ex)
         {
