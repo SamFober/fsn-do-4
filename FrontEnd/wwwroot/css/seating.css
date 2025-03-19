@@ -1,0 +1,442 @@
+/* Seating container and map */
+.seating-container {
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto 30px;
+    perspective: 1000px;
+}
+
+.seat-map {
+    margin-bottom: 40px;
+    transform: rotateX(12deg);
+    transform-origin: bottom;
+    width: 100%;
+}
+
+/* Row and seat styles */
+.seat-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 10px;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.seat-row::-webkit-scrollbar {
+    display: none;
+}
+
+.seats {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 5px;
+    padding: 0 10px;
+    min-width: min-content;
+    justify-content: center;
+}
+
+.row-label {
+    flex-shrink: 0;
+    width: 30px;
+    text-align: right;
+    margin-right: 15px;
+    font-weight: 500;
+    color: white;
+}
+
+/* Individual seat styling */
+.seat {
+    width: 32px;
+    height: 30px;
+    border-radius: 6px 6px 0 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    font-size: 0.75rem;
+    color: white;
+    text-shadow: 0 0 1px rgba(0,0,0,0.5);
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.3);
+}
+
+.seat:after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 3px;
+    right: 3px;
+    height: 3px;
+    background-color: rgba(0,0,0,0.2);
+    border-radius: 0 0 2px 2px;
+}
+
+.seat-number {
+    position: absolute;
+    bottom: 2px;
+    font-size: 0.7rem;
+}
+
+/* Seat states */
+.seat-available {
+    background-color: #8B8000;
+    border: 1px solid #665e00;
+    color: white;
+}
+
+.seat-available:hover {
+    background-color: #9e9100;
+    transform: scale(1.1);
+    z-index: 10;
+}
+
+.seat-selected {
+    background-color: #28a745;
+    border: 1px solid #218838;
+    transform: scale(1.05);
+    z-index: 5;
+}
+
+.seat-selected:hover {
+    transform: scale(1.15);
+    z-index: 10;
+}
+
+.seat-unavailable {
+    background-color: #343a40;
+    border: 1px solid #1d2124;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Screen styles */
+.screen-container {
+    width: 100%;
+    perspective: 500px;
+    margin-top: 40px;
+}
+
+.screen {
+    height: 70px;
+    background: linear-gradient(180deg, #151d4a 0%, #0a0e24 100%);
+    width: 90%;
+    margin: 0 auto;
+    transform: rotateX(-30deg);
+    transform-origin: top;
+    box-shadow: 0 8px 15px rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.screen:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+}
+
+.screen-text {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1.5rem;
+    letter-spacing: 3px;
+    text-shadow: 0 0 8px rgba(255,255,255,0.4);
+}
+
+/* Seat legend */
+.seat-legend {
+    display: flex;
+    justify-content: center;
+    margin: 30px 0;
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    margin: 0 15px;
+    color: white;
+}
+
+.seat-sample {
+    width: 24px;
+    height: 24px;
+    border-radius: 5px 5px 0 0;
+    margin-right: 8px;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.3);
+}
+
+/* Main container styles */
+.cinema-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    position: relative;
+    overflow-x: visible;
+}
+
+.cinema-dark-mode {
+    background-color: #0f1730;
+    color: white;
+    border-radius: 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    padding: 25px;
+    margin-top: 0;
+}
+
+.cinema-title {
+    text-align: center;
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+.content-with-header-space {
+    padding-top: 100px;
+}
+
+/* Layout sections */
+.cinema-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.loading-container {
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 30px;
+    border-radius: 8px;
+    margin: 40px auto;
+    max-width: 400px;
+}
+
+/* Order summary and ticket selection */
+.order-summary {
+    margin-top: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 25px;
+    width: 100%;
+    max-width: 600px;
+    background-color: rgba(19, 26, 44, 0.6);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.ticket-type-section {
+    margin-top: 5px;
+    padding-top: 0;
+    border-top: none;
+}
+
+.ticket-instruction-text {
+    color: #f5c518;
+    font-weight: 500;
+    margin-bottom: 1rem;
+    font-size: 1.05rem;
+    padding: 8px 12px;
+    background-color: rgba(245, 197, 24, 0.1);
+    border-left: 3px solid #f5c518;
+    border-radius: 0 4px 4px 0;
+}
+
+.ticket-type-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 12px 15px;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.ticket-type-row:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+.ticket-seat-info {
+    font-weight: 500;
+    font-size: 1rem;
+    color: white;
+}
+
+.ticket-type-selector {
+    width: 220px;
+}
+
+.form-select, select {
+    background-color: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 6px;
+    appearance: auto;
+    font-size: 0.95rem;
+}
+
+.form-select:focus, select:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
+
+.form-select option, select option {
+    background-color: #121a2b;
+    color: white;
+    padding: 8px;
+}
+
+.price-summary {
+    margin-top: 25px;
+    padding: 20px;
+    background-color: rgba(0, 0, 0, 0.25);
+    border-radius: 8px;
+}
+
+.price-details {
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.price-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 1rem;
+    color: white;
+}
+
+.price-total {
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    font-size: 1.2rem;
+    color: white;
+}
+
+.action-buttons {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+    margin-top: 25px;
+}
+
+.seat-selection-section {
+    margin-top: 20px;
+}
+
+/* Seat selection form */
+.seat-selection-form {
+    margin-bottom: 40px;
+}
+
+.seat-selection-title {
+    font-size: 1.6rem;
+    margin-bottom: 30px;
+    font-weight: 500;
+    color: white;
+    text-align: center;
+}
+
+.seat-counter {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+.seat-count-input {
+    width: 120px;
+    height: 80px;
+    text-align: center;
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 2rem;
+    padding: 10px;
+    margin: 0 15px;
+    border-radius: 8px;
+    font-weight: bold;
+}
+
+.btn-adjust {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 2rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-adjust:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-adjust:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.seat-info {
+    color: white;
+    font-size: 1.1rem;
+    margin-top: 10px;
+    text-align: center;
+}
+
+/* Responsive design */
+@media (max-width: 767px) {
+    .seats {
+        justify-content: flex-start;
+    }
+    
+    .seat-row {
+        justify-content: flex-start;
+    }
+    
+    .row-label {
+        width: 25px;
+        margin-right: 10px;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .ticket-type-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .ticket-type-selector {
+        width: 100%;
+        margin-top: 10px;
+    }
+}
+
+@media (max-width: 1000px) {
+    .sticky-header-wrapper {
+        margin-left: -20px;
+        margin-right: -20px;
+    }
+} 
