@@ -1,6 +1,6 @@
 -- Create the database
-CREATE DATABASE IF NOT EXISTS your_project_db;
-USE your_project_db;
+CREATE DATABASE IF NOT EXISTS movietheater;
+USE movietheater;
 
 -- Create halls table
 CREATE TABLE Halls (

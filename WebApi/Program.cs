@@ -39,6 +39,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddMemoryCache(); // For seat locking
 builder.Services.AddScoped<WebApi.Interfaces.Repositories.ITicketRepository, WebApi.Repositories.TicketRepository>();
 builder.Services.AddScoped<WebApi.Interfaces.Services.ITicketService, WebApi.Services.TicketService>();
+builder.Services.AddScoped<WebApi.Interfaces.Services.IPaymentService, WebApi.Services.PaymentService>();
 
 // Add CORS
 builder.Services.AddCors(options =>

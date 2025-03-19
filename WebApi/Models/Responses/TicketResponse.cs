@@ -1,7 +1,7 @@
 namespace WebApi.Models.Responses
 {
     public record TicketResponse(
-        int TicketId,
+        Guid TicketId,
         string MovieTitle,
         string HallName,
         DateTime StartTime,
