@@ -1,18 +1,62 @@
-﻿@page "/print"
+﻿@page "/{orderToken}/finish"
 @using FrontEnd.Models
 
 @inject HttpClient httpClient
 @inject IJSRuntime JSRuntime;
 
 
-
 <div class="cinema-container cinema-dark-mode" id="cinemaContainer">
-    <div class="sticky-title-container">
-        <h1>Your tickets are ready!</h1>
+    <div class="sticky-header-wrapper">
+        <div class="sticky-progress-container">
+            <div class="booking-progress-wrapper">
+                <div class="booking-progress">
+                    <div class="progress-step">
+                        <div class="step-circle">1</div>
+                        <div class="step-label">Choose Seats</div>
+                    </div>
+                    <div class="progress-connector"></div>
+                    <div class="progress-step">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">Payment</div>
+                    </div>
+                    <div class="progress-connector"></div>
+                    <div class="progress-step active">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">Confirmation</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+    <div class="content-with-header-space">
+        @if (message != null)
+        {
+            <div class="cinema-alert @(message.Contains("Error") || message.Contains("Failed") ? "cinema-alert-danger" : "cinema-alert-success") @(isMessageFading ? "fade-out" : "")" @key="message">
+                <div class="cinema-alert-icon">
+                    @if (message.Contains("Error") || message.Contains("Failed"))
+                    {
+                        <span>❌</span>
+                    }
+                    else
+                    {
+                        <span>✓</span>
+                    }
+                </div>
+                <div class="cinema-alert-message">@message</div>
+            </div>
+        }
+        else
+        {
+            {
 
-    <div class="action-buttons">
-        <button class="cinema-btn cinema-btn-primary" @onclick="PrintTickets">Print tickets</button>
+            }
+            <div class="sticky-title-container">
+                <h1>Your tickets are ready!</h1>
+            </div>
+            <div class="=action-buttons">
+                <button class="cinema-btn cinema-btn-primary" @onclick="PrintTickets">Print tickets</button>
+            </div>
+        }
     </div>
 </div>
 
@@ -907,15 +951,35 @@
 </style>
 
 @code {
-    private List<Ticket> tickets;
+    [Parameter]
+    public string orderToken { get; set; } = "";
+
+    public bool isPrintable { get; set; } = false;
+    private string? message;
+    private bool isMessageFading = false;
 
     protected override async Task OnInitializedAsync()
     {
-        //TODO: Load tickets file
+        var response = await httpClient.GetAsync($"http://localhost:5213/api/Tickets/{orderToken}/download");
+
+            if (response.IsSuccessStatusCode)
+            {
+                isPrintable = true;
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                message = "Error: No tickets found.";
+                //alertColor = "color: red;";
+            }
+            else
+            {
+                message = "Error: unknown";
+                //alertColor = "color: orange;";
+            }
     }
 
     private async Task PrintTickets()
     {
-        await JSRuntime.InvokeVoidAsync("openPrintDialog", "http://localhost:5213/api/Tickets/95ebe295-f05c-4e1c-bff0-de08ed4fef94/download");
+        await JSRuntime.InvokeVoidAsync("openPrintDialog", $"http://localhost:5213/api/Tickets/{orderToken}/download");
     }
 }

@@ -9,6 +9,10 @@
 @inject NavigationManager Navigation
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<link href="css/seating.css" rel="stylesheet" />
+<link href="css/modals.css" rel="stylesheet" />
 
 <div class="cinema-container cinema-dark-mode" id="cinemaContainer">
     <div class="sticky-header-wrapper">
@@ -169,8 +173,8 @@
                             </div>
 
                             <div class="action-buttons">
-                                <button @onclick="ConfirmTickets" class="cinema-btn cinema-btn-primary">Confirm Tickets</button>
                                 <button @onclick="CancelOrder" class="cinema-btn cinema-btn-danger">Cancel Order</button>
+                                <button @onclick="ConfirmTickets" class="cinema-btn cinema-btn-primary">Confirm Tickets</button>
                             </div>
                         </div>
                     }
@@ -211,7 +215,8 @@
                 </div>
 
                 <div class="action-buttons overlay-modal-buttons">
-                    <button @onclick="ProcessOrder" class="btn start-order-btn continue-btn">Continue</button>
+                    <button @onclick="CancelOrder" class="cinema-btn cinema-btn-danger">Cancel Order</button>
+                    <button @onclick="ProcessOrder" class="cinema-btn cinema-btn-primary continue-btn">Continue</button>
                 </div>
             </div>
         </div>
@@ -219,32 +224,32 @@
 </div>
 
 <!-- Add this modal for seating options -->
-<div class="modal fade cinema-modal" id="seatingOptionsModal" tabindex="-1" aria-labelledby="seatingOptionsModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<div class="modal fade cinema-modal" id="seatingOptionsModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="seatingOptionsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content cinema-modal-content">
             <div class="modal-header cinema-modal-header">
                 <h5 class="modal-title">Select Seating Option</h5>
-                <button type="button" class="btn-close cinema-close-btn" data-bs-dismiss="modal" aria-label="Close"></button>
+                <!-- No close button to force user decision -->
             </div>
             <div class="modal-body cinema-modal-body">
                 @if (availableOptions != null)
                 {
                     @foreach (var option in availableOptions)
                     {
-                        <div class="cinema-radio-option mb-3">
+                        <label class="cinema-radio-option mb-3">
                             <input class="cinema-radio-input" type="radio" name="seatingOption" 
-                            value="@option.Key" @onchange="@(e => selectedOption = option.Key)" 
-                            checked="@(selectedOption == option.Key)" />
-                            <label class="cinema-radio-label">
-                                @option.Value.Description
+                                value="@option.Key" @onchange="@(e => selectedOption = option.Key)" 
+                                checked="@(selectedOption == option.Key)" />
+                            <div class="cinema-radio-content">
+                                <span class="cinema-radio-title">@option.Value.Description</span>
                                 <div class="cinema-option-details">
                                     @foreach (var group in option.Value.Groups)
                                     {
                                         <div>@group.Description</div>
                                     }
                                 </div>
-                            </label>
-                        </div>
+                            </div>
+                        </label>
                     }
                 }
             </div>
@@ -257,12 +262,12 @@
 </div>
 
 <!-- Add this modal for single option confirmation -->
-<div class="modal fade cinema-modal" id="singleOptionConfirmModal" tabindex="-1" aria-labelledby="singleOptionConfirmModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<div class="modal fade cinema-modal" id="singleOptionConfirmModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="singleOptionConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content cinema-modal-content">
             <div class="modal-header cinema-modal-header">
                 <h5 class="modal-title">Confirm Seating Arrangement</h5>
-                <button type="button" class="btn-close cinema-close-btn" data-bs-dismiss="modal" aria-label="Close"></button>
+                <!-- No close button to force user decision -->
             </div>
             <div class="modal-body cinema-modal-body">
                 @if (singleOptionMessage != null)
@@ -316,877 +321,6 @@
 </div>
 
 <style>
-    .cinema-container {
-    max-width: 1000px;
-    margin: 0 auto;
-    padding: 20px;
-    transition: background-color 0.3s ease, color 0.3s ease;
-    position: relative;
-    overflow-x: visible;
-    }
-
-    .cinema-dark-mode {
-    background-color: #0f1730;
-    color: white;
-    border-radius: 0;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    padding: 25px;
-    margin-top: 0;
-    }
-
-    .cinema-title {
-    text-align: center;
-    margin-bottom: 20px;
-    font-weight: bold;
-    }
-
-    .content-with-header-space {
-    padding-top: 100px;
-    }
-
-    .sticky-title-container {
-    width: 100%;
-    text-align: center;
-    padding: 10px 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .sticky-title {
-    margin: 0;
-    font-size: 1.3rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 950px;
-    margin: 0 auto;
-    }
-
-    .cinema-layout {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-top: 20px;
-    }
-
-    .seating-container {
-    width: 100%;
-    max-width: 800px;
-    margin-bottom: 30px;
-    perspective: 1000px;
-    }
-
-    .seat-map {
-    margin-bottom: 40px;
-    transform: rotateX(12deg);
-    transform-origin: bottom;
-    }
-
-    .seat-row {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 10px;
-    }
-
-    .row-label {
-    width: 30px;
-    text-align: center;
-    font-weight: bold;
-    color: #888;
-    }
-
-    .seats {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 5px;
-    }
-
-    .seat {
-    width: 32px;
-    height: 30px;
-    border-radius: 6px 6px 0 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    position: relative;
-    overflow: hidden;
-    font-size: 0.75rem;
-    color: white;
-    text-shadow: 0 0 1px rgba(0,0,0,0.5);
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 3px rgba(0,0,0,0.3);
-    }
-
-    .seat:after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 3px;
-    right: 3px;
-    height: 3px;
-    background-color: rgba(0,0,0,0.2);
-    border-radius: 0 0 2px 2px;
-    }
-
-    .seat-number {
-    position: absolute;
-    bottom: 2px;
-    font-size: 0.7rem;
-    }
-
-    .seat-available {
-    background-color: #8B8000;
-    border: 1px solid #665e00;
-    color: white;
-    }
-
-    .seat-available:hover {
-    background-color: #9e9100;
-    transform: scale(1.1);
-    z-index: 10;
-    }
-
-    .seat-selected {
-    background-color: #28a745;
-    border: 1px solid #218838;
-    transform: scale(1.05);
-    z-index: 5;
-    }
-
-    .seat-selected:hover {
-    transform: scale(1.15);
-    z-index: 10;
-    }
-
-    .seat-unavailable {
-    background-color: #343a40;
-    border: 1px solid #1d2124;
-    cursor: not-allowed;
-    opacity: 0.6;
-    }
-
-    .screen-container {
-    width: 100%;
-    perspective: 500px;
-    margin-top: 40px;
-    }
-
-    .screen {
-    height: 70px;
-    background: linear-gradient(180deg, #151d4a 0%, #0a0e24 100%);
-    width: 90%;
-    margin: 0 auto;
-    transform: rotateX(-30deg);
-    transform-origin: top;
-    box-shadow: 0 8px 15px rgba(255, 255, 255, 0.2);
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    position: relative;
-    overflow: hidden;
-    }
-
-    .screen:before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 5px;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-    }
-
-    .screen-text {
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 1.5rem;
-    letter-spacing: 3px;
-    text-shadow: 0 0 8px rgba(255,255,255,0.4);
-    }
-
-    .seat-legend {
-    display: flex;
-    justify-content: center;
-    margin: 30px 0;
-    background-color: rgba(255, 255, 255, 0.1);
-    padding: 15px;
-    border-radius: 8px;
-    }
-
-    .legend-item {
-    display: flex;
-    align-items: center;
-    margin: 0 15px;
-    }
-
-    .seat-sample {
-    width: 24px;
-    height: 24px;
-    border-radius: 5px 5px 0 0;
-    margin-right: 8px;
-    box-shadow: 0 2px 3px rgba(0,0,0,0.3);
-    }
-
-    .order-summary {
-    margin-top: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    padding: 25px;
-    width: 100%;
-    max-width: 600px;
-    background-color: rgba(19, 26, 44, 0.6);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-    }
-
-    .ticket-type-section {
-    margin-top: 5px;
-    padding-top: 0;
-    border-top: none;
-    }
-
-    .ticket-type-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-    padding: 12px 15px;
-    background-color: rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    transition: all 0.2s ease;
-    }
-
-    .ticket-type-row:hover {
-    background-color: rgba(255, 255, 255, 0.12);
-    }
-
-    .ticket-seat-info {
-    font-weight: 500;
-    font-size: 1rem;
-    }
-
-    .ticket-type-selector {
-    width: 220px;
-    }
-
-    .form-select {
-    background-color: rgba(255, 255, 255, 0.15);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: white;
-    padding: 10px 15px;
-    border-radius: 6px;
-    appearance: auto;
-    font-size: 0.95rem;
-    }
-
-    .form-select:focus {
-    outline: none;
-    border-color: rgba(255, 255, 255, 0.4);
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
-    }
-
-    .form-select option {
-    background-color: #121a2b;
-    color: white;
-    padding: 8px;
-    }
-
-    .price-summary {
-    margin-top: 25px;
-    padding: 20px;
-    background-color: rgba(0, 0, 0, 0.25);
-    border-radius: 8px;
-    }
-
-    .price-details {
-    margin-bottom: 15px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    }
-
-    .price-row {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 8px;
-    font-size: 1rem;
-    }
-
-    .price-total {
-    display: flex;
-    justify-content: space-between;
-    font-weight: bold;
-    font-size: 1.2rem;
-    }
-
-    .action-buttons {
-    display: flex;
-    justify-content: space-between;
-    gap: 15px;
-    margin-top: 25px;
-    }
-
-    .action-buttons button {
-    flex: 1;
-    padding: 12px 10px;
-    border-radius: 6px;
-    font-weight: 500;
-    font-size: 1.1rem;
-    transition: all 0.3s ease;
-    }
-
-    .action-buttons button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    }
-
-    .order-timer {
-    display: flex;
-    align-items: center;
-    background-color: rgba(0, 0, 0, 0.5);
-    padding: 6px 12px;
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    margin-left: 20px;
-    min-width: auto;
-    }
-
-    .order-timer-warning {
-    background-color: rgba(255, 193, 7, 0.2);
-    border-color: rgba(255, 193, 7, 0.3);
-    animation: pulse 2s infinite;
-    }
-
-    @@keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4); }
-    70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
-    }
-
-    .timer-content {
-    display: flex;
-    justify-content: center;
-    font-size: 0.9rem;
-    color: white;
-    }
-
-    .countdown {
-    font-weight: bold;
-    letter-spacing: 1px;
-    }
-
-    .cancel-button {
-    background: none;
-    border: none;
-    color: white;
-    font-size: 0.9rem;
-    cursor: pointer;
-    padding: 5px;
-    margin-right: 20px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    }
-
-    .cancel-button:hover {
-    color: #f5c518;
-    }
-
-    .start-order-btn {
-    padding: 12px 30px;
-    font-size: 1.2rem;
-    border-radius: 8px;
-    background-color: #f5c518;
-    border-color: #d6aa15;
-    color: #000;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    transition: all 0.3s ease;
-    }
-
-    .start-order-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 12px rgba(0,0,0,0.3);
-    background-color: #ffcc1d;
-    }
-
-    .loading-container {
-    background-color: rgba(255, 255, 255, 0.1);
-    padding: 30px;
-    border-radius: 8px;
-    margin: 40px auto;
-    max-width: 400px;
-    }
-
-    @@media (max-width: 768px) {
-    .seat {
-    width: 26px;
-    height: 24px;
-    font-size: 0.6rem;
-    }
-
-    .row-label {
-    width: 20px;
-    font-size: 0.8rem;
-    }
-
-    .screen {
-    height: 50px;
-    }
-
-    .screen-text {
-    font-size: 1.2rem;
-    }
-
-    .progress-step {
-    width: 80px;
-    }
-
-    .progress-step:not(:last-child):after {
-    width: 40px;
-    right: -25px;
-    }
-
-    .step-number {
-    width: 30px;
-    height: 30px;
-    font-size: 1rem;
-    }
-
-    .step-label {
-    font-size: 0.7rem;
-    }
-    }
-
-    .cinema-alert {
-    display: flex;
-    align-items: center;
-    padding: 15px;
-    border-radius: 8px;
-    margin: 15px auto;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    transition: all 0.5s ease;
-    animation: fadeIn 0.5s ease;
-    width: 100%;
-    opacity: 1;
-    }
-
-    .cinema-alert.fade-out {
-    opacity: 0;
-    transform: translateY(-10px);
-    height: 0;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    }
-
-    @@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-    }
-
-    .cinema-alert-success {
-    background-color: rgba(40, 167, 69, 0.2);
-    border-left: 4px solid #28a745;
-    color: #e2e2e2;
-    }
-
-    .cinema-alert-danger {
-    background-color: rgba(220, 53, 69, 0.2);
-    border-left: 4px solid #dc3545;
-    color: #e2e2e2;
-    }
-
-    .cinema-alert-icon {
-    font-size: 1.2rem;
-    margin-right: 15px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    }
-
-    .cinema-alert-message {
-    flex: 1;
-    font-weight: 500;
-    }
-
-    @@media (max-width: 1000px) {
-    .sticky-header-wrapper {
-    margin-left: -20px;
-    margin-right: -20px;
-    }
-    }
-
-    .seat-selection-section {
-    margin-top: 20px;
-    }
-
-    .overlay-modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.8);
-    z-index: 2000;
-    overflow-y: auto;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    }
-
-    .overlay-modal.show {
-    display: flex;
-    opacity: 1;
-    align-items: center;
-    justify-content: center;
-    }
-
-    .overlay-modal-content {
-    background-color: #0f1730;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-    max-width: 950px;
-    width: 100%;
-    margin: 20px;
-    animation: modalFadeIn 0.4s ease-out;
-    }
-
-    @@keyframes modalFadeIn {
-    from { transform: translateY(-50px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-    }
-
-    .overlay-modal-header {
-    padding: 20px 25px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    text-align: center;
-    }
-
-    .overlay-modal-header h3 {
-    color: white;
-    font-weight: bold;
-    font-size: 1.8rem;
-    margin: 0;
-    }
-
-    .overlay-modal-body {
-    padding: 40px 25px;
-    }
-
-    .overlay-form-container {
-    text-align: center;
-    max-width: 600px;
-    margin: 0 auto;
-    }
-
-    .seat-selection-form {
-    margin-bottom: 40px;
-    }
-
-    .seat-selection-title {
-    font-size: 1.6rem;
-    margin-bottom: 30px;
-    font-weight: 500;
-    color: white;
-    }
-
-    .seat-counter {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 25px;
-    }
-
-    .seat-count-input {
-    width: 120px;
-    height: 80px;
-    text-align: center;
-    background-color: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: white;
-    font-size: 2rem;
-    padding: 10px;
-    margin: 0 15px;
-    border-radius: 8px;
-    font-weight: bold;
-    }
-
-    .btn-adjust {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background-color: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: white;
-    font-size: 2rem;
-    line-height: 1;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    }
-
-    .btn-adjust:hover:not(:disabled) {
-    background-color: rgba(255, 255, 255, 0.2);
-    }
-
-    .btn-adjust:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    }
-
-    .seat-info {
-    color: white;
-    font-size: 1.1rem;
-    margin-top: 10px;
-    }
-
-    .overlay-modal-buttons {
-    justify-content: center;
-    margin-top: 20px;
-    }
-
-    .overlay-modal-buttons button {
-    padding: 15px 40px;
-    border-radius: 8px;
-    font-weight: 500;
-    min-width: 220px;
-    font-size: 1.2rem;
-    }
-
-    .continue-btn {
-    font-size: 1.1rem;
-    }
-
-    /* Sticky header styles */
-    .sticky-header-wrapper {
-    margin: 0;
-    background-color: #000;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 1000;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .sticky-progress-container {
-    background-color: #000;
-    padding: 10px 0 0 0;
-    width: 100%;
-    margin: 0 auto;
-    }
-
-    .booking-progress-wrapper {
-    width: 100%;
-    max-width: 1200px;
-    margin: 0 auto;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    position: relative;
-    padding: 0 20px;
-    }
-
-    .booking-progress {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin: 0 auto;
-    gap: 15px;
-    }
-
-    .progress-step {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    position: relative;
-    color: rgba(255, 255, 255, 0.5);
-    z-index: 2;
-    }
-
-    .progress-connector {
-    height: 1px;
-    width: 45px;
-    background-color: rgba(255, 255, 255, 0.3);
-    margin-top: 15px;
-    position: relative;
-    z-index: 1;
-    }
-
-    .progress-step.active {
-    color: white;
-    }
-
-    .progress-step.active + .progress-connector {
-    background-color: #f5c518;
-    }
-
-    .progress-step.active .step-circle {
-    background-color: #f5c518;
-    border-color: #d6aa15;
-    }
-
-    .step-circle {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background-color: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    margin-bottom: 6px;
-    font-weight: bold;
-    font-size: 1rem;
-    }
-
-    .step-label {
-    font-size: 0.8rem;
-    text-align: center;
-    white-space: nowrap;
-    }
-
-    .ticket-instruction-text {
-    color: #f5c518;
-    font-weight: 500;
-    margin-bottom: 1rem;
-    font-size: 1.05rem;
-    padding: 8px 12px;
-    background-color: rgba(245, 197, 24, 0.1);
-    border-left: 3px solid #f5c518;
-    border-radius: 0 4px 4px 0;
-    }
-
-    /* Cinema themed buttons */
-    .cinema-btn {
-    border: none;
-    padding: 12px 20px;
-    border-radius: 6px;
-    font-weight: 500;
-    font-size: 1.1rem;
-    cursor: pointer;
-    text-align: center;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-    }
-
-    .cinema-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
-    }
-
-    .cinema-btn:active {
-    transform: translateY(1px);
-    }
-
-    .cinema-btn-primary {
-    background-color: #f5c518;
-    color: #0f1730;
-    border: 1px solid #d6aa15;
-    }
-
-    .cinema-btn-primary:hover {
-    background-color: #ffcf2d;
-    }
-
-    .cinema-btn-danger {
-    background-color: rgba(220, 53, 69, 0.8);
-    color: white;
-    border: 1px solid #c82333;
-    }
-
-    .cinema-btn-danger:hover {
-    background-color: rgba(220, 53, 69, 1);
-    }
-
-    /* Cinema themed modals */
-    .cinema-modal .modal-dialog {
-    max-width: 550px;
-    }
-
-    .cinema-modal-content {
-    background-color: #0f1730;
-    color: white;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
-    }
-
-    .cinema-modal-header {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 20px 25px;
-    }
-
-    .cinema-modal-header .modal-title {
-    font-weight: 600;
-    font-size: 1.5rem;
-    color: white;
-    }
-
-    .cinema-close-btn {
-    background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 50%;
-    padding: 8px;
-    margin: -8px;
-    filter: invert(1) brightness(0.8);
-    }
-
-    .cinema-modal-body {
-    padding: 25px;
-    font-size: 1.1rem;
-    }
-
-    .cinema-modal-body-numpad {
-    display: flex;
-    justify-content: center;
-    }
-
-    .cinema-message {
-    line-height: 1.6;
-    margin-bottom: 0;
-    }
-
-    .cinema-modal-footer {
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 15px 25px;
-    gap: 12px;
-    }
-
-    .cinema-radio-option {
-    display: flex;
-    padding: 12px 15px;
-    background-color: rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
-    margin-bottom: 10px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    }
-
-    .cinema-radio-option:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    }
-
-    .cinema-radio-input {
-    margin-right: 10px;
-    margin-top: 3px;
-    transform: scale(1.2);
-    accent-color: #f5c518;
-    }
-
-    .cinema-radio-label {
-    font-weight: 500;
-    cursor: pointer;
-    flex-grow: 1;
-    }
-
-    .cinema-option-details {
-    margin-top: 5px;
-    font-size: 0.9rem;
-    color: rgba(255, 255, 255, 0.7);
-    }
-
     /* Numpad modal */
     .numpad-container {
     width: 250px;
@@ -1243,7 +377,6 @@
     border: 1px solid rgba(255, 0, 0, 0.3);
     }
 </style>
-
 @code {
     [Parameter]
     public int PresentationId { get; set; }
@@ -1718,7 +851,6 @@
             showSeatSelectionModal = true;
         }
     }
-
     private async Task LoadSeats()
     {
         try
@@ -1932,6 +1064,9 @@
                     ticketTypes.Add(seat.Id, "adult");
                 }
             }
+
+            // Load all seats to refresh the UI
+            await LoadSeats();
         }
 
         // Load all seats to refresh the UI
