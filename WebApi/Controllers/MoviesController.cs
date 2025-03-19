@@ -19,8 +19,7 @@ public class MoviesController : ControllerBase
             .Where(m => m.Id == id)
             .FirstOrDefaultAsync();
 
-        if (movie == null)
-            return NotFound();
+        if (movie == null) return NotFound();
 
         return Ok(movie);
     }
