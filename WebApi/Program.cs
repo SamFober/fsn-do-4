@@ -1,11 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using WebApi.Data;
-using WebApi.Models;
-using WebApi.Services;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
 using WebApi.Interfaces.Services;
 using QuestPDF.Infrastructure;
+using WebApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,7 +40,6 @@ if (string.IsNullOrEmpty(connectionString))
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySQL(connectionString));
 
-builder.Services.AddHostedService<OrderCleanupService>();
 builder.Services.AddMemoryCache(); // For seat locking
 builder.Services.AddScoped<ITicketPdfService, TicketPdfServiceQuestPdf>();
 builder.Services.AddScoped<WebApi.Interfaces.Repositories.ITicketRepository, WebApi.Repositories.TicketRepository>();
