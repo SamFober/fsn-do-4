@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using FrontEnd.Models;
-
 namespace FrontEnd.Models
 {
     public class Hall
@@ -21,4 +17,4 @@ namespace FrontEnd.Models
         public ICollection<Seat> Seats { get; set; } = new List<Seat>();
         public ICollection<Presentation> Presentations { get; set; } = new List<Presentation>();
     }
-} 
+}

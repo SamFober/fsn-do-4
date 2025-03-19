@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace FrontEnd.Models.Responses
 {
     public class OrderResponse
@@ -18,4 +15,4 @@ namespace FrontEnd.Models.Responses
         public virtual List<int> SeatIds { get; set; } = new();
         public virtual int? PreselectedSeatId { get; set; }
     }
-} 
+}

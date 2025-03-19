@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using FrontEnd.Models;
-
 namespace FrontEnd.Models
 {
     public class Seat
@@ -20,4 +16,4 @@ namespace FrontEnd.Models
 
         public ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
     }
-} 
+}

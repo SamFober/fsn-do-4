@@ -1,6 +1,3 @@
-using System;
-using WebApi.Models;
-
 namespace WebApi.Models.Responses
 {
     public record TicketResponse(
@@ -16,4 +13,4 @@ namespace WebApi.Models.Responses
         TicketStatus Status,
         DateTime PurchaseDate
     );
-} 
+}

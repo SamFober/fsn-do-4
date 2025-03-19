@@ -5,4 +5,4 @@ namespace WebApi.Models.Responses
         List<int> SeatIds,
         string Description
     );
-} 
+}

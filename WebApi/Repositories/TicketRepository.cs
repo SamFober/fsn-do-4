@@ -1,13 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using WebApi.Data;
+using WebApi.Exceptions;
 using WebApi.Interfaces.Repositories;
 using WebApi.Models;
-using Microsoft.Extensions.Logging;
-using WebApi.Exceptions;
 
 namespace WebApi.Repositories
 {
@@ -26,10 +20,10 @@ namespace WebApi.Repositories
         {
             var middleRow = (int)Math.Ceiling(hall.Rows / 2.0);
             var middleSeat = (int)Math.Ceiling(hall.SeatsPerRow / 2.0);
-            
+
             // Define the ideal viewing distance (about 2/3 back from the front)
             var idealRow = (int)Math.Ceiling(hall.Rows * 0.66);
-            
+
             // Calculate scores for each seat
             var seatsWithScore = availableSeats.Select(seat =>
             {
@@ -85,7 +79,7 @@ namespace WebApi.Repositories
             }
 
             var bookedSeatIds = await _context.Tickets
-                .Where(t => t.PresentationId == presentationId && 
+                .Where(t => t.PresentationId == presentationId &&
                        t.Status != TicketStatus.Cancelled)
                 .Select(t => t.SeatId)
                 .ToListAsync();
@@ -98,7 +92,7 @@ namespace WebApi.Repositories
             var unavailableSeatIds = bookedSeatIds.Concat(lockedSeatIds).ToList();
 
             var availableSeats = await _context.Seats
-                .Where(s => s.HallId == presentation.HallId && 
+                .Where(s => s.HallId == presentation.HallId &&
                        !unavailableSeatIds.Contains(s.Id))
                 .OrderBy(s => s.RowNumber)
                 .ThenBy(s => s.SeatNumber)
@@ -143,14 +137,14 @@ namespace WebApi.Repositories
 
                 // Get booked seats (excluding cancelled tickets)
                 var bookedSeats = await _context.Tickets
-                    .Where(t => t.PresentationId == presentationId && 
+                    .Where(t => t.PresentationId == presentationId &&
                            t.Status != TicketStatus.Cancelled)
                     .Select(t => t.SeatId)
                     .ToListAsync();
 
                 // Get locked seats - Only check locks from other orders
                 var lockedSeats = await _context.SeatLocks
-                    .Where(l => l.ExpiresAt > DateTime.UtcNow && 
+                    .Where(l => l.ExpiresAt > DateTime.UtcNow &&
                            seatIds.Contains(l.SeatId) &&
                            (!orderToken.HasValue || l.OrderToken != orderToken.Value))
                     .Select(l => l.SeatId)
@@ -158,7 +152,7 @@ namespace WebApi.Repositories
 
                 // Get pending orders - Exclude current order
                 var pendingSeats = await _context.TicketOrders
-                    .Where(o => o.PresentationId == presentationId && 
+                    .Where(o => o.PresentationId == presentationId &&
                            o.Status == OrderStatus.Pending &&
                            o.ExpiresAt > DateTime.UtcNow &&
                            (!orderToken.HasValue || o.OrderToken != orderToken.Value))
@@ -172,7 +166,7 @@ namespace WebApi.Repositories
 
                 // Check if any of the requested seats are unavailable
                 var unavailableRequestedSeats = seatIds.Where(id => unavailableSeats.Contains(id)).ToList();
-                
+
                 if (unavailableRequestedSeats.Any())
                 {
                     _logger.LogWarning(
@@ -190,8 +184,8 @@ namespace WebApi.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, 
-                    "Error checking seat availability for presentation {PresentationId}", 
+                _logger.LogError(ex,
+                    "Error checking seat availability for presentation {PresentationId}",
                     presentationId);
                 throw;
             }
@@ -328,10 +322,10 @@ namespace WebApi.Repositories
 
             // Get all seat IDs that need to be made available again
             var seatIds = new HashSet<int>();
-            
+
             // Add seats from order items
             seatIds.UnionWith(order.Items.Select(i => i.SeatId));
-            
+
             // Add seats from all available options
             seatIds.UnionWith(order.AvailableOptions.Values.SelectMany(o => o.SeatIds));
 
@@ -385,4 +379,4 @@ namespace WebApi.Repositories
                 .ToListAsync();
         }
     }
-} 
+}

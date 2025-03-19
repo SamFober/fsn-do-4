@@ -1,7 +1,4 @@
 using WebApi.Models;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace WebApi.Interfaces.Repositories
 {
@@ -25,4 +22,4 @@ namespace WebApi.Interfaces.Repositories
         Task<List<Ticket>> FindTicketsByOrderId(int orderId);
         Task<List<Ticket>> FindTicketsByPhoneBookingCode(string phoneBookingCode);
     }
-} 
+}

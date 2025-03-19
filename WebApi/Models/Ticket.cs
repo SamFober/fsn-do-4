@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using WebApi.Models;
-
 namespace WebApi.Models
 {
     public class Ticket
@@ -29,4 +25,4 @@ namespace WebApi.Models
         Paid,
         Cancelled
     }
-} 
+}

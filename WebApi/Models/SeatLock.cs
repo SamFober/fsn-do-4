@@ -14,5 +14,6 @@ public class SeatLock
 
     // Navigation property
     public Seat? Seat { get; set; }
-    public TicketOrder? TicketOrder { get; set; }
-} 
+}
+
+

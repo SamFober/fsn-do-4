@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using FrontEnd.Models;
-
 namespace FrontEnd.Models
 {
     public class Ticket
@@ -26,4 +22,4 @@ namespace FrontEnd.Models
         Paid,
         Cancelled
     }
-} 
+}
