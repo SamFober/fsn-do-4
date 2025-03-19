@@ -42,14 +42,7 @@
 
         protected override async Task OnInitializedAsync()
         {
-            try
-            {
-                Movie = await Http.GetFromJsonAsync<Movie>($"api/movies/{Id}");
-            }
-            catch (Exception)
-            {
-                Movie = null;
-            }
+            Movie = await Http.GetFromJsonAsync<Movie>($"api/movies/{Id}") ?? null;
         }
     }
 </body>
