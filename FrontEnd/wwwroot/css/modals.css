@@ -1,0 +1,464 @@
+/* Overlay Modal */
+.overlay-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 2000;
+    overflow-y: auto;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.overlay-modal.show {
+    display: flex;
+    opacity: 1;
+    align-items: center;
+    justify-content: center;
+}
+
+.overlay-modal-content {
+    background-color: #0f1730;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    max-width: 950px;
+    width: 100%;
+    margin: 20px;
+    animation: modalFadeIn 0.4s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from { transform: translateY(-50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.overlay-modal-header {
+    padding: 20px 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: center;
+}
+
+.overlay-modal-header h3 {
+    color: white;
+    font-weight: bold;
+    font-size: 1.8rem;
+    margin: 0;
+}
+
+.overlay-modal-body {
+    padding: 40px 25px;
+}
+
+.overlay-form-container {
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* Cinema themed modals - both Bootstrap and custom modals */
+.modal-content,
+.cinema-modal .modal-content {
+    background-color: #0f1730;
+    color: #fff;
+    border: 1px solid #2a3b66;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header,
+.cinema-modal .modal-header {
+    border-bottom: 1px solid #2a3b66;
+    padding: 20px;
+    background-color: #111a33;
+}
+
+.modal-title,
+.cinema-modal .modal-title {
+    color: #f5c518;
+    font-weight: 600;
+    font-size: 1.5rem;
+}
+
+.modal-body,
+.cinema-modal .modal-body {
+    padding: 25px;
+    background-color: #0f1730;
+}
+
+.modal-footer,
+.cinema-modal .modal-footer {
+    border-top: 1px solid #2a3b66;
+    padding: 15px 20px;
+    background-color: #111a33;
+}
+
+.cinema-message {
+    font-size: 1.1rem;
+    line-height: 1.5;
+    color: #fff;
+}
+
+.modal-dialog-centered {
+    display: flex;
+    align-items: center;
+    min-height: calc(100% - 1rem);
+}
+
+/* Bootstrap overrides for modals */
+.modal.fade .modal-dialog {
+    transition: transform 0.3s ease-out;
+    transform: translateY(-50px);
+}
+
+.modal.show .modal-dialog {
+    transform: translateY(0);
+}
+
+.modal-backdrop {
+    background-color: #000;
+}
+
+.modal-backdrop.show {
+    opacity: 0.8;
+}
+
+/* Radio options in modals */
+.cinema-radio-option {
+    display: flex;
+    align-items: flex-start;
+    padding: 12px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    border: 1px solid transparent;
+    margin-bottom: 1rem;
+    position: relative;
+    width: 100%;
+}
+
+.cinema-radio-option:hover {
+    background-color: rgba(245, 197, 24, 0.1);
+    border-color: rgba(245, 197, 24, 0.3);
+}
+
+.cinema-radio-input {
+    margin: 4px 12px 0 0;
+    cursor: pointer;
+    accent-color: #f5c518;
+}
+
+.cinema-radio-content {
+    flex: 1;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cinema-radio-title {
+    font-weight: 500;
+    color: #fff;
+    font-size: 1.1rem;
+}
+
+.cinema-option-details {
+    color: #a9b1c5;
+    font-size: 0.9rem;
+}
+
+.cinema-radio-option input[type="radio"]:checked + .cinema-radio-content {
+    color: #f5c518;
+}
+
+.cinema-radio-option input[type="radio"]:checked + .cinema-radio-content .cinema-radio-title {
+    color: #f5c518;
+}
+
+.cinema-radio-option:focus-within {
+    outline: 2px solid #f5c518;
+    outline-offset: -2px;
+}
+
+/* Continue button in modals */
+.continue-btn {
+    background-color: #f5c518;
+    color: #0f1730;
+    font-weight: 600;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 6px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.continue-btn:hover {
+    background-color: #ffcc1d;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Cinema themed buttons */
+.cinema-btn {
+    border: none;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 1.1rem;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.cinema-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+}
+
+.cinema-btn:active {
+    transform: translateY(1px);
+}
+
+.cinema-btn-primary {
+    background-color: #f5c518;
+    color: #0f1730;
+    border: 1px solid #d6aa15;
+}
+
+.cinema-btn-primary:hover {
+    background-color: #ffcf2d;
+}
+
+.cinema-btn-danger {
+    background-color: rgba(220, 53, 69, 0.8);
+    color: white;
+    border: 1px solid #c82333;
+}
+
+.cinema-btn-danger:hover {
+    background-color: rgba(220, 53, 69, 1);
+}
+
+/* Progress bar and header */
+.sticky-header-wrapper {
+    margin: 0;
+    background-color: #000;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sticky-progress-container {
+    background-color: #000;
+    padding: 10px 0 0 0;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.booking-progress-wrapper {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    padding: 0 20px;
+}
+
+.booking-progress {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 auto;
+    gap: 15px;
+}
+
+.progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    color: rgba(255, 255, 255, 0.5);
+    z-index: 2;
+}
+
+.progress-connector {
+    height: 1px;
+    width: 45px;
+    background-color: rgba(255, 255, 255, 0.3);
+    margin-top: 15px;
+    position: relative;
+    z-index: 1;
+}
+
+.progress-step.active {
+    color: white;
+}
+
+.progress-step.active + .progress-connector {
+    background-color: #f5c518;
+}
+
+.progress-step.active .step-circle {
+    background-color: #f5c518;
+    border-color: #d6aa15;
+}
+
+.step-circle {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    margin-bottom: 6px;
+    font-weight: bold;
+    font-size: 1rem;
+}
+
+.step-label {
+    font-size: 0.8rem;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Timer styles */
+.order-timer {
+    display: flex;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    margin-left: 20px;
+    min-width: auto;
+}
+
+.order-timer-warning {
+    background-color: rgba(255, 193, 7, 0.2);
+    border-color: rgba(255, 193, 7, 0.3);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+}
+
+.timer-content {
+    display: flex;
+    justify-content: center;
+    font-size: 0.9rem;
+    color: white;
+}
+
+.countdown {
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+/* Cancel button */
+.cancel-button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 5px;
+    margin-right: 20px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.cancel-button:hover {
+    color: #f5c518;
+}
+
+/* Alerts */
+.cinema-alert {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 15px auto;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.5s ease;
+    animation: fadeIn 0.5s ease;
+    width: 100%;
+    opacity: 1;
+}
+
+.cinema-alert.fade-out {
+    opacity: 0;
+    transform: translateY(-10px);
+    height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.cinema-alert-success {
+    background-color: rgba(40, 167, 69, 0.2);
+    border-left: 4px solid #28a745;
+    color: #e2e2e2;
+}
+
+.cinema-alert-danger {
+    background-color: rgba(220, 53, 69, 0.2);
+    border-left: 4px solid #dc3545;
+    color: #e2e2e2;
+}
+
+.cinema-alert-icon {
+    font-size: 1.2rem;
+    margin-right: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+.cinema-alert-message {
+    flex: 1;
+    font-weight: 500;
+}
+
+/* Update for the seat counter modal */
+.overlay-modal-buttons {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+    margin-top: 25px;
+    width: 100%;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.overlay-modal-buttons .cinema-btn {
+    flex: 1;
+}
+
+.overlay-modal-buttons .cinema-btn-primary {
+    min-width: 200px;
+} 
