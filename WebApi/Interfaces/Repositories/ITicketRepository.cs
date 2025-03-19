@@ -1,7 +1,4 @@
 using WebApi.Models;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace WebApi.Interfaces.Repositories
 {
@@ -22,4 +19,4 @@ namespace WebApi.Interfaces.Repositories
         Task CancelOrder(Guid orderToken);
         Task<List<SeatLock>> GetSeatLocksByOrderToken(Guid orderToken);
     }
-} 
+}

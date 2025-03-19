@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace WebApi.Models.Responses
 {
     public class SeatingOption
@@ -18,4 +15,4 @@ namespace WebApi.Models.Responses
         public DateTime ExpiresAt { get; set; }
         public List<RowGroup> Groups { get; set; }
     }
-} 
+}

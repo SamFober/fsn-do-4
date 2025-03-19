@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using FrontEnd.Models;  // Add this to reference Hall and Movie
-
 namespace FrontEnd.Models
 {
     public class Presentation
@@ -26,4 +22,4 @@ namespace FrontEnd.Models
         public List<Row> Rows { get; set; } = new List<Row>();
         public ICollection<Ticket> Tickets { get; set; }
     }
-} 
+}

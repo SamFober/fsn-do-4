@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using WebApi.Models;
-
 namespace WebApi.Models
 {
     public class Movie
@@ -25,4 +21,4 @@ namespace WebApi.Models
 
         public ICollection<Presentation> Presentations { get; set; }
     }
-} 
+}

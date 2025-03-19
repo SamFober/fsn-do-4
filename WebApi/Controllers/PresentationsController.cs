@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using WebApi.Data;
 using WebApi.Models;
 
 namespace WebApi.Controllers
@@ -106,7 +105,7 @@ namespace WebApi.Controllers
                     p.EndTime,
                     p.Price,
                     HallName = p.Hall.Name,
-                    AvailableSeats = (p.Hall.Rows * p.Hall.SeatsPerRow) - 
+                    AvailableSeats = (p.Hall.Rows * p.Hall.SeatsPerRow) -
                         p.Tickets.Count(t => t.Status != TicketStatus.Cancelled)
                 })
                 .ToListAsync();
@@ -191,4 +190,4 @@ namespace WebApi.Controllers
             return Ok(response);
         }
     }
-} 
+}

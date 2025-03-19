@@ -1,5 +1,3 @@
-using System;
-
 namespace WebApi.Models.Responses
 {
     public class OrderStatusResponse
@@ -9,4 +7,4 @@ namespace WebApi.Models.Responses
         public DateTime? ExpiresAt { get; set; }
         public string? Status { get; set; }
     }
-} 
+}

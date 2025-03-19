@@ -1,11 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using WebApi.Data;
-using WebApi.Models;
+using WebApi.Exceptions;
 using WebApi.Interfaces.Services;
+using WebApi.Models;
 using WebApi.Models.Requests;
 using WebApi.Models.Responses;
-using WebApi.Exceptions;
 
 namespace WebApi.Controllers
 {
@@ -90,7 +89,7 @@ namespace WebApi.Controllers
                 // Book all seats except:
                 // 1. The specific pattern in row 5
                 // 2. A few random seats in other rows for variety
-                var seatsToBook = allSeats.Where(s => 
+                var seatsToBook = allSeats.Where(s =>
                     (s.RowNumber != 5) && // Not in row 5
                     (s.RowNumber % 3 != 0 || s.SeatNumber % 7 != 0) // Leave some random seats empty
                 ).Concat(
@@ -184,7 +183,7 @@ namespace WebApi.Controllers
         [ProducesResponseType(typeof(OrderResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<OrderResponse>> AddSeatsToOrder(
-            Guid orderToken, 
+            Guid orderToken,
             [FromBody] AddSeatsRequest request)
         {
             try
@@ -328,7 +327,7 @@ namespace WebApi.Controllers
         [ProducesResponseType(typeof(OrderResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<OrderResponse>> SelectGroupSeatingOption(
-            string option, 
+            string option,
             [FromBody] StartGroupOptionRequest request)
         {
             try
@@ -336,7 +335,7 @@ namespace WebApi.Controllers
                 // Get the order to find all locked seats
                 var order = await _context.TicketOrders
                     .FirstOrDefaultAsync(o => o.OrderToken == request.OrderToken);
-                
+
                 if (order == null)
                 {
                     return NotFound("Order not found or expired");
@@ -462,12 +461,12 @@ namespace WebApi.Controllers
             {
                 var order = await _context.TicketOrders
                     .FirstOrDefaultAsync(o => o.OrderToken == orderToken);
-                    
+
                 if (order == null)
                 {
                     return NotFound("Order not found");
                 }
-                
+
                 // If the order is expired according to our database timestamp
                 if (order.ExpiresAt < DateTime.UtcNow || order.Status == OrderStatus.Expired || order.Status == OrderStatus.Cancelled)
                 {
@@ -478,10 +477,10 @@ namespace WebApi.Controllers
                         order.Status = OrderStatus.Expired;
                         await _context.SaveChangesAsync();
                     }
-                    
+
                     return NotFound("Order expired");
                 }
-                
+
                 // Order is valid
                 return Ok(new OrderStatusResponse
                 {
@@ -507,12 +506,12 @@ namespace WebApi.Controllers
             {
                 var order = await _context.TicketOrders
                     .FirstOrDefaultAsync(o => o.OrderToken == orderToken);
-                    
+
                 if (order == null)
                 {
                     return NotFound("Order not found");
                 }
-                
+
                 // Only expire pending orders
                 if (order.Status == OrderStatus.Pending)
                 {
@@ -521,7 +520,7 @@ namespace WebApi.Controllers
                     await _context.SaveChangesAsync();
                     return Ok("Order expired successfully");
                 }
-                
+
                 return Ok("Order already processed");
             }
             catch (Exception ex)
@@ -579,19 +578,19 @@ namespace WebApi.Controllers
         private async Task<bool> ValidateSeatsAvailable(int presentationId, List<int> seatIds)
         {
             var bookedSeats = await _context.Tickets
-                .Where(t => t.PresentationId == presentationId && 
+                .Where(t => t.PresentationId == presentationId &&
                        t.Status != TicketStatus.Cancelled)
                 .Select(t => t.SeatId)
                 .ToListAsync();
 
             var lockedSeats = await _context.SeatLocks
-                .Where(l => l.ExpiresAt > DateTime.UtcNow && 
+                .Where(l => l.ExpiresAt > DateTime.UtcNow &&
                        seatIds.Contains(l.SeatId))
                 .Select(l => l.SeatId)
                 .ToListAsync();
 
             var pendingSeats = await _context.TicketOrders
-                .Where(o => o.PresentationId == presentationId && 
+                .Where(o => o.PresentationId == presentationId &&
                        o.Status == OrderStatus.Pending &&
                        o.ExpiresAt > DateTime.UtcNow)
                 .SelectMany(o => o.Items.Select(i => i.SeatId))
@@ -601,4 +600,4 @@ namespace WebApi.Controllers
             return !seatIds.Any(id => unavailableSeats.Contains(id));
         }
     }
-} 
+}

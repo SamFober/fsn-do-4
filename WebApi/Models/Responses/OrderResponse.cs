@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace WebApi.Models.Responses
 {
     public class OrderResponse
@@ -18,4 +15,4 @@ namespace WebApi.Models.Responses
         public virtual List<int> SeatIds { get; set; } = new();
         public bool IsSuccess { get; set; }
     }
-} 
+}

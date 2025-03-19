@@ -1,8 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using WebApi.Data;
-using WebApi.Models;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
+using WebApi.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,8 +14,9 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { 
-        Title = "Movie Theater API", 
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Movie Theater API",
         Version = "v1",
         Description = "API for booking movie theater tickets with support for group bookings"
     });
@@ -63,10 +63,10 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
-        
+
         // First apply migrations
         await context.Database.MigrateAsync();
-        
+
         // Then seed data
         await DbSeeder.Initialize(context);
     }

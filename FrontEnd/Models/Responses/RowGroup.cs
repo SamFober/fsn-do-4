@@ -5,4 +5,4 @@ namespace FrontEnd.Models.Responses
         List<int> SeatIds,
         string Description
     );
-} 
+}

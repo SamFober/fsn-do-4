@@ -1,13 +1,5 @@
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
-using WebApi.Data;
 using WebApi.Models;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Linq;
-using Microsoft.Extensions.Hosting;
 
 namespace WebApi.Services
 {
@@ -47,7 +39,7 @@ namespace WebApi.Services
                 }
 
                 var expiredOrders = await context.TicketOrders
-                    .Where(o => o.Status == OrderStatus.Pending && 
+                    .Where(o => o.Status == OrderStatus.Pending &&
                                o.ExpiresAt < DateTime.UtcNow)
                     .ToListAsync();
 
@@ -76,4 +68,4 @@ namespace WebApi.Services
             _timer?.Dispose();
         }
     }
-} 
+}

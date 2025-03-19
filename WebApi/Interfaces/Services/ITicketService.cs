@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using WebApi.Models.Requests;
 using WebApi.Models.Responses;
 
@@ -18,4 +15,4 @@ namespace WebApi.Interfaces.Services
         Task<OrderResponse> SelectGroupSeatingOption(string option, StartGroupOptionRequest request);
         Task CancelOrder(Guid orderToken);
     }
-} 
+}

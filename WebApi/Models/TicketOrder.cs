@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using WebApi.Models.Responses;
 
 namespace WebApi.Models
@@ -24,7 +22,7 @@ namespace WebApi.Models
         public int TicketOrderId { get; set; }
         public int SeatId { get; set; }
         public DateTime CreatedAt { get; set; }
-        
+
         // Navigation properties
         public TicketOrder Order { get; set; } = null!;
         public Seat Seat { get; set; } = null!;
@@ -37,4 +35,4 @@ namespace WebApi.Models
         Expired,
         Cancelled
     }
-} 
+}

@@ -1,15 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
+using WebApi.Exceptions;
 using WebApi.Interfaces.Repositories;
 using WebApi.Interfaces.Services;
 using WebApi.Models;
 using WebApi.Models.Requests;
 using WebApi.Models.Responses;
-using WebApi.Exceptions;
 
 namespace WebApi.Services
 {
@@ -221,7 +216,7 @@ namespace WebApi.Services
 
                 // Get all currently locked seats for this order
                 var existingLocks = await _repository.GetSeatLocksByOrderToken(order.OrderToken);
-                
+
                 // Find seats that were locked but not selected in the chosen option
                 var seatsToUnlock = existingLocks
                     .Where(l => !seatingOption.SeatIds.Contains(l.SeatId))
@@ -303,7 +298,7 @@ namespace WebApi.Services
 
             // Create the tickets
             var createdTickets = await _repository.CreateTickets(tickets);
-            
+
             return createdTickets.Select(t => new TicketResponse(
                 t.Id,
                 t.Presentation.Movie.Title,
@@ -427,7 +422,7 @@ namespace WebApi.Services
         public async Task<List<int>> FindConsecutiveSeats(int presentationId, int numberOfSeats)
         {
             var availableSeats = await _repository.GetAvailableSeats(presentationId, true);
-            
+
             // Group seats by row
             var seatsByRow = availableSeats
                 .GroupBy(s => s.RowNumber)
@@ -435,7 +430,7 @@ namespace WebApi.Services
 
             // Find all possible consecutive seat groups
             var candidateGroups = new List<List<Seat>>();
-            
+
             foreach (var row in seatsByRow)
             {
                 var consecutiveSeats = FindConsecutiveInRow(row.Value, numberOfSeats);
@@ -444,59 +439,60 @@ namespace WebApi.Services
                     candidateGroups.Add(consecutiveSeats);
                 }
             }
-            
+
             if (!candidateGroups.Any())
             {
                 return new List<int>();
             }
-            
+
             // Get the presentation information asynchronously
             var presentation = await _context.Presentations
                 .Include(p => p.Hall)
                 .FirstOrDefaultAsync(p => p.Id == presentationId);
-                
+
             if (presentation == null)
             {
                 return candidateGroups.First().Select(s => s.Id).ToList(); // Just return the first group if we can't score
             }
-            
+
             var hall = presentation.Hall;
             var middleRow = (int)Math.Ceiling(hall.Rows / 2.0);
             var middleSeat = (int)Math.Ceiling(hall.SeatsPerRow / 2.0);
             var idealRow = (int)Math.Ceiling(hall.Rows * 0.66); // 2/3 back is ideal
-            
+
             // Calculate score for each candidate group (lower is better)
-            var scoredGroups = candidateGroups.Select(group => {
+            var scoredGroups = candidateGroups.Select(group =>
+            {
                 // For consecutive seats, calculate center of the group
                 var groupRowNumber = group.First().RowNumber;
                 var groupStartSeat = group.Min(s => s.SeatNumber);
                 var groupEndSeat = group.Max(s => s.SeatNumber);
                 var groupCenterSeat = (groupStartSeat + groupEndSeat) / 2.0;
-                
+
                 // Row position score - prefer rows closer to ideal viewing distance
                 var rowDistanceScore = Math.Abs(groupRowNumber - idealRow) * 3;
-                
+
                 // Center alignment score - prefer seats centered in the row
                 var centerAlignmentScore = Math.Abs(groupCenterSeat - middleSeat) * 2;
-                
+
                 // Front row penalty
                 var frontRowPenalty = (groupRowNumber <= 2) ? 10 : 0;
-                
+
                 // Side seats penalty
                 var sideDistanceMin = Math.Min(groupStartSeat, hall.SeatsPerRow - groupEndSeat + 1);
                 var sidePenalty = Math.Max(0, 3 - sideDistanceMin) * 5;
-                
+
                 var totalScore = rowDistanceScore + centerAlignmentScore + frontRowPenalty + sidePenalty;
-                
+
                 return new { Group = group, Score = totalScore };
             });
-            
+
             // Select the group with the lowest score (best viewing experience)
             var bestGroup = scoredGroups
                 .OrderBy(g => g.Score)
                 .First()
                 .Group;
-                
+
             return bestGroup.Select(s => s.Id).ToList();
         }
 
@@ -504,29 +500,29 @@ namespace WebApi.Services
         {
             // Get all available seats, already ordered by best viewing experience
             var availableSeats = await _repository.GetAvailableSeats(presentationId, true);
-            
+
             // Early return if we don't have enough seats
             if (availableSeats.Count < numberOfSeats)
             {
                 return new List<int>();
             }
-            
+
             // Group by row to try to keep parties together where possible
             var seatsByRow = availableSeats
                 .GroupBy(s => s.RowNumber)
                 .OrderBy(g => g.First().RowNumber) // Order by row number
                 .ToDictionary(g => g.Key, g => g.OrderBy(s => s.SeatNumber).ToList());
-            
+
             // Try to find consecutive seats in each row first
             var result = new List<Seat>();
             var seatsRemaining = numberOfSeats;
-            
+
             // First, try to get consecutive groups in good rows
             foreach (var row in seatsByRow.OrderBy(r => Math.Abs(r.Key - availableSeats[0].RowNumber))) // Start with the best row
             {
                 // If we already have enough seats, break
                 if (seatsRemaining <= 0) break;
-                
+
                 // Find the largest consecutive group in this row
                 for (int groupSize = Math.Min(seatsRemaining, row.Value.Count); groupSize > 1; groupSize--)
                 {
@@ -535,19 +531,19 @@ namespace WebApi.Services
                     {
                         result.AddRange(consecutive);
                         seatsRemaining -= consecutive.Count;
-                        
+
                         // Remove these seats from consideration
                         foreach (var seat in consecutive)
                         {
                             row.Value.Remove(seat);
                         }
-                        
+
                         // Try again with the remaining seats in this row
                         groupSize = Math.Min(seatsRemaining, row.Value.Count) + 1; // +1 to offset the loop decrement
                     }
                 }
             }
-            
+
             // If we still need more seats, add individual best seats
             if (seatsRemaining > 0)
             {
@@ -556,17 +552,17 @@ namespace WebApi.Services
                     .Where(s => !result.Any(selected => selected.Id == s.Id))
                     .Take(seatsRemaining)
                     .ToList();
-                    
+
                 result.AddRange(remainingSeats);
             }
-            
+
             return result.Select(s => s.Id).ToList();
         }
 
         private List<Seat> FindConsecutiveInRow(List<Seat> rowSeats, int count)
         {
             var orderedSeats = rowSeats.OrderBy(s => s.SeatNumber).ToList();
-            
+
             for (int i = 0; i <= orderedSeats.Count - count; i++)
             {
                 var consecutive = true;
@@ -578,20 +574,20 @@ namespace WebApi.Services
                         break;
                     }
                 }
-                
+
                 if (consecutive)
                 {
                     return orderedSeats.Skip(i).Take(count).ToList();
                 }
             }
-            
+
             return new List<Seat>();
         }
 
         private async Task<List<RowGroup>> GetSplitArrangement(List<int> seatIds)
         {
             var seats = await _repository.GetSeatsByIds(seatIds);
-            
+
             return seats
                 .GroupBy(s => s.RowNumber)
                 .OrderBy(g => g.Key)
@@ -621,4 +617,4 @@ namespace WebApi.Services
             }
         }
     }
-} 
+}

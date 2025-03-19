@@ -13,4 +13,4 @@ namespace WebApi.Data
             return new ApplicationDbContext(optionsBuilder.Options);
         }
     }
-} 
+}

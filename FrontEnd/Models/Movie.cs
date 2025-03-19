@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using FrontEnd.Models;
-
 namespace FrontEnd.Models
 {
     public class Movie
@@ -25,4 +21,4 @@ namespace FrontEnd.Models
 
         public ICollection<Presentation> Presentations { get; set; }
     }
-} 
+}

@@ -1,18 +1,15 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json.Serialization;
 
 namespace FrontEnd.Models.Responses
 {
     public class GroupOrderResponse : OrderResponse
     {
-        public GroupOrderResponse() 
+        public GroupOrderResponse()
         {
             Seats = new List<SeatResponse>();
         }
 
-        public GroupOrderResponse(String orderToken, List<int> seatIds, bool hasConsecutiveSeats = false) 
+        public GroupOrderResponse(String orderToken, List<int> seatIds, bool hasConsecutiveSeats = false)
             : base(orderToken, seatIds)
         {
             HasConsecutiveSeats = hasConsecutiveSeats;
@@ -47,4 +44,4 @@ namespace FrontEnd.Models.Responses
         public int RowNumber { get; set; }
         public int SeatNumber { get; set; }
     }
-} 
+}

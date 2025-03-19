@@ -13,7 +13,7 @@ public class MoviesController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task< IActionResult > GetMovieById(int id)
+    public async Task<IActionResult> GetMovieById(int id)
     {
         var movie = await _context.Movies
             .Where(m => m.Id == id)
