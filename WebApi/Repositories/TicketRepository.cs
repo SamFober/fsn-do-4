@@ -259,7 +259,7 @@ namespace WebApi.Repositories
         {
             try
             {
-                if (order.Id == Guid.Empty)
+                if (order.Id == 0)
                     _context.TicketOrders.Add(order);
                 else
                     _context.TicketOrders.Update(order);
@@ -345,6 +345,37 @@ namespace WebApi.Repositories
         {
             return await _context.SeatLocks
                 .Where(l => l.OrderToken == orderToken)
+                .ToListAsync();
+        }
+
+        public async Task<TicketOrder?> FindTicketOrderByOrderToken(Guid orderToken)
+        {
+            return await _context.TicketOrders
+                .Where(t => t.OrderToken == orderToken)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<List<Ticket>> FindTicketsByOrderId(int orderId)
+        {
+            return await _context.Tickets
+                .Where(t => t.TicketOrderId == orderId)
+                .Include(t => t.Presentation)
+                .ThenInclude(p => p.Hall)
+                .Include(t => t.Presentation)
+                .ThenInclude(p => p.Movie)
+                .Include(t => t.Seat)
+                .ToListAsync();
+        }
+
+        public async Task<List<Ticket>> FindTicketsByPhoneBookingCode(string phoneBookingCode)
+        {
+            return await _context.Tickets
+                .Where(t => t.PhoneBookingCode == phoneBookingCode)
+                .Include(t => t.Presentation)
+                .ThenInclude(p => p.Hall)
+                .Include(t => t.Presentation)
+                .ThenInclude(p => p.Movie)
+                .Include(t => t.Seat)
                 .ToListAsync();
         }
     }

@@ -10,8 +10,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace WebApi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250318170238_ChangeTicketOrderToGuid")]
-    partial class ChangeTicketOrderToGuid
+    [Migration("20250221201425_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -20,33 +20,6 @@ namespace WebApi.Migrations
             modelBuilder
                 .HasAnnotation("ProductVersion", "8.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
-
-            modelBuilder.Entity("WebApi.Models.Discount", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<bool>("ExcludesHolidays")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<bool>("OnlyWeekdays")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<bool>("RequiresValidation")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Discounts");
-                });
 
             modelBuilder.Entity("WebApi.Models.Hall", b =>
                 {
@@ -78,6 +51,10 @@ namespace WebApi.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    b.Property<string>("AgeRating")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
@@ -87,8 +64,16 @@ namespace WebApi.Migrations
                     b.Property<int>("DurationMinutes")
                         .HasColumnType("int");
 
+                    b.Property<string>("Genre")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("PosterUrl")
+                        .IsRequired()
+                        .HasColumnType("longtext");
 
                     b.Property<DateTime?>("ReleaseDate")
                         .HasColumnType("datetime(6)");
@@ -185,20 +170,12 @@ namespace WebApi.Migrations
                     b.Property<Guid>("OrderToken")
                         .HasColumnType("char(36)");
 
-                    b.Property<int>("PresentationId")
-                        .HasColumnType("int");
-
                     b.Property<int>("SeatId")
                         .HasColumnType("int");
-
-                    b.Property<Guid>("TicketOrderId")
-                        .HasColumnType("char(36)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("SeatId");
-
-                    b.HasIndex("TicketOrderId");
 
                     b.ToTable("SeatLocks");
                 });
@@ -232,17 +209,12 @@ namespace WebApi.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
-                    b.Property<Guid>("TicketOrderId")
-                        .HasColumnType("char(36)");
-
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime(6)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("SeatId");
-
-                    b.HasIndex("TicketOrderId");
 
                     b.HasIndex("PresentationId", "SeatId")
                         .IsUnique();
@@ -252,9 +224,9 @@ namespace WebApi.Migrations
 
             modelBuilder.Entity("WebApi.Models.TicketOrder", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
+                        .HasColumnType("int");
 
                     b.Property<string>("AvailableOptions")
                         .IsRequired()
@@ -297,8 +269,8 @@ namespace WebApi.Migrations
                     b.Property<int>("SeatId")
                         .HasColumnType("int");
 
-                    b.Property<Guid>("TicketOrderId")
-                        .HasColumnType("char(36)");
+                    b.Property<int>("TicketOrderId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -347,15 +319,7 @@ namespace WebApi.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("WebApi.Models.TicketOrder", "TicketOrder")
-                        .WithMany("SeatLocks")
-                        .HasForeignKey("TicketOrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("Seat");
-
-                    b.Navigation("TicketOrder");
                 });
 
             modelBuilder.Entity("WebApi.Models.Ticket", b =>
@@ -372,17 +336,9 @@ namespace WebApi.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("WebApi.Models.TicketOrder", "TicketOrder")
-                        .WithMany("Tickets")
-                        .HasForeignKey("TicketOrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("Presentation");
 
                     b.Navigation("Seat");
-
-                    b.Navigation("TicketOrder");
                 });
 
             modelBuilder.Entity("WebApi.Models.TicketOrder", b =>
@@ -440,10 +396,6 @@ namespace WebApi.Migrations
             modelBuilder.Entity("WebApi.Models.TicketOrder", b =>
                 {
                     b.Navigation("Items");
-
-                    b.Navigation("SeatLocks");
-
-                    b.Navigation("Tickets");
                 });
 #pragma warning restore 612, 618
         }

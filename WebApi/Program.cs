@@ -1,9 +1,14 @@
 using Microsoft.EntityFrameworkCore;
+using WebApi.Data;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
-using WebApi.Data;
+using WebApi.Interfaces.Services;
+using QuestPDF.Infrastructure;
+using WebApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+QuestPDF.Settings.License = LicenseType.Community;
 
 // Add services to the container.
 builder.Services.AddControllers()
@@ -37,9 +42,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySQL(connectionString));
 
 builder.Services.AddMemoryCache(); // For seat locking
+builder.Services.AddScoped<ITicketPdfService, TicketPdfServiceQuestPdf>();
 builder.Services.AddScoped<WebApi.Interfaces.Repositories.ITicketRepository, WebApi.Repositories.TicketRepository>();
 builder.Services.AddScoped<WebApi.Interfaces.Services.ITicketService, WebApi.Services.TicketService>();
-builder.Services.AddScoped<WebApi.Interfaces.Services.IPaymentService, WebApi.Services.PaymentService>();
 
 // Add CORS
 builder.Services.AddCors(options =>
