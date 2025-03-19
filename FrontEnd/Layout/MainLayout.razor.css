@@ -36,6 +36,29 @@ main {
         text-overflow: ellipsis;
     }
 
+/* Full width styles for seat selector */
+.full-width-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    width: 100%;
+    background-color: #000;
+}
+
+.full-width-main {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    width: 100%;
+    flex: 1;
+}
+
+.full-width-main article {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
 @media (max-width: 640.98px) {
     .top-row {
         justify-content: space-between;

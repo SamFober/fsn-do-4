@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using WebApi.Models.Responses;
 
 namespace WebApi.Models
 {
@@ -11,9 +12,10 @@ namespace WebApi.Models
         public DateTime CreatedAt { get; set; }
         public DateTime ExpiresAt { get; set; } // Hold seats for X minutes
         public OrderStatus Status { get; set; }
+        public int RequestedSeats { get; set; } // Number of seats originally requested
         public virtual Presentation? Presentation { get; set; }
-        public virtual List<TicketOrderItem> Items { get; set; } = new();
         public Dictionary<string, SeatingOption> AvailableOptions { get; set; } = new();
+        public ICollection<TicketOrderItem> Items { get; set; } = new List<TicketOrderItem>();
     }
 
     public class TicketOrderItem
@@ -26,23 +28,6 @@ namespace WebApi.Models
         // Navigation properties
         public TicketOrder Order { get; set; } = null!;
         public Seat Seat { get; set; } = null!;
-    }
-
-    public class SeatingOption
-    {
-        public string Type { get; set; } = string.Empty;
-        public List<int> SeatIds { get; set; } = new();
-        public DateTime ExpiresAt { get; set; }
-
-        // Parameterless constructor for JSON deserialization
-        public SeatingOption() { }
-
-        public SeatingOption(string type, List<int> seatIds, DateTime expiresAt)
-        {
-            Type = type;
-            SeatIds = seatIds;
-            ExpiresAt = expiresAt;
-        }
     }
 
     public enum OrderStatus

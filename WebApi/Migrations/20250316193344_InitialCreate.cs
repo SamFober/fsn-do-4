@@ -40,6 +40,9 @@ namespace WebApi.Migrations
                         .Annotation("MySQL:ValueGenerationStrategy", MySQLValueGenerationStrategy.IdentityColumn),
                     Title = table.Column<string>(type: "longtext", nullable: false),
                     Description = table.Column<string>(type: "longtext", nullable: true),
+                    PosterUrl = table.Column<string>(type: "longtext", nullable: false),
+                    Genre = table.Column<string>(type: "longtext", nullable: false),
+                    AgeRating = table.Column<string>(type: "longtext", nullable: false),
                     DurationMinutes = table.Column<int>(type: "int", nullable: false),
                     ReleaseDate = table.Column<DateTime>(type: "datetime(6)", nullable: true),
                     IsActive = table.Column<bool>(type: "tinyint(1)", nullable: false),
@@ -61,6 +64,7 @@ namespace WebApi.Migrations
                     HallId = table.Column<int>(type: "int", nullable: false),
                     RowNumber = table.Column<int>(type: "int", nullable: false),
                     SeatNumber = table.Column<int>(type: "int", nullable: false),
+                    IsAvailable = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false)
                 },
                 constraints: table =>
@@ -140,7 +144,9 @@ namespace WebApi.Migrations
                     PresentationId = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false),
                     ExpiresAt = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    Status = table.Column<int>(type: "int", nullable: false)
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    RequestedSeats = table.Column<int>(type: "int", nullable: false),
+                    AvailableOptions = table.Column<string>(type: "json", nullable: false)
                 },
                 constraints: table =>
                 {

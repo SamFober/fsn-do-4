@@ -1,16 +1,40 @@
 ﻿@inherits LayoutComponentBase
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@inject NavigationManager NavigationManager
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+@{
+    bool isSeatSelector = NavigationManager.Uri.Contains("/seat-selector");
+}
+
+<div class="page @(isSeatSelector ? "full-width-page" : "")">
+    @if (!isSeatSelector)
+    {
+        <div class="sidebar">
+            <NavMenu />
         </div>
+    }
+
+    <main class="@(isSeatSelector ? "full-width-main" : "")">
+        @if (!isSeatSelector)
+        {
+            <div class="top-row px-4">
+                <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            </div>
+        }
 
         <article class="content px-4">
             @Body
         </article>
     </main>
 </div>
+
+<style>
+    .full-width-page {
+        display: block;
+        width: 100%;
+    }
+    
+    .full-width-main {
+        margin-left: 0;
+        width: 100%;
+    }
+</style>

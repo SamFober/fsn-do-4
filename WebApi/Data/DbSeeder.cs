@@ -1,4 +1,5 @@
 using WebApi.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace WebApi.Data
 {
@@ -6,86 +7,108 @@ namespace WebApi.Data
     {
         public static async Task Initialize(ApplicationDbContext context)
         {
-            // Only seed if the database is empty
-            if (context.Halls.Any()) return;
-
-            var halls = new[]
+            // Seed halls
+            if (!await context.Halls.AnyAsync())
             {
-                new Hall { Name = "IMAX 1", Rows = 15, SeatsPerRow = 20, CreatedAt = DateTime.UtcNow },
-                new Hall { Name = "IMAX 2", Rows = 15, SeatsPerRow = 20, CreatedAt = DateTime.UtcNow },
-                new Hall { Name = "Standard 1", Rows = 10, SeatsPerRow = 15, CreatedAt = DateTime.UtcNow },
-                new Hall { Name = "Standard 2", Rows = 10, SeatsPerRow = 15, CreatedAt = DateTime.UtcNow },
-                new Hall { Name = "VIP 1", Rows = 5, SeatsPerRow = 10, CreatedAt = DateTime.UtcNow },
-                new Hall { Name = "VIP 2", Rows = 5, SeatsPerRow = 10, CreatedAt = DateTime.UtcNow }
-            };
-
-            foreach (var hall in halls)
-            {
-                // Create seats for each hall
-                for (int row = 1; row <= hall.Rows; row++)
+                var halls = new[]
                 {
-                    for (int seatNum = 1; seatNum <= hall.SeatsPerRow; seatNum++)
+                    new Hall { Name = "Hall 1", Rows = 8, SeatsPerRow = 15 },
+                    new Hall { Name = "Hall 2", Rows = 8, SeatsPerRow = 15 },
+                    new Hall { Name = "Hall 3", Rows = 8, SeatsPerRow = 15 },
+                    new Hall { Name = "Hall 4", Rows = 6, SeatsPerRow = 10 },
+                    new Hall { Name = "Hall 5", Rows = 4, SeatsPerRow = 15 },
+                    new Hall { Name = "Hall 6", Rows = 4, SeatsPerRow = 15 }
+                };
+                context.Halls.AddRange(halls);
+                await context.SaveChangesAsync();
+
+                // Add seats for each hall
+                foreach (var hall in halls)
+                {
+                    var seats = new List<Seat>();
+                    for (int row = 1; row <= hall.Rows; row++)
                     {
-                        var seat = new Seat
+                        for (int seatNum = 1; seatNum <= hall.SeatsPerRow; seatNum++)
                         {
-                            Hall = hall,  // Set the required Hall navigation property
-                            RowNumber = row,
-                            SeatNumber = seatNum,
-                            CreatedAt = DateTime.UtcNow
-                        };
-                        hall.Seats.Add(seat);
+                            seats.Add(new Seat
+                            {
+                                Hall = hall,
+                                HallId = hall.Id, // Set HallId directly
+                                RowNumber = row,
+                                SeatNumber = seatNum,
+                                IsAvailable = true,
+                                CreatedAt = DateTime.UtcNow
+                            });
+                        }
                     }
+                    context.Seats.AddRange(seats);
                 }
+                await context.SaveChangesAsync();
             }
 
-            context.Halls.AddRange(halls);
-            await context.SaveChangesAsync();
-
-            // Add Movies
-            var movies = new List<Movie>
+            if (!await context.Movies.AnyAsync())
             {
-                new Movie 
-                { 
-                    Title = "Inception",
-                    Description = "A thief who steals corporate secrets through dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.",
-                    DurationMinutes = 148,
-                    ReleaseDate = new DateTime(2010, 7, 16),
-                    IsActive = true
-                },
-                new Movie 
-                { 
-                    Title = "The Dark Knight",
-                    Description = "When the menace known as the Joker wreaks havoc and chaos on the people of Gotham, Batman must accept one of the greatest psychological and physical tests of his ability to fight injustice.",
-                    DurationMinutes = 152,
-                    ReleaseDate = new DateTime(2008, 7, 18),
-                    IsActive = true
-                }
-            };
-            context.Movies.AddRange(movies);
-            await context.SaveChangesAsync();
+                // Add sample movies
+                var movies = new[]
+                {
+                    new Movie 
+                    { 
+                        Title = "The Matrix",
+                        Description = "A computer programmer discovers a mysterious world.",
+                        PosterUrl = "",
+                        Genre = "Action",
+                        AgeRating = "R",
+                        DurationMinutes = 136,
+                        ReleaseDate = new DateTime(1999, 3, 31),
+                        IsActive = true
+                    },
+                    new Movie 
+                    { 
+                        Title = "Inception",
+                        Description = "A thief who steals corporate secrets through dream-sharing technology.",
+                        PosterUrl = "",
+                        Genre = "Action",
+                        AgeRating = "R",
+                        DurationMinutes = 148,
+                        ReleaseDate = new DateTime(2010, 7, 16),
+                        IsActive = true
+                    }
+                };
+                context.Movies.AddRange(movies);
+                await context.SaveChangesAsync();
+            }
 
-            // Add Presentations (movie showings)
-            var presentations = new List<Presentation>
+            // Separate check for presentations
+            if (!await context.Presentations.AnyAsync())
             {
-                new Presentation
+                var movies = await context.Movies.Take(2).ToListAsync();
+                var halls = await context.Halls.Take(2).ToListAsync();
+                
+                if (movies.Any() && halls.Any())
                 {
-                    Movie = movies[0],
-                    Hall = halls[0],
-                    StartTime = DateTime.Now.Date.AddHours(18), // 6 PM today
-                    EndTime = DateTime.Now.Date.AddHours(20).AddMinutes(28),
-                    Price = 12.99m
-                },
-                new Presentation
-                {
-                    Movie = movies[1],
-                    Hall = halls[1],
-                    StartTime = DateTime.Now.Date.AddHours(20), // 8 PM today
-                    EndTime = DateTime.Now.Date.AddHours(22).AddMinutes(32),
-                    Price = 12.99m
+                    var presentations = new[]
+                    {
+                        new Presentation
+                        {
+                            Movie = movies[0],
+                            Hall = halls[0],
+                            StartTime = DateTime.Today.AddHours(19),
+                            EndTime = DateTime.Today.AddHours(21),
+                            Price = 12.99m
+                        },
+                        new Presentation
+                        {
+                            Movie = movies[1],
+                            Hall = halls[1],
+                            StartTime = DateTime.Today.AddHours(20),
+                            EndTime = DateTime.Today.AddHours(22),
+                            Price = 14.99m
+                        }
+                    };
+                    context.Presentations.AddRange(presentations);
+                    await context.SaveChangesAsync();
                 }
-            };
-            context.Presentations.AddRange(presentations);
-            await context.SaveChangesAsync();
+            }
         }
     }
 } 

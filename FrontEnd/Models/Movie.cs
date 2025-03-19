@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using WebApi.Models;
+using FrontEnd.Models;
 
-namespace WebApi.Models
+namespace FrontEnd.Models
 {
     public class Movie
     {

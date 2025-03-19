@@ -1,14 +1,15 @@
 using System;
 using System.Collections.Generic;
-using WebApi.Models;  // Add this to reference Hall and Movie
+using FrontEnd.Models;  // Add this to reference Hall and Movie
 
-namespace WebApi.Models
+namespace FrontEnd.Models
 {
     public class Presentation
     {
         public Presentation()
         {
             Tickets = new List<Ticket>();
+            Rows = new List<Row>();
         }
 
         public int Id { get; set; }
@@ -19,8 +20,10 @@ namespace WebApi.Models
         public decimal Price { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
-        public required Movie Movie { get; set; }
-        public required Hall Hall { get; set; }
+
+        public string Title { get; set; }
+        public string HallName { get; set; }
+        public List<Row> Rows { get; set; } = new List<Row>();
         public ICollection<Ticket> Tickets { get; set; }
     }
 } 
