@@ -19,8 +19,6 @@ public class ApplicationDbContext : DbContext
     public DbSet<TicketOrder> TicketOrders { get; set; } = null!;
     public DbSet<TicketOrderItem> TicketOrderItems { get; set; } = null!;
     public DbSet<SeatLock> SeatLocks { get; set; } = null!;
-    public DbSet<Discount> Discounts { get; set; } 
-
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

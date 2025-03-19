@@ -18,33 +18,6 @@ namespace WebApi.Migrations
                 .HasAnnotation("ProductVersion", "8.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
-            modelBuilder.Entity("WebApi.Models.Discount", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<bool>("ExcludesHolidays")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<bool>("OnlyWeekdays")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<bool>("RequiresValidation")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Discounts");
-                });
-
             modelBuilder.Entity("WebApi.Models.Hall", b =>
                 {
                     b.Property<int>("Id")
@@ -188,8 +161,8 @@ namespace WebApi.Migrations
                     b.Property<int>("SeatId")
                         .HasColumnType("int");
 
-                    b.Property<Guid>("TicketOrderId")
-                        .HasColumnType("char(36)");
+                    b.Property<int>("TicketOrderId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -202,9 +175,9 @@ namespace WebApi.Migrations
 
             modelBuilder.Entity("WebApi.Models.Ticket", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
@@ -229,8 +202,8 @@ namespace WebApi.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
-                    b.Property<Guid>("TicketOrderId")
-                        .HasColumnType("char(36)");
+                    b.Property<int>("TicketOrderId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime(6)");
@@ -249,9 +222,9 @@ namespace WebApi.Migrations
 
             modelBuilder.Entity("WebApi.Models.TicketOrder", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
+                        .HasColumnType("int");
 
                     b.Property<string>("AvailableOptions")
                         .IsRequired()
@@ -294,8 +267,8 @@ namespace WebApi.Migrations
                     b.Property<int>("SeatId")
                         .HasColumnType("int");
 
-                    b.Property<Guid>("TicketOrderId")
-                        .HasColumnType("char(36)");
+                    b.Property<int>("TicketOrderId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
