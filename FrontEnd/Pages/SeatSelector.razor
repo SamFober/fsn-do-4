@@ -20,7 +20,7 @@
                 <button @onclick="CancelOrder" class="cancel-button">
                     <span>← Cancel</span>
                 </button>
-                
+
                 <div class="booking-progress">
                     <div class="progress-step @(activeStep == 1 ? "active" : "")">
                         <div class="step-circle">1</div>
@@ -37,7 +37,7 @@
                         <div class="step-label">Confirmation</div>
                     </div>
                 </div>
-                
+
                 @if (orderExpirationTime.HasValue)
                 {
                     <div class="order-timer @(timeRemaining.TotalMinutes < 2 ? "order-timer-warning" : "")">
@@ -52,7 +52,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="content-with-header-space">
         @if (message != null)
         {
@@ -70,7 +70,7 @@
                 <div class="cinema-alert-message">@message</div>
             </div>
         }
-        
+
         @if (presentation == null)
         {
             <div class="text-center loading-container seat-selection-section">
@@ -97,7 +97,7 @@
                                             var isSelected = selectedSeats.Any(s => s.Id == seat.Id);
                                             string seatClass = isSelected ? "seat-selected" : 
                                                                !seat.IsAvailable ? "seat-unavailable" : "seat-available";
-                                            
+
                                             <div class="seat @seatClass" @onclick="() => SelectSeat(seat)" title="Row @row.RowNumber, Seat @seat.SeatNumber">
                                                 <span class="seat-number">@seat.SeatNumber</span>
                                             </div>
@@ -112,7 +112,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="seat-legend">
                         <div class="legend-item">
                             <div class="seat-sample seat-available"></div>
@@ -127,24 +127,24 @@
                             <span>Unavailable</span>
                         </div>
                     </div>
-                    
+
                     @if (selectedSeats.Count > 0)
                     {
                         <div class="order-summary">
                             <div id="ticketTypeSection" class="ticket-type-section">
                                 <h4>Select Ticket Types:</h4>
                                 <p class="ticket-instruction-text">Please select a ticket type for each seat</p>
-                                
+
                                 @for (int i = 0; i < selectedSeats.Count; i++)
                                 {
                                     var seat = selectedSeats.OrderBy(s => s.RowNumber).ThenBy(s => s.SeatNumber).ElementAt(i);
                                     var index = i;
-                                    
+
                                     <div class="ticket-type-row">
                                         <div class="ticket-seat-info">Row @seat.RowNumber, Seat @seat.SeatNumber</div>
                                         <div class="ticket-type-selector">
                                             <select class="form-select" value="@(ticketTypes.ContainsKey(seat.Id) ? ticketTypes[seat.Id] : "adult")" 
-                                                   @onchange="@(e => SelectTicketType(seat.Id, e.Value.ToString()))">
+                                            @onchange="@(e => SelectTicketType(seat.Id, e.Value.ToString()))">
                                                 <option value="adult">Adult - €12.50</option>
                                                 <option value="child">Child - €8.50</option>
                                                 <option value="senior">Senior - €10.50</option>
@@ -153,7 +153,7 @@
                                         </div>
                                     </div>
                                 }
-                                
+
                                 <div class="price-summary">
                                     <div class="price-details">
                                         @foreach (var ticketGroup in ticketTypes.GroupBy(t => t.Value).OrderBy(g => g.Key))
@@ -170,7 +170,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="action-buttons">
                                 <button @onclick="CancelOrder" class="cinema-btn cinema-btn-danger">Cancel Order</button>
                                 <button @onclick="ConfirmTickets" class="cinema-btn cinema-btn-primary">Confirm Tickets</button>
@@ -199,7 +199,7 @@
                     <div class="cinema-alert-message">@groupOrderError</div>
                 </div>
             }
-            
+
             <div class="overlay-form-container">
                 <div class="form-group seat-selection-form">
                     <h2 class="seat-selection-title">How many seats would you like to book?</h2>
@@ -212,7 +212,7 @@
                         <p>Maximum available: @maxAvailableSeats seats</p>
                     </div>
                 </div>
-                
+
                 <div class="action-buttons overlay-modal-buttons">
                     <button @onclick="CancelOrder" class="cinema-btn cinema-btn-danger">Cancel Order</button>
                     <button @onclick="ProcessOrder" class="cinema-btn cinema-btn-primary continue-btn">Continue</button>
@@ -237,8 +237,8 @@
                     {
                         <label class="cinema-radio-option mb-3">
                             <input class="cinema-radio-input" type="radio" name="seatingOption" 
-                                   value="@option.Key" @onchange="@(e => selectedOption = option.Key)" 
-                                   checked="@(selectedOption == option.Key)" />
+                                value="@option.Key" @onchange="@(e => selectedOption = option.Key)" 
+                                checked="@(selectedOption == option.Key)" />
                             <div class="cinema-radio-content">
                                 <span class="cinema-radio-title">@option.Value.Description</span>
                                 <div class="cinema-option-details">
@@ -281,7 +281,6 @@
         </div>
     </div>
 </div>
-
 @code {
     [Parameter]
     public int PresentationId { get; set; }
@@ -298,26 +297,26 @@
     private GroupOrderResponse? pendingGroupOrder;
     private string? groupOrderError;
     private int maxAvailableSeats;
-    
+
     // Timer properties
     private DateTime? orderExpirationTime;
     private Timer expirationTimer = new Timer(1000);
     private Timer validationTimer = new Timer(30000);
     private TimeSpan timeRemaining = TimeSpan.Zero;
-    
+
     private Dictionary<int, string> ticketTypes = new Dictionary<int, string>();
     private int activeStep = 1;
-    
+
     private Timer messageTimer = new Timer(5000); // 5 seconds
     private bool isMessageFading = false;
     private Timer fadeTimer = new Timer(400); // For the fade out transition
-    
+
     // Static instance management for JS Interop
     private static SeatSelector _instance;
-    
+
     // Modal visibility control
     private bool showSeatSelectionModal = true;
-    
+
     protected override void OnInitialized()
     {
         _instance = this;
@@ -328,7 +327,7 @@
         fadeTimer.AutoReset = false; 
         fadeTimer.Elapsed += CompleteMessageFadeOut;
     }
-    
+
     private void StartMessageFadeOut(object? sender, ElapsedEventArgs e)
     {
         InvokeAsync(() => 
@@ -338,7 +337,7 @@
             fadeTimer.Start();
         });
     }
-    
+
     private void CompleteMessageFadeOut(object? sender, ElapsedEventArgs e)
     {
         InvokeAsync(() => 
@@ -348,21 +347,21 @@
             StateHasChanged();
         });
     }
-    
+
     private void SetMessage(string newMessage)
     {
         // Stop any existing fade process
         fadeTimer.Stop();
         messageTimer.Stop();
-        
+
         // Reset message state
         isMessageFading = false;
         message = newMessage;
-        
+
         // Start the message timer
         messageTimer.Start();
     }
-    
+
     private void TimerTick(object? sender, ElapsedEventArgs e)
     {
         if (orderExpirationTime.HasValue)
@@ -372,22 +371,22 @@
             {
                 expirationTimer.Stop();
                 validationTimer.Stop();
-                
+
                 // Order has expired, reset the state
                 InvokeAsync(async () => 
                 {
                     // Call the backend to ensure the order is marked as expired there too
                     await ExpireOrder();
-                    
+
                     SetMessage("Your order has expired. Please start a new order.");
                     orderExpirationTime = null;
                     orderToken = null;
                     pendingGroupOrder = null;
                     selectedSeats.Clear();
-                    
+
                     // Refresh the seats to show updated availability
                     await LoadSeats();
-                    
+
                     StateHasChanged();
                 });
             }
@@ -397,26 +396,26 @@
             }
         }
     }
-    
+
     private async void ValidateOrderWithBackend(object? sender, ElapsedEventArgs e)
     {
         if (string.IsNullOrEmpty(orderToken) && pendingGroupOrder?.OrderToken == null)
         {
             return; // No active order to validate
         }
-        
+
         try
         {
             string currentToken = orderToken ?? pendingGroupOrder?.OrderToken?.ToString() ?? string.Empty;
-            
+
             if (string.IsNullOrEmpty(currentToken))
             {
                 return;
             }
-            
+
             // Call the API to check if the order is still valid
             var response = await Http.GetAsync($"api/tickets/orders/{currentToken}/check");
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 // Order is no longer valid, reset the state
@@ -424,16 +423,16 @@
                 {
                     expirationTimer.Stop();
                     validationTimer.Stop();
-                    
+
                     SetMessage("Your order has expired or is no longer valid. Please start a new order.");
                     orderExpirationTime = null;
                     orderToken = null;
                     pendingGroupOrder = null;
                     selectedSeats.Clear();
-                    
+
                     // Refresh the seats to show updated availability
                     await LoadSeats();
-                    
+
                     StateHasChanged();
                 });
             }
@@ -441,7 +440,7 @@
             {
                 // Order is still valid, potentially update expiration time based on response
                 var result = await response.Content.ReadFromJsonAsync<OrderStatusResponse>();
-                
+
                 if (result != null && result.ExpiresAt.HasValue)
                 {
                     await InvokeAsync(() => 
@@ -460,7 +459,7 @@
             // Don't invalidate the order on connection errors
         }
     }
-    
+
     private async Task ExpireOrder()
     {
         string? tokenToExpire = orderToken ?? pendingGroupOrder?.OrderToken;
@@ -478,7 +477,7 @@
             }
         }
     }
-    
+
     public void Dispose()
     {
         expirationTimer.Elapsed -= TimerTick;
@@ -511,7 +510,7 @@
                 maxAvailableSeats = presentation.Rows
                     .SelectMany(r => r.Seats)
                     .Count(s => s.IsAvailable);
-                
+
                 // Set a default value for numberOfSeats
                 numberOfSeats = Math.Min(2, maxAvailableSeats);
 
@@ -542,7 +541,7 @@
             numberOfSeats++;
         }
     }
-    
+
     private void DecrementSeats()
     {
         if (numberOfSeats > 1)
@@ -550,7 +549,7 @@
             numberOfSeats--;
         }
     }
-    
+
     private async Task ProcessOrder()
     {
         // Check if the user selected a valid number of seats
@@ -581,19 +580,19 @@
         {
             // Hide the modal during the API call
             showSeatSelectionModal = false;
-            
+
             var response = await Http.PostAsJsonAsync("api/tickets/orders/start", new { presentationId = PresentationId });
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<OrderResponse>();
                 orderToken = result.OrderToken;
-                
+
                 // Set the expiration time (10 minutes from now)
                 orderExpirationTime = DateTime.UtcNow.AddMinutes(10);
                 timeRemaining = TimeSpan.FromMinutes(10);
                 expirationTimer.Start();
                 validationTimer.Start();
-                
+
                 // Handle pre-selected seats from the SeatIds array
                 if (result.SeatIds != null && result.SeatIds.Any())
                 {
@@ -601,12 +600,12 @@
                         .SelectMany(r => r.Seats)
                         .Where(s => result.SeatIds.Contains(s.Id))
                         .ToList();
-                    
+
                     if (preselectedSeats.Any())
                     {
                         selectedSeats.Clear();
                         selectedSeats.AddRange(preselectedSeats);
-                        
+
                         if (preselectedSeats.Count == 1)
                         {
                             var seat = preselectedSeats.First();
@@ -616,7 +615,7 @@
                         {
                             SetMessage($"Order started with {preselectedSeats.Count} pre-selected seats.");
                         }
-                        
+
                         Console.WriteLine($"Preselected seats added: {string.Join(", ", preselectedSeats.Select(s => s.SeatNumber))}");
                     }
                     else
@@ -628,7 +627,7 @@
                 {
                     SetMessage("Order started. Please select your seats.");
                 }
-                
+
                 Console.WriteLine($"Order started successfully. Order Token: {orderToken}");
 
                 // Load all seats immediately after starting the order
@@ -639,7 +638,7 @@
                 var errorMessage = await response.Content.ReadAsStringAsync();
                 SetMessage($"Failed to start order: {errorMessage}");
                 Console.WriteLine($"Failed to start order: {errorMessage}");
-                
+
                 // Show the modal again if there was an error
                 showSeatSelectionModal = true;
             }
@@ -648,7 +647,7 @@
         {
             SetMessage($"Error starting order: {ex.Message}");
             Console.WriteLine($"Error starting order: {ex.Message}");
-            
+
             // Show the modal again if there was an error
             showSeatSelectionModal = true;
         }
@@ -699,7 +698,7 @@
                 var result = await response.Content.ReadFromJsonAsync<GroupOrderResponse>();
                 pendingGroupOrder = result;
                 availableOptions = result.AvailableOptions;
-                
+
                 // Set the expiration time (10 minutes from now)
                 orderExpirationTime = DateTime.UtcNow.AddMinutes(10);
                 timeRemaining = TimeSpan.FromMinutes(10);
@@ -726,7 +725,7 @@
                             singleOptionMessage = option.Key == "split" 
                                 ? "The only available option is to split your group. Would you like to proceed with split seating?"
                                 : $"We can offer {numberOfSeats - 1} consecutive seats. Would you like to proceed with fewer seats?";
-                            
+
                             await JSRuntime.InvokeVoidAsync("showModal", "singleOptionConfirmModal");
                         }
                         else
@@ -742,7 +741,7 @@
                 var errorMessage = await response.Content.ReadAsStringAsync();
                 SetMessage($"Failed to start group order: {errorMessage}");
                 Console.WriteLine($"Failed to start group order: {errorMessage}");
-                
+
                 // Show the modal again if there was an error
                 showSeatSelectionModal = true;
             }
@@ -751,7 +750,7 @@
         {
             SetMessage($"Error starting group order: {ex.Message}");
             Console.WriteLine($"Error starting group order: {ex.Message}");
-            
+
             // Show the modal again if there was an error
             showSeatSelectionModal = true;
         }
@@ -763,26 +762,26 @@
         {
             // Store the IDs of seats that were previously selected
             var selectedSeatIds = selectedSeats.Select(s => s.Id).ToList();
-            
+
             // Fetch updated seat information
             presentation = await Http.GetFromJsonAsync<Presentation>($"api/presentations/{PresentationId}/seats");
-            
+
             if (presentation == null || presentation.Rows.Count == 0)
             {
                 SetMessage("No seats available for this presentation.");
                 return;
             }
-            
+
             // Clear and rebuild the selectedSeats list with the updated seat objects
             selectedSeats.Clear();
-            
+
             // For each previously selected seat ID, find the seat in the refreshed data
             foreach (var seatId in selectedSeatIds)
             {
                 var updatedSeat = presentation.Rows
                     .SelectMany(r => r.Seats)
                     .FirstOrDefault(s => s.Id == seatId);
-                
+
                 if (updatedSeat != null)
                 {
                     selectedSeats.Add(updatedSeat);
@@ -891,12 +890,15 @@
             expirationTimer.Stop();
             validationTimer.Stop();
             orderExpirationTime = null;
-            
+
             var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { customerName = "NamHere", customerEmail = "validEmailHere" });
 
             if (confirmationResponse.IsSuccessStatusCode)
             {
                 SetMessage("Tickets confirmed successfully!");
+
+                // Navigeren naar betaalpagina met het orderToken
+                Navigation.NavigateTo($"/payment/{orderToken}");
             }
             else
             {

@@ -104,10 +104,23 @@ namespace WebApi.Controllers
                 }
                 await _context.SaveChangesAsync();
 
+                // Create a mock ticket order for our test tickets
+                var mockOrder = new TicketOrder
+                {
+                    OrderToken = Guid.NewGuid(),
+                    PresentationId = presentationId,
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = DateTime.UtcNow.AddDays(1),
+                    Status = OrderStatus.Confirmed
+                };
+                _context.TicketOrders.Add(mockOrder);
+                await _context.SaveChangesAsync();
+
                 var tickets = seatsToBook.Select(seat => new Ticket
                 {
                     PresentationId = presentationId,
                     SeatId = seat.Id,
+                    TicketOrderId = mockOrder.Id,
                     CustomerName = "Test Booking",
                     CustomerEmail = "test@example.com",
                     Status = TicketStatus.Reserved,
@@ -115,7 +128,8 @@ namespace WebApi.Controllers
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
                     Presentation = presentation,
-                    Seat = seat
+                    Seat = seat,
+                    TicketOrder = mockOrder
                 }).ToList();
 
                 await _context.Tickets.AddRangeAsync(tickets);
@@ -541,6 +555,16 @@ namespace WebApi.Controllers
                     return false;
                 }
 
+                // Get the TicketOrder to set the TicketOrderId
+                var order = await _context.TicketOrders
+                    .FirstOrDefaultAsync(o => o.OrderToken == orderToken);
+                
+                if (order == null)
+                {
+                    _logger.LogError("Failed to find TicketOrder with token {OrderToken}", orderToken);
+                    return false;
+                }
+
                 // Lock seats with orderToken
                 var timestamp = DateTime.UtcNow;
                 foreach (var seatId in seatIds)
@@ -548,7 +572,9 @@ namespace WebApi.Controllers
                     _context.SeatLocks.Add(new SeatLock
                     {
                         SeatId = seatId,
+                        PresentationId = presentationId,
                         OrderToken = orderToken,
+                        TicketOrderId = order.Id,
                         CreatedAt = timestamp,
                         ExpiresAt = timestamp.AddMinutes(10)
                     });

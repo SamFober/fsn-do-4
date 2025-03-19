@@ -66,7 +66,7 @@ public class TicketBookingTests : IDisposable
             capturedException = exception;
         }));
 
-        _ticketService = new TicketService(_repositoryMock.Object, loggerMock.Object);
+        _ticketService = new TicketService(_repositoryMock.Object, loggerMock.Object, _context);
         _controller = new TicketsController(_ticketService, _context, _loggerMock.Object);
 
         // Setup services for cleanup service testing
@@ -331,6 +331,18 @@ public class TicketBookingTests : IDisposable
             .ThenBy(s => s.SeatNumber)
             .ToListAsync();
 
+        // Create a mock order for our test tickets
+        var mockOrder = new TicketOrder
+        {
+            OrderToken = Guid.NewGuid(),
+            PresentationId = 1,
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddDays(1),
+            Status = OrderStatus.Confirmed
+        };
+        _context.TicketOrders.Add(mockOrder);
+        await _context.SaveChangesAsync();
+
         foreach (var row in allSeats.GroupBy(s => s.RowNumber))
         {
             // Leave seats 4-5 and 8-9 available in each row
@@ -346,11 +358,13 @@ public class TicketBookingTests : IDisposable
                 {
                     PresentationId = 1,
                     SeatId = seat.Id,
+                    TicketOrderId = mockOrder.Id,
                     CustomerName = "Test Customer",
                     CustomerEmail = "test@example.com",
                     Status = TicketStatus.Reserved,
                     Presentation = _presentation!,
-                    Seat = seat
+                    Seat = seat,
+                    TicketOrder = mockOrder
                 });
             }
         }
@@ -462,7 +476,7 @@ public class TicketBookingTests : IDisposable
         var seatToRemove = response.SeatIds[0];
 
         // Act
-        var removeResult = await _controller.RemoveSeatFromOrder(response.OrderToken, seatToRemove);
+        var removeResult = await _controller.RemoveSeatFromOrder(response.OrderToken.ToString(), seatToRemove);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(removeResult.Result);

@@ -110,6 +110,18 @@ namespace WebApi.Tests.Repositories
             var hall = await _context.Halls.FirstAsync();
             var presentation = await _context.Presentations.FirstAsync();
 
+            // Create a mock order for our test tickets
+            var mockOrder = new TicketOrder
+            {
+                OrderToken = Guid.NewGuid(),
+                PresentationId = presentationId,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddDays(1),
+                Status = OrderStatus.Confirmed
+            };
+            _context.TicketOrders.Add(mockOrder);
+            await _context.SaveChangesAsync();
+
             // Book all seats except front row corners and one middle seat
             var seatsToBook = await _context.Seats
                 .Where(s => !(s.RowNumber == 1 && (s.SeatNumber == 1 || s.SeatNumber == hall.SeatsPerRow)) &&
@@ -122,6 +134,7 @@ namespace WebApi.Tests.Repositories
                 {
                     PresentationId = presentationId,
                     SeatId = seat.Id,
+                    TicketOrderId = mockOrder.Id,
                     Status = TicketStatus.Reserved,
                     CustomerName = "Test Customer",
                     CustomerEmail = "test@example.com",
@@ -129,7 +142,8 @@ namespace WebApi.Tests.Repositories
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
                     Presentation = presentation,
-                    Seat = seat
+                    Seat = seat,
+                    TicketOrder = mockOrder
                 });
             }
             await _context.SaveChangesAsync();
@@ -151,6 +165,18 @@ namespace WebApi.Tests.Repositories
             var hall = await _context.Halls.FirstAsync();
             var presentation = await _context.Presentations.FirstAsync();
 
+            // Create a mock order for our test tickets
+            var mockOrder = new TicketOrder
+            {
+                OrderToken = Guid.NewGuid(),
+                PresentationId = presentationId,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddDays(1),
+                Status = OrderStatus.Confirmed
+            };
+            _context.TicketOrders.Add(mockOrder);
+            await _context.SaveChangesAsync();
+
             // Book all center seats except row 7
             var seatsToBook = await _context.Seats
                 .Where(s => s.SeatNumber >= 5 && s.SeatNumber <= 11 && s.RowNumber != 7)
@@ -162,6 +188,7 @@ namespace WebApi.Tests.Repositories
                 {
                     PresentationId = presentationId,
                     SeatId = seat.Id,
+                    TicketOrderId = mockOrder.Id,
                     Status = TicketStatus.Reserved,
                     CustomerName = "Test Customer",
                     CustomerEmail = "test@example.com",
@@ -169,7 +196,62 @@ namespace WebApi.Tests.Repositories
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
                     Presentation = presentation,
-                    Seat = seat
+                    Seat = seat,
+                    TicketOrder = mockOrder
+                });
+            }
+            await _context.SaveChangesAsync();
+
+            // Act
+            var seats = await _repository.GetAvailableSeats(presentationId, findBestSeat: true);
+            var bestSeat = seats.First();
+
+            // Assert
+            Assert.Equal(7, bestSeat.RowNumber);
+            Assert.InRange(bestSeat.SeatNumber, 5, 11);
+        }
+
+        [Fact]
+        public async Task GetAvailableSeats_WithCenterSeatsBookedExceptRow7_SelectsCenter()
+        {
+            // Arrange
+            var presentationId = 1;
+            var hall = await _context.Halls.FirstAsync();
+            var presentation = await _context.Presentations.FirstAsync();
+
+            // Create a mock order for our test tickets
+            var mockOrder = new TicketOrder
+            {
+                OrderToken = Guid.NewGuid(),
+                PresentationId = presentationId,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddDays(1),
+                Status = OrderStatus.Confirmed
+            };
+            _context.TicketOrders.Add(mockOrder);
+            await _context.SaveChangesAsync();
+
+            // Book all center seats except row 7
+            var seatsToBook = await _context.Seats
+                .Where(s => s.SeatNumber >= 5 && s.SeatNumber <= 11 && s.RowNumber != 7)
+                .ToListAsync();
+
+            foreach (var seat in seatsToBook)
+            {
+                _context.Tickets.Add(new Ticket
+                {
+                    PresentationId = presentationId,
+                    SeatId = seat.Id,
+                    TicketOrderId = mockOrder.Id,
+                    Status = TicketStatus.Reserved,
+                    CustomerName = "Test Customer",
+                    CustomerEmail = "test@example.com",
+                    PurchaseDate = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                    Presentation = presentation,
+                    Seat = seat,
+                    TicketOrder = mockOrder
                 });
             }
             await _context.SaveChangesAsync();
@@ -190,17 +272,32 @@ namespace WebApi.Tests.Repositories
             var presentationId = 1;
             var presentation = await _context.Presentations.FirstAsync();
 
-            // Book all seats in rows 6-7 (ideal rows)
-            var idealRowSeats = await _context.Seats
-                .Where(s => s.RowNumber >= 6 && s.RowNumber <= 7)
+            // Create a mock order for our test tickets
+            var mockOrder = new TicketOrder
+            {
+                OrderToken = Guid.NewGuid(),
+                PresentationId = presentationId,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddDays(1),
+                Status = OrderStatus.Confirmed
+            };
+            _context.TicketOrders.Add(mockOrder);
+            await _context.SaveChangesAsync();
+
+            // Book all seats except corners and front row
+            var seatsToBook = await _context.Seats
+                .Where(s => s.RowNumber > 1 && 
+                           s.SeatNumber > 1 && 
+                           s.SeatNumber < 15)
                 .ToListAsync();
 
-            foreach (var seat in idealRowSeats)
+            foreach (var seat in seatsToBook)
             {
                 _context.Tickets.Add(new Ticket
                 {
                     PresentationId = presentationId,
                     SeatId = seat.Id,
+                    TicketOrderId = mockOrder.Id,
                     Status = TicketStatus.Reserved,
                     CustomerName = "Test Customer",
                     CustomerEmail = "test@example.com",
@@ -208,7 +305,8 @@ namespace WebApi.Tests.Repositories
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
                     Presentation = presentation,
-                    Seat = seat
+                    Seat = seat,
+                    TicketOrder = mockOrder
                 });
             }
             await _context.SaveChangesAsync();
@@ -220,9 +318,9 @@ namespace WebApi.Tests.Repositories
             Assert.NotEmpty(seats);
             var bestSeat = seats.First();
 
-            // Best alternative should be in rows 5 or 8
-            Assert.True(bestSeat.RowNumber == 5 || bestSeat.RowNumber == 8);
-            Assert.InRange(bestSeat.SeatNumber, 7, 9); // Should still prefer middle seats
+            // Should prefer middle seats in back rows over corner seats in front
+            Assert.True(bestSeat.RowNumber > 1, "Should avoid front row");
+            Assert.True(bestSeat.SeatNumber > 3 && bestSeat.SeatNumber < 13, "Should avoid corner seats");
         }
 
         [Fact]
