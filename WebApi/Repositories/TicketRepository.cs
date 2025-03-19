@@ -265,7 +265,7 @@ namespace WebApi.Repositories
         {
             try
             {
-                if (order.Id == Guid.Empty)
+                if (order.Id == 0)
                     _context.TicketOrders.Add(order);
                 else
                     _context.TicketOrders.Update(order);
