@@ -16,6 +16,7 @@ namespace WebApi.Models
         public TicketStatus Status { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+        public string PhoneBookingCode { get; set; } = "";
 
         public required Presentation Presentation { get; set; }
         public required Seat Seat { get; set; }

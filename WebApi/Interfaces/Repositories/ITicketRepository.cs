@@ -21,5 +21,8 @@ namespace WebApi.Interfaces.Repositories
         Task UpdateSeatAvailability(List<int> seatIds, bool isAvailable);
         Task CancelOrder(Guid orderToken);
         Task<List<SeatLock>> GetSeatLocksByOrderToken(Guid orderToken);
+        Task<TicketOrder?> FindTicketOrderByOrderToken(Guid orderToken);
+        Task<List<Ticket>> FindTicketsByOrderId(int orderId);
+        Task<List<Ticket>> FindTicketsByPhoneBookingCode(string phoneBookingCode);
     }
 } 

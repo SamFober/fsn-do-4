@@ -14,7 +14,8 @@ using Microsoft.Extensions.DependencyInjection;
 using WebApi.Services;  // Add this for OrderCleanupService
 using WebApi.Interfaces.Services;    // Add this for ITicketService
 using WebApi.Interfaces.Repositories; // Add this for ITicketRepository
-using WebApi.Models.Responses;  // Add this to use TicketResponse
+using WebApi.Models.Responses;
+using WebApi.Tests.Mocks.Services;  // Add this to use TicketResponse
 
 namespace WebApi.Tests;
 
@@ -25,6 +26,7 @@ public class TicketBookingTests : IDisposable
     private readonly Mock<ILogger<TicketsController>> _loggerMock;
     private readonly Mock<ILogger<TicketService>> _serviceLoggerMock;
     private readonly Mock<ITicketRepository> _repositoryMock;
+    private readonly ITicketPdfService _ticketPdfService;
     private readonly ITicketService _ticketService;
     private readonly IServiceProvider _services;  // Add this for cleanup service testing
     private Presentation _presentation;  // Make it non-nullable
@@ -66,7 +68,8 @@ public class TicketBookingTests : IDisposable
             capturedException = exception;
         }));
 
-        _ticketService = new TicketService(_repositoryMock.Object, loggerMock.Object, _context);
+        _ticketPdfService = new TicketPdfServiceMock();
+        _ticketService = new TicketService(_repositoryMock.Object, _ticketPdfService, loggerMock.Object, _context);
         _controller = new TicketsController(_ticketService, _context, _loggerMock.Object);
 
         // Setup services for cleanup service testing
