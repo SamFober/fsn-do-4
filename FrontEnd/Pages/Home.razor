@@ -1,7 +1,62 @@
 ﻿@page "/"
+@using FrontEnd.Models
+
+@inject HttpClient Http
+@inject IJSRuntime JS
 
 <PageTitle>Home</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="main-content">
+        <!-- Navigation Bar (Overlay) -->
+        <nav class="homepage-navbar">
+            <div class="logo-container">
+                <img src="Cinemagia_logo.jpg" alt="Logo" class="navbar-logo"> <!-- Dummy logo -->
+            </div>
+            <ul class="nav-links">
+                <li><a href="#film-posters">AGENDA</a></li>
+                <li><a href="#films">FILMS</a></li>
+                <li><a href="#contact">CONTACT</a></li>
+            </ul>
+        </nav>
+	</div>
+		
+<!-- Film Posters Section -->
+    <section id="film-posters">
+        <div class="film-grid">
+            <h2>Nu te zien
+            </h2>
 
-Welcome to your new app.
+            @if (Movies.Count > 0)
+            {
+                @foreach (var movie in Movies)
+                {
+                    <div class="film-item">
+                        <img src="@movie.PosterUrl" alt="@movie.Title">
+                        <div class="time-slots">
+                            <a href="/film/@movie.Id" class="time-slot-btn">Voostellingen</a>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <p>No movies available.</p>
+            }
+        </div>
+    </section>
+
+@code {
+    private List<Movie> Movies = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Movies = await Http.GetFromJsonAsync<List<Movie>>("api/movies") ?? new List<Movie>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching movies: {ex.Message}");
+        }
+    }
+}

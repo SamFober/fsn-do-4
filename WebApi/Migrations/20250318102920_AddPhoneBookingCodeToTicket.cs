@@ -5,15 +5,15 @@
 namespace WebApi.Migrations
 {
     /// <inheritdoc />
-    public partial class AddAvailableOptionsToTicketOrder : Migration
+    public partial class AddPhoneBookingCodeToTicket : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
-                name: "AvailableOptions",
-                table: "TicketOrders",
-                type: "json",
+                name: "PhoneBookingCode",
+                table: "Tickets",
+                type: "longtext",
                 nullable: false);
         }
 
@@ -21,8 +21,8 @@ namespace WebApi.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "AvailableOptions",
-                table: "TicketOrders");
+                name: "PhoneBookingCode",
+                table: "Tickets");
         }
     }
 }

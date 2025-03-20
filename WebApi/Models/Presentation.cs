@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using WebApi.Models;  // Add this to reference Hall and Movie
-
 namespace WebApi.Models
 {
     public class Presentation
@@ -19,9 +15,8 @@ namespace WebApi.Models
         public decimal Price { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
-
         public required Movie Movie { get; set; }
         public required Hall Hall { get; set; }
         public ICollection<Ticket> Tickets { get; set; }
     }
-} 
+}

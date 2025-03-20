@@ -1,0 +1,1292 @@
+@page "/seat-selector/{presentationId:int}"
+
+@using FrontEnd.Models
+@using FrontEnd.Models.Responses
+@using Microsoft.JSInterop
+@using System.Timers
+
+@implements IDisposable
+@inject NavigationManager Navigation
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<link href="css/seating.css" rel="stylesheet" />
+<link href="css/modals.css" rel="stylesheet" />
+
+<div class="cinema-container cinema-dark-mode" id="cinemaContainer">
+    <div class="sticky-header-wrapper">
+        <div class="sticky-progress-container">
+            <div class="booking-progress-wrapper">
+                <button @onclick="CancelOrder" class="cancel-button">
+                    <span>← Cancel</span>
+                </button>
+
+                <div class="booking-progress">
+                    <div class="progress-step @(activeStep == 1 ? "active" : "")">
+                        <div class="step-circle">1</div>
+                        <div class="step-label">Choose Seats</div>
+                    </div>
+                    <div class="progress-connector"></div>
+                    <div class="progress-step @(activeStep == 2 ? "active" : "")">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">Payment</div>
+                    </div>
+                    <div class="progress-connector"></div>
+                    <div class="progress-step @(activeStep == 3 ? "active" : "")">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">Confirmation</div>
+                    </div>
+                </div>
+
+                @if (orderExpirationTime.HasValue)
+                {
+                    <div class="order-timer @(timeRemaining.TotalMinutes < 2 ? "order-timer-warning" : "")">
+                        <div class="timer-content">
+                            <div class="countdown">@(timeRemaining.Minutes.ToString("D2")):@(timeRemaining.Seconds.ToString("D2"))</div>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="sticky-title-container">
+                <h3 class="cinema-title sticky-title">@(presentation?.Title ?? "Unknown Movie") - @(presentation?.HallName ?? "Unknown Hall")</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-with-header-space">
+        @if (message != null)
+        {
+            <div class="cinema-alert @(message.Contains("Error") || message.Contains("Failed") ? "cinema-alert-danger" : "cinema-alert-success") @(isMessageFading ? "fade-out" : "")" @key="message">
+                <div class="cinema-alert-icon">
+                    @if (message.Contains("Error") || message.Contains("Failed"))
+                    {
+                        <span>❌</span>
+                    }
+                    else
+                    {
+                        <span>✓</span>
+                    }
+                </div>
+                <div class="cinema-alert-message">@message</div>
+            </div>
+        }
+
+        @if (presentation == null)
+        {
+            <div class="text-center loading-container seat-selection-section">
+                <h4>Loading all seats...</h4>
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        }
+        else
+        {
+            @if (presentation.Rows.Count > 0)
+            {
+                <div class="cinema-layout seat-selection-section">
+                    <div class="seating-container">
+                        <div class="seat-map">
+                            @foreach (var row in presentation.Rows.OrderBy(r => r.RowNumber))
+                            {
+                                <div class="seat-row">
+                                    <div class="row-label">@row.RowNumber</div>
+                                    <div class="seats">
+                                        @foreach (var seat in row.Seats.OrderBy(s => s.SeatNumber))
+                                        {
+                                            var isSelected = selectedSeats.Any(s => s.Id == seat.Id);
+                                            string seatClass = isSelected ? "seat-selected" : 
+                                                               !seat.IsAvailable ? "seat-unavailable" : "seat-available";
+
+                                            <div class="seat @seatClass" @onclick="() => SelectSeat(seat)" title="Row @row.RowNumber, Seat @seat.SeatNumber">
+                                                <span class="seat-number">@seat.SeatNumber</span>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        <div class="screen-container">
+                            <div class="screen">
+                                <div class="screen-text">SCREEN</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="seat-legend">
+                        <div class="legend-item">
+                            <div class="seat-sample seat-available"></div>
+                            <span>Available</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="seat-sample seat-selected"></div>
+                            <span>Selected</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="seat-sample seat-unavailable"></div>
+                            <span>Unavailable</span>
+                        </div>
+                    </div>
+
+                    @if (selectedSeats.Count > 0)
+                    {
+                        <div class="order-summary">
+                            <div id="ticketTypeSection" class="ticket-type-section">
+                                <h4>Select Ticket Types:</h4>
+                                <p class="ticket-instruction-text">Please select a ticket type for each seat</p>
+
+                                @for (int i = 0; i < selectedSeats.Count; i++)
+                                {
+                                    var seat = selectedSeats.OrderBy(s => s.RowNumber).ThenBy(s => s.SeatNumber).ElementAt(i);
+                                    var index = i;
+
+                                    <div class="ticket-type-row">
+                                        <div class="ticket-seat-info">Row @seat.RowNumber, Seat @seat.SeatNumber</div>
+                                        <div class="ticket-type-selector">
+                                            <select class="form-select" value="@(ticketTypes.ContainsKey(seat.Id) ? ticketTypes[seat.Id] : "adult")" 
+                                            @onchange="@(e => SelectTicketType(seat.Id, e.Value.ToString()))">
+                                                <option value="adult">Adult - €12.50</option>
+                                                <option value="child">Child - €8.50</option>
+                                                <option value="senior">Senior - €10.50</option>
+                                                <option value="student">Student - €9.50</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                }
+
+                                <div class="price-summary">
+                                    <div class="price-details">
+                                        @foreach (var ticketGroup in ticketTypes.GroupBy(t => t.Value).OrderBy(g => g.Key))
+                                        {
+                                            <div class="price-row">
+                                                <span>@GetTicketTypeName(ticketGroup.Key) (@ticketGroup.Count())</span>
+                                                <span>€@((GetTicketTypePrice(ticketGroup.Key) * ticketGroup.Count()).ToString("F2"))</span>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="price-total">
+                                        <span>Total</span>
+                                        <span>€@CalculateTotalPrice().ToString("F2")</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="action-buttons">
+                                <button @onclick="CancelOrder" class="cinema-btn cinema-btn-danger">Cancel Order</button>
+                                <button @onclick="ConfirmTickets" class="cinema-btn cinema-btn-primary">Confirm Tickets</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<!-- Replace the fullscreen modal with an overlay modal -->
+<div class="overlay-modal @(showSeatSelectionModal ? "show" : "")" id="seatSelectionModal">
+    <div class="overlay-modal-content">
+        <div class="overlay-modal-header">
+            <h3 class="modal-title">Select Seats for @(presentation?.Title ?? "Unknown Movie")</h3>
+        </div>
+        <div class="overlay-modal-body">
+            @if (!string.IsNullOrEmpty(groupOrderError))
+            {
+                <div class="cinema-alert cinema-alert-danger">
+                    <div class="cinema-alert-icon">
+                        <span>❌</span>
+                    </div>
+                    <div class="cinema-alert-message">@groupOrderError</div>
+                </div>
+            }
+
+            <div class="overlay-form-container">
+                <div class="form-group seat-selection-form">
+                    <h2 class="seat-selection-title">How many seats would you like to book?</h2>
+                    <div class="seat-counter">
+                        <button class="btn-adjust" @onclick="DecrementSeats" disabled="@(numberOfSeats <= 1)">-</button>
+                        <input type="number" class="form-control seat-count-input" id="numberOfSeats" @bind="numberOfSeats" min="1" max="@maxAvailableSeats" />
+                        <button class="btn-adjust" @onclick="IncrementSeats" disabled="@(numberOfSeats >= maxAvailableSeats)">+</button>
+                    </div>
+                    <div class="seat-info">
+                        <p>Maximum available: @maxAvailableSeats seats</p>
+                    </div>
+                </div>
+
+                <div class="action-buttons overlay-modal-buttons">
+                    <button @onclick="CancelOrder" class="cinema-btn cinema-btn-danger">Cancel Order</button>
+                    <button @onclick="ProcessOrder" class="cinema-btn cinema-btn-primary continue-btn">Continue</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add this modal for seating options -->
+<div class="modal fade cinema-modal" id="seatingOptionsModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="seatingOptionsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content cinema-modal-content">
+            <div class="modal-header cinema-modal-header">
+                <h5 class="modal-title">Select Seating Option</h5>
+                <!-- No close button to force user decision -->
+            </div>
+            <div class="modal-body cinema-modal-body">
+                @if (availableOptions != null)
+                {
+                    @foreach (var option in availableOptions)
+                    {
+                        <label class="cinema-radio-option mb-3">
+                            <input class="cinema-radio-input" type="radio" name="seatingOption" 
+                                value="@option.Key" @onchange="@(e => selectedOption = option.Key)" 
+                                checked="@(selectedOption == option.Key)" />
+                            <div class="cinema-radio-content">
+                                <span class="cinema-radio-title">@option.Value.Description</span>
+                                <div class="cinema-option-details">
+                                    @foreach (var group in option.Value.Groups)
+                                    {
+                                        <div>@group.Description</div>
+                                    }
+                                </div>
+                            </div>
+                        </label>
+                    }
+                }
+            </div>
+            <div class="modal-footer cinema-modal-footer">
+                <button type="button" class="cinema-btn cinema-btn-danger" @onclick="CancelOrder">Cancel Order</button>
+                <button type="button" class="cinema-btn cinema-btn-primary" @onclick="ConfirmSeatingOption">Confirm Selection</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add this modal for single option confirmation -->
+<div class="modal fade cinema-modal" id="singleOptionConfirmModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="singleOptionConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content cinema-modal-content">
+            <div class="modal-header cinema-modal-header">
+                <h5 class="modal-title">Confirm Seating Arrangement</h5>
+                <!-- No close button to force user decision -->
+            </div>
+            <div class="modal-body cinema-modal-body">
+                @if (singleOptionMessage != null)
+                {
+                    <p class="cinema-message">@singleOptionMessage</p>
+                }
+            </div>
+            <div class="modal-footer cinema-modal-footer">
+                <button type="button" class="cinema-btn cinema-btn-danger" @onclick="CancelOrder">Cancel Order</button>
+                <button type="button" class="cinema-btn cinema-btn-primary" @onclick="ConfirmSingleOption">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade cinema-modal" id="numpadModal" tabindex="-1" aria-labelledby="numpadModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content cinema-modal-content">
+            <div class="modal-header cinema-modal-header">
+                <h5 class="modal-title">Total: €@CalculateTotalPrice().ToString("F2"). Please enter your PIN</h5>
+            </div>
+            <div class="modal-body cinema-modal-body cinema-modal-body-numpad">
+                <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+                <div class="numpad-container">
+                    <div class="numpad-display">@numpadInputValue</div>
+                    <div class="numpad-grid">
+                        @foreach (var num in new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9" })
+                        {
+                            <button class="numpad-button" @onclick="() => NumpadAddNumber(num)">@num</button>
+                        }
+                        <button class="numpad-button" @onclick="@(() => NumpadAddNumber("0"))">0</button>
+                        <button class="numpad-button" @onclick="NumpadRemoveNumber"><i class="material-icons">&#xe14a;</i></button>
+                        <button class="numpad-button numpad-clear" @onclick="NumpadClearInput">AC</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer cinema-modal-footer">
+                <!-- Conditionally change if PIN is confirmed -->
+                @if (!numpadPinConfirmed)
+                {
+                    <button type="button" class="cinema-btn cinema-btn-danger" @onclick="CancelOrder">Cancel Order</button>
+                    <button type="button" class="cinema-btn cinema-btn-primary" @onclick="NumpadConfirmInput">Confirm PIN</button>
+                }
+                else
+                {
+                    <button type="button" class="cinema-btn cinema-btn-primary" @onclick="GetTickets">Get tickets</button>    
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Numpad modal */
+    .numpad-container {
+    width: 250px;
+    background: transparent;
+    color: white;
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .numpad-display {
+    height: 50px;
+    font-size: 1.5em;
+    background: transparent;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    color: white;
+    border: 1px solid white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    }
+
+    .numpad-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    }
+
+    .numpad-button {
+    background: transparent;
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 15px;
+    font-size: 1.2em;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    }
+
+    .numpad-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.1);
+    }
+
+    .numpad-clear {
+    background: transparent;
+    color: white;
+    border: 1px solid rgba(255, 0, 0, 0.3);
+    }
+</style>
+@code {
+    [Parameter]
+    public int PresentationId { get; set; }
+
+    private Presentation? presentation;
+    private string? message;
+    private int numberOfSeats = 1;
+    private List<Seat> selectedSeats = new List<Seat>();
+    private string? orderToken;
+    private int? preselectedSeatId;
+    private Dictionary<string, SeatingOption>? availableOptions;
+    private string? selectedOption;
+    private string? singleOptionMessage;
+    private GroupOrderResponse? pendingGroupOrder;
+    private string? groupOrderError;
+    private int maxAvailableSeats;
+
+    // Timer properties
+    private DateTime? orderExpirationTime;
+    private Timer expirationTimer = new Timer(1000);
+    private Timer validationTimer = new Timer(30000);
+    private TimeSpan timeRemaining = TimeSpan.Zero;
+
+    private Dictionary<int, string> ticketTypes = new Dictionary<int, string>();
+    private int activeStep = 1;
+
+    private Timer messageTimer = new Timer(5000); // 5 seconds
+    private bool isMessageFading = false;
+    private Timer fadeTimer = new Timer(400); // For the fade out transition
+
+    // Static instance management for JS Interop
+    private static SeatSelector _instance;
+
+    // Modal visibility control
+    private bool showSeatSelectionModal = true;
+
+    protected override void OnInitialized()
+    {
+        _instance = this;
+        expirationTimer.Elapsed += TimerTick;
+        validationTimer.Elapsed += ValidateOrderWithBackend;
+        messageTimer.AutoReset = false;
+        messageTimer.Elapsed += StartMessageFadeOut;
+        fadeTimer.AutoReset = false; 
+        fadeTimer.Elapsed += CompleteMessageFadeOut;
+    }
+
+    private void StartMessageFadeOut(object? sender, ElapsedEventArgs e)
+    {
+        InvokeAsync(() => 
+        {
+            isMessageFading = true;
+            StateHasChanged();
+            fadeTimer.Start();
+        });
+    }
+
+    private void CompleteMessageFadeOut(object? sender, ElapsedEventArgs e)
+    {
+        InvokeAsync(() => 
+        {
+            message = null;
+            isMessageFading = false;
+            StateHasChanged();
+        });
+    }
+
+    private void SetMessage(string newMessage)
+    {
+        // Stop any existing fade process
+        fadeTimer.Stop();
+        messageTimer.Stop();
+
+        // Reset message state
+        isMessageFading = false;
+        message = newMessage;
+
+        // Start the message timer
+        messageTimer.Start();
+    }
+
+    private void TimerTick(object? sender, ElapsedEventArgs e)
+    {
+        if (orderExpirationTime.HasValue)
+        {
+            timeRemaining = orderExpirationTime.Value - DateTime.UtcNow;
+            if (timeRemaining.TotalSeconds <= 0)
+            {
+                expirationTimer.Stop();
+                validationTimer.Stop();
+
+                // Order has expired, reset the state
+                InvokeAsync(async () => 
+                {
+                    // Call the backend to ensure the order is marked as expired there too
+                    await ExpireOrder();
+
+                    SetMessage("Your order has expired. Please start a new order.");
+                    orderExpirationTime = null;
+                    orderToken = null;
+                    pendingGroupOrder = null;
+                    selectedSeats.Clear();
+
+                    // Refresh the seats to show updated availability
+                    await LoadSeats();
+
+                    StateHasChanged();
+                });
+            }
+            else
+            {
+                InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private async void ValidateOrderWithBackend(object? sender, ElapsedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(orderToken) && pendingGroupOrder?.OrderToken == null)
+        {
+            return; // No active order to validate
+        }
+
+        try
+        {
+            string currentToken = orderToken ?? pendingGroupOrder?.OrderToken?.ToString() ?? string.Empty;
+
+            if (string.IsNullOrEmpty(currentToken))
+            {
+                return;
+            }
+
+            // Call the API to check if the order is still valid
+            var response = await Http.GetAsync($"api/tickets/orders/{currentToken}/check");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                // Order is no longer valid, reset the state
+                await InvokeAsync(async () => 
+                {
+                    expirationTimer.Stop();
+                    validationTimer.Stop();
+
+                    SetMessage("Your order has expired or is no longer valid. Please start a new order.");
+                    orderExpirationTime = null;
+                    orderToken = null;
+                    pendingGroupOrder = null;
+                    selectedSeats.Clear();
+
+                    // Refresh the seats to show updated availability
+                    await LoadSeats();
+
+                    StateHasChanged();
+                });
+            }
+            else
+            {
+                // Order is still valid, potentially update expiration time based on response
+                var result = await response.Content.ReadFromJsonAsync<OrderStatusResponse>();
+
+                if (result != null && result.ExpiresAt.HasValue)
+                {
+                    await InvokeAsync(() => 
+                    {
+                        // Update our local expiration time to match the server
+                        orderExpirationTime = result.ExpiresAt.Value;
+                        timeRemaining = orderExpirationTime.Value - DateTime.UtcNow;
+                        StateHasChanged();
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error validating order: {ex.Message}");
+            // Don't invalidate the order on connection errors
+        }
+    }
+
+    private async Task ExpireOrder()
+    {
+        string? tokenToExpire = orderToken ?? pendingGroupOrder?.OrderToken;
+        if (tokenToExpire != null)
+        {
+            try
+            {
+                // Just notify the backend that the order is expired from client side
+                await Http.PostAsync($"api/tickets/orders/{tokenToExpire}/expire", null);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error expiring order: {ex.Message}");
+                // Continue with local expiration even if server call fails
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        expirationTimer.Elapsed -= TimerTick;
+        validationTimer.Elapsed -= ValidateOrderWithBackend;
+        messageTimer.Elapsed -= StartMessageFadeOut;
+        fadeTimer.Elapsed -= CompleteMessageFadeOut;
+        expirationTimer.Dispose();
+        validationTimer.Dispose();
+        messageTimer.Dispose();
+        fadeTimer.Dispose();
+        if (_instance == this)
+        {
+            _instance = null;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            presentation = await Http.GetFromJsonAsync<Presentation>($"api/presentations/{PresentationId}/seats");
+
+            if (presentation == null || presentation.Rows.Count == 0)
+            {
+                SetMessage("No seats available for this presentation.");
+            }
+            else
+            {
+                // Calculate maximum available seats
+                maxAvailableSeats = presentation.Rows
+                    .SelectMany(r => r.Seats)
+                    .Count(s => s.IsAvailable);
+
+                // Set a default value for numberOfSeats
+                numberOfSeats = Math.Min(2, maxAvailableSeats);
+
+                // If no seats are available, show a message
+                if (maxAvailableSeats == 0)
+                {
+                    SetMessage("Sorry, this showing is fully booked! Please check other showtimes.");
+                    showSeatSelectionModal = false;
+                }
+                else
+                {
+                    // Initialize the modal
+                    showSeatSelectionModal = true;
+                    groupOrderError = null;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            SetMessage($"Error fetching seats: {ex.Message}");
+        }
+    }
+
+    private void IncrementSeats()
+    {
+        if (numberOfSeats < maxAvailableSeats)
+        {
+            numberOfSeats++;
+        }
+    }
+
+    private void DecrementSeats()
+    {
+        if (numberOfSeats > 1)
+        {
+            numberOfSeats--;
+        }
+    }
+
+    private async Task ProcessOrder()
+    {
+        // Check if the user selected a valid number of seats
+        if (numberOfSeats <= 0 || numberOfSeats > maxAvailableSeats)
+        {
+            groupOrderError = $"Please select between 1 and {maxAvailableSeats} seats.";
+            return;
+        }
+
+        // Hide the modal only
+        showSeatSelectionModal = false;
+
+        // Start single or group order based on the number of seats
+        if (numberOfSeats == 1)
+        {
+            await StartOrder();
+        }
+        else
+        {
+            await StartGroupOrder();
+        }
+    }
+
+    private async Task StartOrder()
+    {
+        Console.WriteLine("StartOrder called");
+        try
+        {
+            // Hide the modal during the API call
+            showSeatSelectionModal = false;
+
+            var response = await Http.PostAsJsonAsync("api/tickets/orders/start", new { presentationId = PresentationId });
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<OrderResponse>();
+                orderToken = result.OrderToken;
+
+                // Set the expiration time (10 minutes from now)
+                orderExpirationTime = DateTime.UtcNow.AddMinutes(10);
+                timeRemaining = TimeSpan.FromMinutes(10);
+                expirationTimer.Start();
+                validationTimer.Start();
+
+                // Handle pre-selected seats from the SeatIds array
+                if (result.SeatIds != null && result.SeatIds.Any())
+                {
+                    var preselectedSeats = presentation.Rows
+                        .SelectMany(r => r.Seats)
+                        .Where(s => result.SeatIds.Contains(s.Id))
+                        .ToList();
+
+                    if (preselectedSeats.Any())
+                    {
+                        selectedSeats.Clear();
+                        selectedSeats.AddRange(preselectedSeats);
+
+                        if (preselectedSeats.Count == 1)
+                        {
+                            var seat = preselectedSeats.First();
+                            SetMessage($"Order started with pre-selected seat Row {seat.RowNumber}, Seat {seat.SeatNumber}.");
+                        }
+                        else
+                        {
+                            SetMessage($"Order started with {preselectedSeats.Count} pre-selected seats.");
+                        }
+
+                        Console.WriteLine($"Preselected seats added: {string.Join(", ", preselectedSeats.Select(s => s.SeatNumber))}");
+                    }
+                    else
+                    {
+                        SetMessage("Order started. Please select your seats.");
+                    }
+                }
+                else 
+                {
+                    SetMessage("Order started. Please select your seats.");
+                }
+
+                Console.WriteLine($"Order started successfully. Order Token: {orderToken}");
+
+                // Load all seats immediately after starting the order
+                await LoadSeats();
+            }
+            else
+            {
+                var errorMessage = await response.Content.ReadAsStringAsync();
+                SetMessage($"Failed to start order: {errorMessage}");
+                Console.WriteLine($"Failed to start order: {errorMessage}");
+
+                // Show the modal again if there was an error
+                showSeatSelectionModal = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            SetMessage($"Error starting order: {ex.Message}");
+            Console.WriteLine($"Error starting order: {ex.Message}");
+
+            // Show the modal again if there was an error
+            showSeatSelectionModal = true;
+        }
+    }
+
+    private async Task StartGroupOrder()
+    {
+        Console.WriteLine($"StartGroupOrder called with {numberOfSeats} seats");
+        try
+        {
+            // Clear any previous error message
+            groupOrderError = null;
+
+            // First check how many seats are actually available
+            var availableSeats = presentation?.Rows
+                .SelectMany(r => r.Seats)
+                .Where(s => s.IsAvailable)
+                .ToList() ?? new List<Seat>();
+
+            var availableSeatsCount = availableSeats.Count;
+            Console.WriteLine($"Available seats: {availableSeatsCount}");
+
+            if (availableSeatsCount == 0)
+            {
+                groupOrderError = "No seats are available for this presentation.";
+                showSeatSelectionModal = true;
+                return;
+            }
+
+            if (numberOfSeats > availableSeatsCount)
+            {
+                groupOrderError = $"Only {availableSeatsCount} seats are available. You requested {numberOfSeats} seats.";
+                showSeatSelectionModal = true;
+                return;
+            }
+
+            if (numberOfSeats <= 0 || numberOfSeats > 20)
+            {
+                groupOrderError = "Please select between 1 and 20 seats.";
+                showSeatSelectionModal = true;
+                return;
+            }
+
+            // Call the API to start a group order with the specified number of seats
+            var response = await Http.PostAsJsonAsync("api/tickets/orders/start-group", new { presentationId = PresentationId, numberOfSeats });
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<GroupOrderResponse>();
+                pendingGroupOrder = result;
+                availableOptions = result.AvailableOptions;
+
+                // Set the expiration time (10 minutes from now)
+                orderExpirationTime = DateTime.UtcNow.AddMinutes(10);
+                timeRemaining = TimeSpan.FromMinutes(10);
+                expirationTimer.Start();
+                validationTimer.Start();
+
+                if (availableOptions != null)
+                {
+                    if (availableOptions.Count > 1)
+                    {
+                        // Show the options modal for multiple options
+                        selectedOption = availableOptions.Keys.First();
+                        await JSRuntime.InvokeVoidAsync("showModal", "seatingOptionsModal");
+                    }
+                    else if (availableOptions.Count == 1)
+                    {
+                        // Handle single option case
+                        var option = availableOptions.First();
+                        selectedOption = option.Key;
+
+                        if (option.Key != "consecutive")
+                        {
+                            // Show confirmation modal for split or smaller consecutive
+                            singleOptionMessage = option.Key == "split" 
+                                ? "The only available option is to split your group. Would you like to proceed with split seating?"
+                                : $"We can offer {numberOfSeats - 1} consecutive seats. Would you like to proceed with fewer seats?";
+
+                            await JSRuntime.InvokeVoidAsync("showModal", "singleOptionConfirmModal");
+                        }
+                        else
+                        {
+                            // Automatically confirm consecutive seating
+                            await SelectSeatingOption(option.Key);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                var errorMessage = await response.Content.ReadAsStringAsync();
+                SetMessage($"Failed to start group order: {errorMessage}");
+                Console.WriteLine($"Failed to start group order: {errorMessage}");
+
+                // Show the modal again if there was an error
+                showSeatSelectionModal = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            SetMessage($"Error starting group order: {ex.Message}");
+            Console.WriteLine($"Error starting group order: {ex.Message}");
+
+            // Show the modal again if there was an error
+            showSeatSelectionModal = true;
+        }
+    }
+    private async Task LoadSeats()
+    {
+        try
+        {
+            // Store the IDs of seats that were previously selected
+            var selectedSeatIds = selectedSeats.Select(s => s.Id).ToList();
+
+            // Fetch updated seat information
+            presentation = await Http.GetFromJsonAsync<Presentation>($"api/presentations/{PresentationId}/seats");
+
+            if (presentation == null || presentation.Rows.Count == 0)
+            {
+                SetMessage("No seats available for this presentation.");
+                return;
+            }
+
+            // Clear and rebuild the selectedSeats list with the updated seat objects
+            selectedSeats.Clear();
+
+            // For each previously selected seat ID, find the seat in the refreshed data
+            foreach (var seatId in selectedSeatIds)
+            {
+                var updatedSeat = presentation.Rows
+                    .SelectMany(r => r.Seats)
+                    .FirstOrDefault(s => s.Id == seatId);
+
+                if (updatedSeat != null)
+                {
+                    selectedSeats.Add(updatedSeat);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            SetMessage($"Error fetching seats: {ex.Message}");
+        }
+    }
+
+    private async Task SelectSeat(Seat seat)
+    {
+        Console.WriteLine($"SelectSeat called for seat {seat.SeatNumber}");
+
+        // Check if the seat is already in our selectedSeats list
+        var existingSeat = selectedSeats.FirstOrDefault(s => s.Id == seat.Id);
+        bool isSelected = existingSeat != null;
+
+        if (isSelected)
+        {
+            // Check if this is the last selected seat
+            if (selectedSeats.Count == 1)
+            {
+                SetMessage("Warning: At least one seat must be selected.");
+                Console.WriteLine("Attempted to deselect the last seat - operation prevented");
+                return;
+            }
+
+            // If the seat is already selected, remove it from the list
+            selectedSeats.Remove(existingSeat);
+            Console.WriteLine($"Seat {seat.SeatNumber} unselected.");
+
+            // Remove the ticket type for this seat
+            if (ticketTypes.ContainsKey(seat.Id))
+            {
+                ticketTypes.Remove(seat.Id);
+            }
+
+            // Call the DELETE API to remove the seat from the order
+            if (!string.IsNullOrEmpty(orderToken))
+            {
+                var response = await Http.DeleteAsync($"api/tickets/orders/{orderToken}/seats/{seat.Id}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    SetMessage($"Seat {seat.SeatNumber} removed from the order.");
+                    Console.WriteLine($"Seat {seat.SeatNumber} removed from the order.");
+                }
+                else
+                {
+                    var errorMessage = await response.Content.ReadAsStringAsync();
+                    SetMessage($"Failed to remove seat {seat.SeatNumber} from the order: {errorMessage}");
+                    Console.WriteLine($"Failed to remove seat {seat.SeatNumber} from the order: {errorMessage}");
+                }
+            }
+        }
+        else
+        {
+            // If the seat is not selected and is available, add it
+            if (seat.IsAvailable)
+            {
+                // Add the seat to our selected list
+                selectedSeats.Add(seat);
+                Console.WriteLine($"Seat {seat.SeatNumber} selected.");
+
+                // Call the API to add the seat to the order
+                if (!string.IsNullOrEmpty(orderToken))
+                {
+                    var response = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/seats", new { seatIds = new List<int> { seat.Id } });
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var result = await response.Content.ReadFromJsonAsync<OrderResponse>();
+                        orderToken = result.OrderToken; // Store the order token for confirmation
+                        SetMessage("Seat selected successfully!");
+                        Console.WriteLine("Seat selected successfully.");
+                    }
+                    else
+                    {
+                        var errorMessage = await response.Content.ReadAsStringAsync();
+                        SetMessage($"Failed to select seat: {errorMessage}");
+                        Console.WriteLine($"Failed to select seat: {errorMessage}");
+                    }
+                }
+            }
+            else
+            {
+                SetMessage("This seat is not available for selection.");
+                Console.WriteLine("This seat is not available for selection.");
+            }
+        }
+
+        // Refetch the seats to get the latest availability
+        await LoadSeats();
+
+        // Update the UI
+        StateHasChanged();
+    }
+
+    private async Task ConfirmTickets()
+    {
+        try {
+            // Stop both timers when tickets are confirmed
+            expirationTimer.Stop();
+            validationTimer.Stop();
+            orderExpirationTime = null;
+
+            var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { customerName = "NamHere", customerEmail = "validEmailHere" });
+
+            if (confirmationResponse.IsSuccessStatusCode)
+                /*{
+                SetMessage("Tickets confirmed successfully!");
+            }*/
+            {
+            await JSRuntime.InvokeVoidAsync("showModal", "numpadModal");
+        }
+    else
+        {
+            var errorMessage = await confirmationResponse.Content.ReadAsStringAsync();
+            SetMessage($"Failed to confirm tickets: {errorMessage}");
+        }
+    }
+    catch (Exception ex)
+    {
+    SetMessage($"Error confirming tickets: {ex.Message}");
+    Console.WriteLine($"Error confirming tickets: {ex}");
+    }
+    }
+
+    private async Task ConfirmSeatingOption()
+    {
+        if (selectedOption != null)
+        {
+    await JSRuntime.InvokeVoidAsync("hideModal", "seatingOptionsModal");
+    await SelectSeatingOption(selectedOption);
+        }
+    }
+
+    private async Task ConfirmSingleOption()
+    {
+        if (selectedOption != null)
+        {
+    await JSRuntime.InvokeVoidAsync("hideModal", "singleOptionConfirmModal");
+    await SelectSeatingOption(selectedOption);
+        }
+    }
+
+    private async Task SelectSeatingOption(string option)
+    {
+        try
+        {
+    if (pendingGroupOrder?.OrderToken == null)
+    {
+        SetMessage("No pending group order found.");
+        return;
+    }
+
+    var request = new { OrderToken = pendingGroupOrder.OrderToken };
+    var response = await Http.PostAsJsonAsync($"api/tickets/orders/select-option/{option}", request);
+
+    if (response.IsSuccessStatusCode)
+    {
+        var result = await response.Content.ReadFromJsonAsync<OrderResponse>();
+        orderToken = result.OrderToken;
+
+        // Now we can add the selected seats
+        if (result.SeatIds != null && result.SeatIds.Any())
+        {
+            var selectedSeatsFromResponse = presentation.Rows
+                .SelectMany(r => r.Seats)
+                .Where(s => result.SeatIds.Contains(s.Id))
+                .ToList();
+
+            selectedSeats.Clear();
+            selectedSeats.AddRange(selectedSeatsFromResponse);
+            SetMessage($"Group order started with {selectedSeats.Count} seats selected.");
+
+            // Initialize ticket types for all seats in the group order
+            foreach (var seat in selectedSeats)
+            {
+                if (!ticketTypes.ContainsKey(seat.Id))
+                {
+                    ticketTypes.Add(seat.Id, "adult");
+                }
+            }
+
+            // Load all seats to refresh the UI
+            await LoadSeats();
+        }
+
+        // Load all seats to refresh the UI
+        await LoadSeats();
+    }
+    else
+    {
+        var errorMessage = await response.Content.ReadAsStringAsync();
+        SetMessage($"Failed to select seating option: {errorMessage}");
+    }
+        }
+        catch (Exception ex)
+        {
+    SetMessage($"Error selecting seating option: {ex.Message}");
+    Console.WriteLine($"Error selecting seating option: {ex.Message}");
+        }
+    }
+
+    private async Task CancelOrder()
+    {
+        try
+        {
+    string? tokenToCancel = orderToken ?? pendingGroupOrder?.OrderToken;
+    if (tokenToCancel != null)
+    {
+        // Hide any open modals
+        showSeatSelectionModal = false;
+        await JSRuntime.InvokeVoidAsync("hideModal", "seatingOptionsModal");
+        await JSRuntime.InvokeVoidAsync("hideModal", "singleOptionConfirmModal");
+        await JSRuntime.InvokeVoidAsync("hideModal", "numpadModal");
+
+        // Call the API to cancel the order
+        var response = await Http.PostAsync($"api/tickets/orders/{tokenToCancel}/cancel", null);
+
+        if (response.IsSuccessStatusCode)
+        {
+            // Stop both timers
+            expirationTimer.Stop();
+            validationTimer.Stop();
+            orderExpirationTime = null;
+
+            // Clear local state
+            orderToken = null;
+            pendingGroupOrder = null;
+            selectedSeats.Clear();
+            availableOptions = null;
+            selectedOption = null;
+            SetMessage("Order cancelled successfully.");
+            numpadPinConfirmed = false;
+            NumpadClearInput();
+
+            // Refresh the seats to show updated availability
+            await LoadSeats();
+
+            // Go back to the seat selection modal
+            showSeatSelectionModal = true;
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            SetMessage($"Failed to cancel order: {error}");
+        }
+    }
+    else
+    {
+        // If there's no active order yet, just show the modal again
+        showSeatSelectionModal = true;
+    }
+        }
+        catch (Exception ex)
+        {
+    SetMessage($"Error cancelling order: {ex.Message}");
+    Console.WriteLine($"Error cancelling order: {ex}");
+        }
+    }
+
+    private void SelectTicketType(int seatId, string ticketType)
+    {
+        if (ticketTypes.ContainsKey(seatId))
+        {
+    ticketTypes[seatId] = ticketType;
+        }
+        else
+        {
+    ticketTypes.Add(seatId, ticketType);
+        }
+
+        StateHasChanged();
+    }
+
+    private string GetTicketTypeName(string type)
+    {
+        return type switch
+        {
+    "adult" => "Adult",
+    "child" => "Child",
+    "senior" => "Senior",
+    "student" => "Student",
+    _ => "Regular"
+        };
+    }
+
+    private decimal GetTicketTypePrice(string type)
+    {
+        return type switch
+        {
+    "adult" => 12.50m,
+    "child" => 8.50m,
+    "senior" => 10.50m,
+    "student" => 9.50m,
+    _ => 12.50m
+        };
+    }
+
+    private decimal CalculateTotalPrice()
+    {
+        decimal total = 0;
+
+        // Ensure we have ticket types for all selected seats
+        foreach (var seat in selectedSeats)
+        {
+    string ticketType = ticketTypes.ContainsKey(seat.Id) ? ticketTypes[seat.Id] : "adult";
+
+    if (!ticketTypes.ContainsKey(seat.Id))
+    {
+        ticketTypes.Add(seat.Id, ticketType);
+    }
+
+    total += GetTicketTypePrice(ticketType);
+        }
+
+        return total;
+    }
+
+    // When seats change, ensure we have ticket types for each seat
+    protected override void OnParametersSet()
+    {
+        InitializeTicketTypes();
+    }
+
+    private void InitializeTicketTypes()
+    {
+        // Initialize default ticket types for all selected seats
+        foreach (var seat in selectedSeats)
+        {
+    if (!ticketTypes.ContainsKey(seat.Id))
+    {
+        ticketTypes.Add(seat.Id, "adult");
+    }
+        }
+
+        // Remove ticket types for seats that are no longer selected
+        var seatIds = selectedSeats.Select(s => s.Id).ToList();
+        var keysToRemove = ticketTypes.Keys.Where(k => !seatIds.Contains(k)).ToList();
+
+        foreach (var key in keysToRemove)
+        {
+    ticketTypes.Remove(key);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+    await JSRuntime.InvokeVoidAsync("initScrollTracking");
+        }
+    }
+
+    // Numpad functions
+    private string numpadInputValue = "";
+    private bool numpadPinConfirmed = false;
+
+    private void NumpadAddNumber(string number)
+    {
+        if (numpadInputValue == "Invalid PIN") NumpadClearInput();
+        if (numpadInputValue.Length < 4)
+    numpadInputValue += number;
+    }
+
+    private void NumpadRemoveNumber()
+    {
+        if (!string.IsNullOrEmpty(numpadInputValue) && numpadInputValue != "Error" && numpadInputValue != "Confirmed")
+        {
+    numpadInputValue = numpadInputValue[..^1];
+        }
+    }
+
+    private void NumpadClearInput() => numpadInputValue = "";
+
+    public async Task NumpadConfirmInput()
+    {
+        var validCodes = new List<string> { "1234", "5678", "9876" };
+        
+        if (validCodes.Contains(numpadInputValue))
+        {
+            numpadInputValue = "Processing..";
+            await Task.Delay(2000);
+            numpadInputValue = "Confirmed";
+            numpadPinConfirmed = true;
+        } else
+        {
+            numpadInputValue = "Invalid PIN";
+        }
+    }
+
+    private void GetTickets()
+    {
+        string url = $"http://localhost:5270/{orderToken}/finish";
+        Navigation.NavigateTo(url, true);
+    }
+
+    [JSInvokable]
+    public static Task UpdateProgressStep(int step)
+    {
+        if (_instance != null && _instance.activeStep != step)
+        {
+            _instance.activeStep = step;
+            _instance.StateHasChanged();
+        }
+        return Task.CompletedTask;
+    }
+} 

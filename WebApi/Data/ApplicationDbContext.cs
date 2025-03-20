@@ -1,7 +1,8 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using System.Text.Json;
 using WebApi.Models;
+using WebApi.Models.Responses;
 
 public class ApplicationDbContext : DbContext
 {
@@ -23,9 +24,15 @@ public class ApplicationDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // Configure Seat entity
         modelBuilder.Entity<Seat>()
             .HasIndex(s => new { s.HallId, s.RowNumber, s.SeatNumber })
             .IsUnique();
+
+        modelBuilder.Entity<Seat>()
+            .HasOne(s => s.Hall)
+            .WithMany(h => h.Seats) // Ensure this is set to the collection in Hall
+            .HasForeignKey(s => s.HallId);
 
         modelBuilder.Entity<Ticket>()
             .HasIndex(t => new { t.PresentationId, t.SeatId })
@@ -52,4 +59,4 @@ public class ApplicationDbContext : DbContext
                 )
             );
     }
-} 
+}

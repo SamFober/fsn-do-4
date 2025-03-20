@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using WebApi.Models;
-
 namespace WebApi.Models
 {
     public class Seat
@@ -15,9 +11,10 @@ namespace WebApi.Models
         public int HallId { get; set; }
         public int RowNumber { get; set; }
         public int SeatNumber { get; set; }
+        public bool IsAvailable { get; set; }
         public DateTime CreatedAt { get; set; }
 
         public required Hall Hall { get; set; }
-        public ICollection<Ticket> Tickets { get; set; }
+        public ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
     }
-} 
+}

@@ -1,10 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using WebApi.Data;
-using WebApi.Models;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
+using WebApi.Interfaces.Services;
+using QuestPDF.Infrastructure;
+using WebApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+QuestPDF.Settings.License = LicenseType.Community;
 
 // Add services to the container.
 builder.Services.AddControllers()
@@ -15,8 +19,9 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { 
-        Title = "Movie Theater API", 
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Movie Theater API",
         Version = "v1",
         Description = "API for booking movie theater tickets with support for group bookings"
     });
@@ -37,8 +42,25 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySQL(connectionString));
 
 builder.Services.AddMemoryCache(); // For seat locking
+builder.Services.AddScoped<ITicketPdfService, TicketPdfServiceQuestPdf>();
+builder.Services.AddScoped<WebApi.Interfaces.Repositories.ITicketRepository, WebApi.Repositories.TicketRepository>();
+builder.Services.AddScoped<WebApi.Interfaces.Services.ITicketService, WebApi.Services.TicketService>();
+
+// Add CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", builder =>
+    {
+        builder.AllowAnyOrigin()
+               .AllowAnyMethod()
+               .AllowAnyHeader();
+    });
+});
 
 var app = builder.Build();
+
+// Use CORS
+app.UseCors("AllowAll");
 
 // Add this section to seed the database
 using (var scope = app.Services.CreateScope())
@@ -47,11 +69,11 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
-        // Ensure database is created
-        context.Database.EnsureCreated();
-        // Run migrations
-        context.Database.Migrate();
-        // Seed data
+
+        // First apply migrations
+        await context.Database.MigrateAsync();
+
+        // Then seed data
         await DbSeeder.Initialize(context);
     }
     catch (Exception ex)

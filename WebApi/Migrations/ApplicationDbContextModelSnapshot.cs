@@ -2,7 +2,6 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,11 +9,9 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace WebApi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250221210241_AddAvailableOptionsToTicketOrder")]
-    partial class AddAvailableOptionsToTicketOrder
+    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
     {
-        /// <inheritdoc />
-        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -51,6 +48,10 @@ namespace WebApi.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
+                    b.Property<string>("AgeRating")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
@@ -60,8 +61,16 @@ namespace WebApi.Migrations
                     b.Property<int>("DurationMinutes")
                         .HasColumnType("int");
 
+                    b.Property<string>("Genre")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("PosterUrl")
+                        .IsRequired()
+                        .HasColumnType("longtext");
 
                     b.Property<DateTime?>("ReleaseDate")
                         .HasColumnType("datetime(6)");
@@ -126,6 +135,9 @@ namespace WebApi.Migrations
                     b.Property<int>("HallId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsAvailable")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<int>("RowNumber")
                         .HasColumnType("int");
 
@@ -155,12 +167,20 @@ namespace WebApi.Migrations
                     b.Property<Guid>("OrderToken")
                         .HasColumnType("char(36)");
 
+                    b.Property<int>("PresentationId")
+                        .HasColumnType("int");
+
                     b.Property<int>("SeatId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TicketOrderId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
                     b.HasIndex("SeatId");
+
+                    b.HasIndex("TicketOrderId");
 
                     b.ToTable("SeatLocks");
                 });
@@ -182,6 +202,10 @@ namespace WebApi.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<string>("PhoneBookingCode")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
                     b.Property<int>("PresentationId")
                         .HasColumnType("int");
 
@@ -194,12 +218,17 @@ namespace WebApi.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int>("TicketOrderId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime(6)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("SeatId");
+
+                    b.HasIndex("TicketOrderId");
 
                     b.HasIndex("PresentationId", "SeatId")
                         .IsUnique();
@@ -227,6 +256,9 @@ namespace WebApi.Migrations
                         .HasColumnType("char(36)");
 
                     b.Property<int>("PresentationId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RequestedSeats")
                         .HasColumnType("int");
 
                     b.Property<int>("Status")
@@ -301,7 +333,15 @@ namespace WebApi.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("WebApi.Models.TicketOrder", "TicketOrder")
+                        .WithMany("SeatLocks")
+                        .HasForeignKey("TicketOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Seat");
+
+                    b.Navigation("TicketOrder");
                 });
 
             modelBuilder.Entity("WebApi.Models.Ticket", b =>
@@ -318,9 +358,17 @@ namespace WebApi.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("WebApi.Models.TicketOrder", "TicketOrder")
+                        .WithMany("Tickets")
+                        .HasForeignKey("TicketOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Presentation");
 
                     b.Navigation("Seat");
+
+                    b.Navigation("TicketOrder");
                 });
 
             modelBuilder.Entity("WebApi.Models.TicketOrder", b =>
@@ -378,6 +426,10 @@ namespace WebApi.Migrations
             modelBuilder.Entity("WebApi.Models.TicketOrder", b =>
                 {
                     b.Navigation("Items");
+
+                    b.Navigation("SeatLocks");
+
+                    b.Navigation("Tickets");
                 });
 #pragma warning restore 612, 618
         }
