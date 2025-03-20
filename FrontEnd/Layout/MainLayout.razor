@@ -5,8 +5,8 @@
     bool isSeatSelector = NavigationManager.Uri.Contains("/seat-selector");
 }
 
-<div class="full-width-page">
-    <main class="full-width-main">
+<div class="@(isSeatSelector ? "full-width-page" : "")">
+    <main class="@(isSeatSelector ? "full-width-main" : "")">
         <article class="content px-4">
             @Body
         </article>

@@ -2,7 +2,7 @@
 @using FrontEnd.Models
 @inject HttpClient Http
 
-<html lang=" nl">
+<html lang="nl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,19 +13,38 @@
     <div class="container">
         <h1>@(Movie?.Title ?? "Film niet gevonden")</h1>
 
-        <!--Picking up the details of the movie-->
         @if (Movie != null)
         {
             <img src="@Movie.PosterUrl" alt="@Movie.Title" width="300" />
-            <p><strong>Beschrijving:</strong> <br/>@Movie.Description</p>
+            <p><strong>Beschrijving:</strong> <br />@Movie.Description</p>
             <p><strong>Genre:</strong> @Movie.Genre</p>
             <p><strong>Leeftijdsclassificatie:</strong> @Movie.AgeRating</p>
             <p><strong>Duur:</strong> @Movie.DurationMinutes minuten</p>
             <p><strong>Releasedatum:</strong> @(Movie.ReleaseDate?.ToString("dd-MM-yyyy") ?? "Onbekend")</p>
 
-            <a href="/seat-selector/@Movie.Id">
-                <button>Stoel selecteren</button>
-            </a>
+            <!-- Presentations Section -->
+            <h2>Beschikbare voorstellingen</h2>
+            @if (Presentations != null && Presentations.Any())
+            {
+                <ul>
+                    @foreach (var presentation in Presentations)
+                    {
+                        <li>
+                            <strong>Zaal:</strong> @presentation.HallName <br />
+                            <strong>Starttijd:</strong> @presentation.StartTime.ToString("HH:mm") <br />
+                            <strong>Eindtijd:</strong> @presentation.EndTime.ToString("HH:mm") <br />
+                            <strong>Prijs:</strong> €@presentation.Price <br />
+                            <a href="/seat-selector/@presentation.Id">
+                                <button>Tickets boeken</button>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <p>Geen voorstellingen gevonden voor deze film.</p>
+            }
         }
         else
         {
@@ -39,10 +58,12 @@
     @code {
         [Parameter] public int Id { get; set; }
         private Movie? Movie { get; set; }
+        private List<Presentation>? Presentations { get; set; }
 
         protected override async Task OnInitializedAsync()
         {
             Movie = await Http.GetFromJsonAsync<Movie>($"api/movies/{Id}") ?? null;
+            Presentations = await Http.GetFromJsonAsync<List<Presentation>>($"api/presentations/movie/{Id}") ?? new List<Presentation>();
         }
     }
 </body>

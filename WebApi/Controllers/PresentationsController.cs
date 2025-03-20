@@ -189,5 +189,34 @@ namespace WebApi.Controllers
             Console.WriteLine($"Fetched Presentation: {id}, Hall: {presentation.Hall.Name}, Movie: {presentation.Movie.Title}");
             return Ok(response);
         }
+
+        [HttpGet("movie/{movieId}")]
+        public async Task<ActionResult<IEnumerable<object>>> GetPresentationsByMovieId(int movieId)
+        {
+            var presentations = await _context.Presentations
+                .Where(p => p.Movie.Id == movieId)
+                .Include(p => p.Hall)
+                .Include(p => p.Movie)
+                .ToListAsync();
+
+            if (!presentations.Any())
+            {
+                Console.WriteLine($"No presentations found for Movie ID {movieId}.");
+                return NotFound();
+            }
+
+            var response = presentations.Select(p => new
+            {
+                p.Id,
+                MovieTitle = p.Movie.Title,
+                HallName = p.Hall.Name,
+                p.StartTime,
+                p.EndTime,
+                p.Price
+            });
+
+            Console.WriteLine($"Fetched {presentations.Count} presentations for Movie ID {movieId}.");
+            return Ok(response);
+        }
     }
 }
