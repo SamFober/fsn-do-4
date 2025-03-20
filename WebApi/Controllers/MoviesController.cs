@@ -23,7 +23,7 @@ public class MoviesController : ControllerBase
 
         return Ok(movie);
     }
-        [HttpGet]
+    [HttpGet]
     public async Task<IActionResult> GetMovies()
     {
         var movies = await _context.Movies
