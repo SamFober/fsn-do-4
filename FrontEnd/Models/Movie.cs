@@ -5,6 +5,7 @@ namespace FrontEnd.Models
         public Movie()
         {
             Presentations = new List<Presentation>();
+            Formats = new List<MovieFormat>();
         }
 
         public int Id { get; set; }
@@ -18,7 +19,10 @@ namespace FrontEnd.Models
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+        public string BackdropUrl { get; set; } = string.Empty;
+        public string TrailerUrl { get; set; } = string.Empty;
 
         public ICollection<Presentation> Presentations { get; set; }
+        public ICollection<MovieFormat> Formats { get; set; }
     }
 }

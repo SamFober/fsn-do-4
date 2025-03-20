@@ -236,7 +236,7 @@
                 {
                     @foreach (var option in availableOptions)
                     {
-                        <label class="cinema-radio-option mb-3">
+                        <label class="cinema-radio-option mb-3 @(selectedOption == option.Key ? "selected" : "")">
                             <input class="cinema-radio-input" type="radio" name="seatingOption" 
                                 value="@option.Key" @onchange="@(e => selectedOption = option.Key)" 
                                 checked="@(selectedOption == option.Key)" />

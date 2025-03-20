@@ -16,6 +16,8 @@ public class MoviesController : ControllerBase
     public async Task<IActionResult> GetMovieById(int id)
     {
         var movie = await _context.Movies
+            .Include(m => m.Presentations) // Include presentations for the movie
+            .Include(m => m.Formats)      // Include formats for the movie
             .Where(m => m.Id == id)
             .FirstOrDefaultAsync();
 
@@ -28,6 +30,7 @@ public class MoviesController : ControllerBase
     {
         var movies = await _context.Movies
             .Include(m => m.Presentations) // Include presentations for each movie
+            .Include(m => m.Formats)       // Include formats for each movie
             .Where(m => m.IsActive) // Optionally filter by active status
             .ToListAsync();
 
