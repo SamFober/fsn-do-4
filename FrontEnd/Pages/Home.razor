@@ -13,7 +13,7 @@
                 <img src="Cinemagia_logo.jpg" alt="Logo" class="navbar-logo"> <!-- Dummy logo -->
             </div>
             <ul class="nav-links">
-                <li><a href="#film-posters">AGENDA</a></li>
+                <li><a href="#film-posters">CALENDAR</a></li>
                 <li><a href="#films">FILMS</a></li>
                 <li><a href="#contact">CONTACT</a></li>
             </ul>
@@ -23,7 +23,7 @@
 <!-- Film Posters Section -->
     <section id="film-posters">
         <div class="film-grid">
-            <h2>Nu te zien
+            <h2>Now showing
             </h2>
 
             @if (Movies.Count > 0)
@@ -33,7 +33,7 @@
                     <div class="film-item">
                         <img src="@movie.PosterUrl" alt="@movie.Title">
                         <div class="time-slots">
-                            <a href="/film/@movie.Id" class="time-slot-btn">Voostellingen</a>
+                            <a href="/film/@movie.Id" class="time-slot-btn">Presentations</a>
                         </div>
                     </div>
                 }
