@@ -1,5 +1,7 @@
 namespace WebApi.Models
 {
+    using System.ComponentModel.DataAnnotations;
+
     public class Presentation
     {
         public Presentation()
@@ -15,6 +17,13 @@ namespace WebApi.Models
         public decimal Price { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+        
+        [StringLength(50)]
+        public string Format { get; set; } = "Standard";
+        
+        [StringLength(100)]
+        public string HallName { get; set; } = "";
+        
         public required Movie Movie { get; set; }
         public required Hall Hall { get; set; }
         public ICollection<Ticket> Tickets { get; set; }

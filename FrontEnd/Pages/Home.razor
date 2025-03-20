@@ -1,62 +1,233 @@
 ﻿@page "/"
 @using FrontEnd.Models
+@implements IDisposable
 
 @inject HttpClient Http
 @inject IJSRuntime JS
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Cinemagia - Home</PageTitle>
 
-<div class="main-content">
-        <!-- Navigation Bar (Overlay) -->
-        <nav class="homepage-navbar">
+<link href="css/home_style.css" rel="stylesheet" />
+<link href="css/home_navbar.css" rel="stylesheet" />
+<link href="css/seating.css" rel="stylesheet" />
+<link href="css/modals.css" rel="stylesheet" />
+
+<div class="cinema-container is-page-home">
+    <!-- Gradient Background Wrapper -->
+    <div class="gradient-background-wrapper"></div>
+    
+    <!-- Navigation Bar -->
+    <nav class="homepage-navbar">
+        <div class="nav-left-group">
             <div class="logo-container">
-                <img src="Cinemagia_logo.jpg" alt="Logo" class="navbar-logo"> <!-- Dummy logo -->
+                <img src="Cinemagia_logo.jpg" alt="Logo" class="navbar-logo">
             </div>
-            <ul class="nav-links">
-                <li><a href="#film-posters">CALENDAR</a></li>
-                <li><a href="#films">FILMS</a></li>
-                <li><a href="#contact">CONTACT</a></li>
+            
+            <ul class="nav-links @(isMobileMenuOpen ? "active" : "")">
+                <li><a href="#film-posters">Movies</a></li>
             </ul>
-        </nav>
-	</div>
-		
-<!-- Film Posters Section -->
-    <section id="film-posters">
-        <div class="film-grid">
-            <h2>Now showing
-            </h2>
-
-            @if (Movies.Count > 0)
-            {
-                @foreach (var movie in Movies)
-                {
-                    <div class="film-item">
-                        <img src="@movie.PosterUrl" alt="@movie.Title">
-                        <div class="time-slots">
-                            <a href="/film/@movie.Id" class="time-slot-btn">Presentations</a>
-                        </div>
-                    </div>
-                }
-            }
-            else
-            {
-                <p>No movies available.</p>
-            }
         </div>
-    </section>
+        
+        <!-- Mobile menu icon -->
+        <div class="menu-icon" @onclick="ToggleMobileMenu">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+        
+        <div class="nav-secondary">
+            <div class="search-icon">🔍</div>
+            <div class="account-icon">👤</div>
+            <div class="language-selector">EN</div>
+        </div>
+    </nav>
+    
+    <div class="content-with-header-space">
+        <!-- Hero Banner Section -->
+        @if (Movies.Count > 0)
+        {
+            var featuredMovie = Movies.FirstOrDefault();
+            <section class="split-hero">
+                <div class="split-hero-content">
+                    <!-- Movie Logo/Title styled like Pathé -->
+                    <div class="movie-logo">
+                        <h1 class="hero-title">@featuredMovie?.Title</h1>
+                    </div>
+                    <p class="hero-description">@(featuredMovie?.Description?.Length > 150 ? featuredMovie.Description.Substring(0, 150) + "..." : featuredMovie?.Description)</p>
+                    <div class="hero-cta">
+                        <a href="/film/@featuredMovie?.Id" class="hero-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ticket-icon"><path d="M3 7v2a3 3 0 1 1 0 6v2h18v-2a3 3 0 1 1 0-6V7zm0 5h18"></path></svg>
+                            Book now
+                        </a>
+                        <!-- Additional action button similar to Pathé's + button -->
+                        <a href="#" class="secondary-btn">
+                            <span>+</span>
+                        </a>
+                    </div>
+                    
+                    <!-- Format icons like on Pathé site, using inline SVG for reliability -->
+                    <div class="format-icons">
+                        @if (featuredMovie?.Formats != null && featuredMovie.Formats.Any())
+                        {
+                            @foreach (var format in featuredMovie.Formats)
+                            {
+                                <div class="format-icon-wrapper" title="@format.Description">
+                                    <span class="format-label">@format.Name</span>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <!-- Default formats if none available in movie data -->
+                            <div class="format-icon-wrapper" title="ScreenX Cinema Experience">
+                                <span class="format-label">ScreenX</span>
+                            </div>
+                            <div class="format-icon-wrapper" title="IMAX Cinema Experience">
+                                <span class="format-label">IMAX</span>
+                            </div>
+                            <div class="format-icon-wrapper" title="4DX Cinema Experience">
+                                <span class="format-label">4DX</span>
+                            </div>
+                            <div class="format-icon-wrapper" title="Dolby Cinema Experience">
+                                <span class="format-label">DOLBY CINEMA</span>
+                            </div>
+                            <div class="format-icon-wrapper" title="Dolby Atmos Sound Experience">
+                                <span class="format-label">DOLBY ATMOS</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+                
+                <div class="split-angle-divider"></div>
+                
+                <div class="split-hero-image">
+                    <div class="split-hero-backdrop" style="background-image: url('@featuredMovie?.BackdropUrl')"></div>
+                </div>
+            </section>
+        }
+
+        <!-- Now Showing Section -->
+        <section id="film-posters" class="cinema-layout">
+            <div class="section-container">
+                <h2 class="section-title">Now Showing</h2>
+                
+                <div class="film-grid">
+                    @if (Movies.Count > 0)
+                    {
+                        @foreach (var movie in Movies.OrderByDescending(m => m.ReleaseDate))
+                        {
+                            <div class="film-item">
+                                <a href="/film/@movie.Id" class="film-link">
+                                    <div class="poster-wrapper">
+                                        <img src="@movie.PosterUrl" alt="@movie.Title" class="film-poster">
+                                    </div>
+                                    <h3 class="film-title">@movie.Title</h3>
+                                </a>
+                                <a href="/film/@movie.Id" class="btn-book">Book Now</a>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-center loading-container">
+                            <h4>No movies available.</h4>
+                        </div>
+                    }
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
 
 @code {
     private List<Movie> Movies = new();
+    private bool isMobileMenuOpen = false;
+    private static DotNetObjectReference<Home>? objRef;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             Movies = await Http.GetFromJsonAsync<List<Movie>>("api/movies") ?? new List<Movie>();
+            
+            // Default backdrop URL if none exists
+            foreach (var movie in Movies)
+            {
+                if (string.IsNullOrEmpty(movie.BackdropUrl))
+                {
+                    movie.BackdropUrl = movie.PosterUrl;
+                }
+                
+                // For development/testing: Add sample formats if none exist
+                if (movie.Formats == null || !movie.Formats.Any())
+                {
+                    // Create a random selection of formats for each movie
+                    var random = new Random(movie.Id); // Use movie.Id as seed for consistent results
+                    var formatCount = random.Next(2, 5); // Each movie gets 2-4 formats
+                    var allFormats = new List<(string Name, string Description)>
+                    {
+                        ("ScreenX", "270-degree panoramic movie viewing experience"),
+                        ("IMAX", "IMAX offers a premium movie experience"),
+                        ("4DX", "Motion and environmental effects synchronized with the film"),
+                        ("DOLBY CINEMA", "Premium large format offering by Dolby"),
+                        ("DOLBY ATMOS", "Immersive sound technology by Dolby"),
+                        ("3D", "Three-dimensional film technology"),
+                        ("2D", "Standard two-dimensional film")
+                    };
+                    
+                    // Shuffle and take a subset of formats for this movie
+                    var selectedFormats = allFormats.OrderBy(x => random.Next()).Take(formatCount).ToList();
+                    
+                    movie.Formats = selectedFormats.Select((format, index) => 
+                        new MovieFormat { 
+                            Id = index + 1, 
+                            Name = format.Name, 
+                            Description = format.Description, 
+                            MovieId = movie.Id 
+                        }).ToList();
+                }
+            }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error fetching movies: {ex.Message}");
         }
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("eval", "window.DotNet = DotNet");
+            await JS.InvokeVoidAsync("import", "./js/home.js");
+            
+            // Add body class for home page
+            await JS.InvokeVoidAsync("document.body.classList.add", "is-page-home");
+        }
+    }
+    
+    private void ToggleMobileMenu()
+    {
+        isMobileMenuOpen = !isMobileMenuOpen;
+        StateHasChanged();
+    }
+    
+    [JSInvokable]
+    public static Task CloseMobileMenu()
+    {
+        if (objRef?.Value != null)
+        {
+            objRef.Value.isMobileMenuOpen = false;
+            objRef.Value.StateHasChanged();
+        }
+        return Task.CompletedTask;
+    }
+    
+    public void Dispose()
+    {
+        objRef?.Dispose();
+        // Remove body class when navigating away
+        JS.InvokeVoidAsync("document.body.classList.remove", "is-page-home");
     }
 }

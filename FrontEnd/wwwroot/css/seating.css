@@ -439,4 +439,54 @@
         margin-left: -20px;
         margin-right: -20px;
     }
+}
+
+/* Specific styles for the seating modal to override any black backgrounds */
+.seat-selection-modal,
+.modal-dialog.seat-selection-dialog {
+    background-color: transparent !important;
+    box-shadow: none !important;
+}
+
+.modal-dialog.seat-selection-dialog .modal-content {
+    background-color: #0f1730 !important;
+    border: 1px solid #2a3b66 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8) !important;
+    position: relative !important;
+    z-index: 10000 !important;
+}
+
+/* Ensure no black background for any modal */
+body .modal,
+body .modal-backdrop,
+body .modal-open .modal {
+    background-color: transparent !important;
+}
+
+/* Completely remove backdrop interaction */
+body .modal-backdrop {
+    pointer-events: none !important;
+}
+
+/* Style for all modals to ensure contents are visible and properly styled */
+body .modal .modal-dialog {
+    margin: 0 auto !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    max-width: 90% !important;
+    width: auto !important;
+    min-width: 300px !important;
+}
+
+/* Override any styles that might create additional black backgrounds */
+.modal::before,
+.modal::after,
+.modal-content::before,
+.modal-content::after {
+    display: none !important;
+    content: none !important;
+    background: none !important;
 } 

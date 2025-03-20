@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -9,9 +10,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace WebApi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250320211437_AddMovieFormats")]
+    partial class AddMovieFormats
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -52,10 +55,6 @@ namespace WebApi.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
-                    b.Property<string>("BackdropUrl")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
@@ -83,10 +82,6 @@ namespace WebApi.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
-                    b.Property<string>("TrailerUrl")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime(6)");
 
@@ -100,9 +95,6 @@ namespace WebApi.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -138,18 +130,8 @@ namespace WebApi.Migrations
                     b.Property<DateTime>("EndTime")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<string>("Format")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
                     b.Property<int>("HallId")
                         .HasColumnType("int");
-
-                    b.Property<string>("HallName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
 
                     b.Property<int>("MovieId")
                         .HasColumnType("int");

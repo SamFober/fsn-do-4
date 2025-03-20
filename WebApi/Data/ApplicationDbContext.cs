@@ -19,6 +19,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<TicketOrder> TicketOrders { get; set; } = null!;
     public DbSet<TicketOrderItem> TicketOrderItems { get; set; } = null!;
     public DbSet<SeatLock> SeatLocks { get; set; } = null!;
+    public DbSet<MovieFormat> MovieFormats { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,6 +43,12 @@ public class ApplicationDbContext : DbContext
             .HasOne(sl => sl.Seat)
             .WithMany()
             .HasForeignKey(sl => sl.SeatId);
+
+        // Configure MovieFormat entity
+        modelBuilder.Entity<MovieFormat>()
+            .HasOne(mf => mf.Movie)
+            .WithMany(m => m.Formats)
+            .HasForeignKey(mf => mf.MovieId);
 
         modelBuilder.Entity<TicketOrder>()
             .Property(e => e.AvailableOptions)
