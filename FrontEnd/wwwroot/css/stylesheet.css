@@ -1,6 +1,6 @@
 ﻿body {
     font-family: Arial, sans-serif;
-    background-color: #f4f4f9;
+    background-color: #122646;
     margin: 0;
     padding: 0;
     display: flex;
@@ -9,7 +9,7 @@
     height: 100vh;
 }
 .container {
-    background-color: #fff;
+    background-color: #e8e7f2;
     width: 80%;
     max-width: 600px;
     padding: 20px;
@@ -45,8 +45,9 @@ button {
     width: 100%;
     padding: 12px;
     margin-top: 20px;
-    background-color: #007BFF;
-    color: white;
+    background-color: #e9ba1f;
+    color: black;
+    font-weight: bold;
     border: none;
     border-radius: 8px;
     font-size: 16px;

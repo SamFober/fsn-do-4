@@ -23,4 +23,14 @@ public class MoviesController : ControllerBase
 
         return Ok(movie);
     }
+    [HttpGet]
+    public async Task<IActionResult> GetMovies()
+    {
+        var movies = await _context.Movies
+            .Include(m => m.Presentations) // Include presentations for each movie
+            .Where(m => m.IsActive) // Optionally filter by active status
+            .ToListAsync();
+
+        return Ok(movies);
+    }
 }
