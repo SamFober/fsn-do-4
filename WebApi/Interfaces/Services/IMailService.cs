@@ -2,6 +2,6 @@
 {
     public interface IMailService
     {
-        Task<bool> SendEmail(string recipient, string subject, string body, List<object> attachments);
+        Task<bool> SendEmai(string recipient, string subject, string body, List<object>? attachments);
     }
 }
