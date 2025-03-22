@@ -16,5 +16,6 @@ namespace WebApi.Interfaces.Services
         Task CancelOrder(Guid orderToken);
         Task<byte[]> GetTicketsByOrderToken(Guid orderToken);
         Task<byte[]> GetTicketsByPhoneBookingCode(string phoneBookingCode);
+        Task UpdateSeatAvailability(List<int> seatIds, bool isAvailable, int presentationId);
     }
 }

@@ -1,5 +1,6 @@
 ﻿@page "/film/{Id:int}"
 @using FrontEnd.Models
+@using FrontEnd.Models.Responses
 @using System.Globalization
 @inject HttpClient Http
 @inject IJSRuntime JS
@@ -89,6 +90,7 @@
             
             <div class="showtimes-date-heading">
                 <h3>@SelectedDate.ToString("dddd, MMMM d", CultureInfo.InvariantCulture)</h3>
+                <a href="/schedule?movieId=@Id" class="view-all-showtimes">View all showtimes</a>
             </div>
             
             <div class="showtimes-list">
@@ -98,7 +100,7 @@
                     {
                         @if (presentation != null && 
                             (string.IsNullOrEmpty(selectedFormat) || 
-                            (presentation.Format != null && presentation.Format.Equals(selectedFormat, StringComparison.OrdinalIgnoreCase))))
+                            (presentation.Format != null && string.Equals(presentation.Format, selectedFormat, StringComparison.OrdinalIgnoreCase))))
                         {
                             <div class="showtime-item">
                                 <div class="showtime-format">@(presentation.Format ?? "Standard")</div>
@@ -343,19 +345,6 @@
             // For example, show a notification or search for the trailer on YouTube
             string searchQuery = Uri.EscapeDataString($"{Movie.Title} official trailer");
             await JS.InvokeVoidAsync("open", $"https://www.youtube.com/results?search_query={searchQuery}", "_blank");
-        }
-    }
-    
-    private async Task CheckPresentationsEndpoint()
-    {
-        try
-        {
-            var response = await Http.GetAsync($"api/presentations/movie/{Id}");
-            DirectPresentationsResponse = await response.Content.ReadAsStringAsync();
-        }
-        catch (Exception ex)
-        {
-            DirectPresentationsResponse = $"Error: {ex.Message}";
         }
     }
     

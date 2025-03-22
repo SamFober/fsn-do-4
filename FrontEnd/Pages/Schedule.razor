@@ -1,0 +1,551 @@
+@page "/schedule"
+@using FrontEnd.Models
+@using FrontEnd.Models.Responses
+@using System.Globalization
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<PageTitle>Film Schedule - Cinemagia</PageTitle>
+
+<link href="css/schedule.css" rel="stylesheet" />
+<link href="css/home_navbar.css" rel="stylesheet" />
+
+<div class="cinema-container">
+    <!-- Navigation Bar -->
+    <nav class="homepage-navbar">
+        <div class="nav-left-group">
+            <div class="logo-container">
+                <a href="/">
+                    <img src="Cinemagia_logo.jpg" alt="Logo" class="navbar-logo">
+                </a>
+            </div>
+            
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/schedule" class="active">Film Schedule</a></li>
+            </ul>
+        </div>
+        
+        <div class="nav-secondary">
+            <div class="search-icon">🔍</div>
+            <div class="account-icon">👤</div>
+            <div class="language-selector">EN</div>
+        </div>
+    </nav>
+
+    <div class="content-with-header-space">
+        <div class="schedule-container">
+            <h1 class="page-title">Film Schedule</h1>
+            
+            <!-- Filters Section -->
+            <div class="filters-section">
+                <div class="filter-item">
+                    <label for="formatFilter">Format:</label>
+                    <select id="formatFilter" value="@selectedFormat" @onchange="@((e) => FormatChanged(e.Value.ToString()))">
+                        <option value="">All Formats</option>
+                        @foreach (var format in availableFormats)
+                        {
+                            bool isCurrentlySelected = string.Equals(format, selectedFormat, StringComparison.OrdinalIgnoreCase);
+                            bool isAvailable = IsFormatAvailableOnSelectedDate(format);
+                            bool showUnavailabilityIndicator = !isAvailable && !isCurrentlySelected;
+                            
+                            <option value="@format" selected="@isCurrentlySelected">
+                                @format @(showUnavailabilityIndicator ? "(none on this day)" : "")
+                            </option>
+                        }
+                    </select>
+                </div>
+                
+                <div class="filter-item">
+                    <label for="sortBy">Sort by:</label>
+                    <select id="sortBy" value="@sortBy" @onchange="@((e) => SortChanged(e.Value.ToString()))">
+                        <option value="time">Time (Earliest First)</option>
+                        <option value="time_desc">Time (Latest First)</option>
+                        <option value="popularity">Popularity (Most Popular First)</option>
+                        <option value="popularity_asc">Popularity (Least Popular First)</option>
+                    </select>
+                </div>
+                
+                <button class="btn-reset-filters" @onclick="ResetFilters">Reset Filters</button>
+            </div>
+            
+            <!-- Date Navigation -->
+            <div class="dates-nav">
+                @foreach (var date in dateRange)
+                {
+                    <button class="date-btn @(date.Date == selectedDate.Date ? "active" : "")" @onclick="() => ChangeDate(date)">
+                        <span class="date-day">@date.ToString("ddd", CultureInfo.InvariantCulture)</span>
+                        <span class="date-num">@date.Day</span>
+                        <span class="date-month">@date.ToString("MMM", CultureInfo.InvariantCulture)</span>
+                    </button>
+                }
+            </div>
+            
+            <!-- Schedule Content -->
+            @if (isLoading)
+            {
+                <div class="loading-container">
+                    <div class="spinner-border" role="status"></div>
+                    <p>Loading schedule...</p>
+                </div>
+            }
+            else if (schedule != null && schedule.Any())
+            {
+                <div class="schedule-date-heading">
+                    <h2>@selectedDate.ToString("dddd, MMMM d", CultureInfo.InvariantCulture)</h2>
+                </div>
+                
+                <div class="schedule-content">
+                    @{
+                        var selectedDaySchedule = schedule.FirstOrDefault(s => s.Date == selectedDate.ToString("yyyy-MM-dd"));
+                        var moviesToShow = selectedDaySchedule?.Movies ?? Enumerable.Empty<MovieScheduleItem>();
+                    }
+                    
+                    @if (!moviesToShow.Any() && !string.IsNullOrEmpty(selectedFormat))
+                    {
+                        <div class="no-schedule-message">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="message-icon"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path><line x1="2" y1="2" x2="22" y2="22"></line></svg>
+                            <p>No movies available in @selectedFormat format on @selectedDate.ToString("dddd, MMMM d").</p>
+                            <div class="message-actions">
+                                <button class="btn-inline" @onclick="ResetFilters">Reset filters</button> or select another date.
+                            </div>
+                        </div>
+                    }
+                    else if (!moviesToShow.Any())
+                    {
+                        <div class="no-schedule-message">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="message-icon"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path><line x1="2" y1="2" x2="22" y2="22"></line></svg>
+                            <p>No movies scheduled for @selectedDate.ToString("dddd, MMMM d").</p>
+                            <div class="message-actions">
+                                Please select another date.
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var movie in moviesToShow)
+                        {
+                            <div class="movie-schedule-item">
+                                <div class="movie-info">
+                                    <a href="/film/@movie.MovieId" class="movie-poster-link">
+                                        <img src="@movie.PosterUrl" alt="@movie.Title" class="movie-poster">
+                                    </a>
+                                    <div class="movie-details">
+                                        <h3 class="movie-title">
+                                            <a href="/film/@movie.MovieId">@movie.Title</a>
+                                        </h3>
+                                        <div class="movie-meta">
+                                            <span class="movie-duration">@movie.Duration min</span>
+                                            <div class="format-badges">
+                                                @foreach (var format in movie.Formats)
+                                                {
+                                                    <span class="format-badge">@format</span>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="showtimes-container">
+                                    <h4>Available Showtimes:</h4>
+                                    <div class="showtimes-list">
+                                        @if (movie.Showtimes != null && movie.Showtimes.Any())
+                                        {
+                                            @foreach (var showtime in movie.Showtimes)
+                                            {
+                                                @if (showtime.IsSoldOut)
+                                                {
+                                                    <div class="showtime-btn sold-out" title="Sold out!">
+                                                        <span class="time">@showtime.StartTime</span>
+                                                        <span class="hall">@showtime.HallName</span>
+                                                        <span class="format">@showtime.Format</span>
+                                                        <span class="availability-indicator sold-out-indicator">Sold out</span>
+                                                        @{
+                                                            // Log for debugging
+                                                            Console.WriteLine($"Sold out showtime: ID {showtime.Id}, Time: {showtime.StartTime}, Available: {showtime.AvailableSeats}/{showtime.TotalSeats}");
+                                                        }
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <a href="/seat-selector/@showtime.Id" 
+                                                       class="showtime-btn @(showtime.IsAlmostFull ? "almost-full" : "")" 
+                                                       title="@(showtime.IsAlmostFull ? "Almost sold out!" : "")">
+                                                        <span class="time">@showtime.StartTime</span>
+                                                        <span class="hall">@showtime.HallName</span>
+                                                        <span class="format">@showtime.Format</span>
+                                                        @if (showtime.IsAlmostFull)
+                                                        {
+                                                            <span class="availability-indicator">Almost sold out</span>
+                                                        }
+                                                        @{
+                                                            // Log for debugging
+                                                            if (showtime.IsAlmostFull)
+                                                            {
+                                                                Console.WriteLine($"Almost full showtime: ID {showtime.Id}, Time: {showtime.StartTime}, Available: {showtime.AvailableSeats}/{showtime.TotalSeats}");
+                                                            }
+                                                        }
+                                                    </a>
+                                                }
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <div class="no-showtimes">No showtimes available</div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="no-schedule-message">
+                    <p>No movies scheduled for this date. Please try another date or check back later.</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<DailySchedule> schedule = new List<DailySchedule>();
+    private List<DateTime> dateRange = new List<DateTime>();
+    private DateTime selectedDate = DateTime.Today;
+    private bool isLoading = true;
+    private string selectedFormat = "";
+    private string sortBy = "time";
+    private List<string> availableFormats = new List<string>();
+    private List<string> allAvailableFormats = new List<string>();  // Store all formats regardless of current filter
+    
+    // Dictionary to track which formats are available on each date
+    // Key: date string (yyyy-MM-dd), Value: list of formats available on that date
+    private Dictionary<string, HashSet<string>> formatAvailabilityByDate = new Dictionary<string, HashSet<string>>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Initialize date range for next 7 days
+        dateRange = Enumerable.Range(0, 7)
+            .Select(i => DateTime.Today.AddDays(i))
+            .ToList();
+            
+        await LoadSchedule();
+    }
+
+    private async Task LoadSchedule()
+    {
+        isLoading = true;
+        
+        try
+        {
+            // Store original case of selectedFormat before the API call
+            string originalSelectedFormat = selectedFormat;
+            Console.WriteLine($"Original format: {originalSelectedFormat}");
+            
+            // Build the API URL with query parameters
+            string apiUrl = $"api/presentations/schedule?startDate={DateTime.Today:yyyy-MM-dd}&endDate={DateTime.Today.AddDays(6):yyyy-MM-dd}";
+            
+            if (!string.IsNullOrEmpty(selectedFormat))
+            {
+                apiUrl += $"&format={Uri.EscapeDataString(selectedFormat)}";
+            }
+            
+            // The server sorting isn't working well, so we'll only send time/popularity to the server
+            // and do the rest of the sorting client-side
+            string serverSortBy = sortBy;
+            if (sortBy == "time_desc" || sortBy == "popularity_asc")
+            {
+                serverSortBy = sortBy.Split('_')[0]; // Extract 'time' or 'popularity'
+            }
+            
+            apiUrl += $"&sortBy={Uri.EscapeDataString(serverSortBy)}";
+            
+            Console.WriteLine($"API URL: {apiUrl}");
+            
+            // Fetch the schedule from the API
+            var response = await Http.GetFromJsonAsync<List<DailySchedule>>(apiUrl);
+            
+            if (response != null)
+            {
+                schedule = response;
+                
+                // Apply our client-side sorting to get more meaningful results
+                ApplyClientSideSorting();
+                
+                // Extract formats from the current schedule
+                var currentFormats = schedule
+                    .SelectMany(d => d.Movies)
+                    .SelectMany(m => m.Formats)
+                    .Distinct()
+                    .OrderBy(f => f)
+                    .ToList();
+                
+                // For the first load or when resetting filters, update all available formats
+                if (string.IsNullOrEmpty(originalSelectedFormat))
+                {
+                    allAvailableFormats = currentFormats;
+                    
+                    // When loading all formats, update our format availability tracking
+                    UpdateFormatAvailabilityTracking();
+                }
+                // Otherwise, merge any new formats into our master list
+                else
+                {
+                    foreach (var format in currentFormats)
+                    {
+                        if (!allAvailableFormats.Contains(format, StringComparer.OrdinalIgnoreCase))
+                        {
+                            allAvailableFormats.Add(format);
+                        }
+                    }
+                    // Keep the list sorted
+                    allAvailableFormats = allAvailableFormats.OrderBy(f => f).ToList();
+                }
+                
+                // Use allAvailableFormats for the dropdown
+                availableFormats = allAvailableFormats;
+                
+                Console.WriteLine($"Available formats: {string.Join(", ", availableFormats)}");
+                
+                // Restore the original format selection if it's still in the list (case-insensitive)
+                if (!string.IsNullOrEmpty(originalSelectedFormat))
+                {
+                    // Check if the original format exists in the format list (case-insensitive)
+                    var matchingFormat = availableFormats.FirstOrDefault(f => 
+                        string.Equals(f, originalSelectedFormat, StringComparison.OrdinalIgnoreCase));
+                    
+                    if (matchingFormat != null)
+                    {
+                        Console.WriteLine($"Found matching format: {matchingFormat}");
+                        // Preserve the original selection by setting it to the matching format
+                        selectedFormat = matchingFormat;
+                    }
+                    else
+                    {
+                        Console.WriteLine("No matching format found");
+                    }
+                }
+                
+                Console.WriteLine($"Final selected format: {selectedFormat}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading schedule: {ex.Message}");
+            schedule = new List<DailySchedule>();
+        }
+        
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task ChangeDate(DateTime date)
+    {
+        // Update selected date
+        selectedDate = date;
+        
+        Console.WriteLine($"Changing date to: {selectedDate:yyyy-MM-dd}");
+        Console.WriteLine($"Formats available on this date: {string.Join(", ", GetFormatsAvailableOnDate(selectedDate))}");
+        
+        // If a format is selected, we need to reload the data for the selected date with that format
+        if (!string.IsNullOrEmpty(selectedFormat))
+        {
+            bool isSelectedFormatAvailable = IsFormatAvailableOnSelectedDate(selectedFormat);
+            Console.WriteLine($"Selected format {selectedFormat} available on this date: {isSelectedFormatAvailable}");
+            
+            // Reload the data with the current format filter and new date
+            await LoadSchedule();
+        }
+        else
+        {
+            // When no format is selected, we just need to refresh the UI
+            // as we already have all the data for all dates
+            StateHasChanged();
+        }
+    }
+
+    // Helper method to get the list of formats available on a specific date
+    private List<string> GetFormatsAvailableOnDate(DateTime date)
+    {
+        string dateKey = date.ToString("yyyy-MM-dd");
+        
+        if (formatAvailabilityByDate.ContainsKey(dateKey))
+        {
+            return formatAvailabilityByDate[dateKey].ToList();
+        }
+        
+        return new List<string>();
+    }
+
+    private async Task SortChanged(string newSort)
+    {
+        Console.WriteLine($"Sort changed to: {newSort}");
+        sortBy = newSort;
+        await LoadSchedule();
+    }
+
+    private async Task ResetFilters()
+    {
+        // Reset the format selection
+        selectedFormat = string.Empty;
+        
+        // Reload the schedule without format filter
+        await LoadSchedule();
+        
+        // Force UI update
+        StateHasChanged();
+    }
+
+    private async Task FormatChanged(string newFormat)
+    {
+        Console.WriteLine($"Format changed to: {newFormat}");
+        selectedFormat = newFormat;
+        await LoadSchedule();
+    }
+
+    // Manually sort schedules based on our own sorting logic
+    private void ApplyClientSideSorting()
+    {
+        // Only apply client-side sorting if we have a schedule
+        if (schedule == null || !schedule.Any())
+            return;
+            
+        foreach (var day in schedule)
+        {
+            if (day.Movies == null)
+                continue;
+                
+            // Apply sorting to movies and their showtimes
+            switch (sortBy)
+            {
+                case "time":
+                    // Sort showtimes for each movie by start time (ascending)
+                    foreach (var movie in day.Movies)
+                    {
+                        if (movie.Showtimes != null)
+                        {
+                            movie.Showtimes = movie.Showtimes
+                                .OrderBy(s => TimeSpan.Parse(s.StartTime))
+                                .ToList();
+                        }
+                    }
+                    break;
+                    
+                case "time_desc":
+                    // Sort showtimes for each movie by start time (descending)
+                    foreach (var movie in day.Movies)
+                    {
+                        if (movie.Showtimes != null)
+                        {
+                            movie.Showtimes = movie.Showtimes
+                                .OrderByDescending(s => TimeSpan.Parse(s.StartTime))
+                                .ToList();
+                        }
+                    }
+                    break;
+                    
+                case "popularity":
+                    // Sort movies by the sum of how full their showtimes are (descending)
+                    day.Movies = day.Movies
+                        .OrderByDescending(m => 
+                            m.Showtimes != null 
+                                ? m.Showtimes.Sum(s => s.TotalSeats - s.AvailableSeats)
+                                : 0)
+                        .ToList();
+                    break;
+                    
+                case "popularity_asc":
+                    // Sort movies by the sum of how full their showtimes are (ascending)
+                    day.Movies = day.Movies
+                        .OrderBy(m => 
+                            m.Showtimes != null 
+                                ? m.Showtimes.Sum(s => s.TotalSeats - s.AvailableSeats)
+                                : 0)
+                        .ToList();
+                    break;
+            }
+        }
+    }
+
+    private bool IsFormatInCurrentResults(string format)
+    {
+        // If no schedule data is available, we can't determine format availability
+        if (schedule == null || !schedule.Any())
+        {
+            return false;
+        }
+
+        // Get the daily schedule for the selected date
+        var selectedDaySchedule = schedule.FirstOrDefault(s => s.Date == selectedDate.ToString("yyyy-MM-dd"));
+        
+        // If there's no schedule for the selected day or no movies, format is not available
+        if (selectedDaySchedule == null || !selectedDaySchedule.Movies.Any())
+        {
+            return false;
+        }
+
+        // Check if any movie has a showtime with this format on the selected date
+        return selectedDaySchedule.Movies.Any(movie => 
+            movie.Showtimes != null && 
+            movie.Showtimes.Any(showtime => 
+                string.Equals(showtime.Format, format, StringComparison.OrdinalIgnoreCase))
+        );
+    }
+
+    // New method to update our tracking of which formats are available on each date
+    private void UpdateFormatAvailabilityTracking()
+    {
+        // Clear existing tracking data if resetting filters
+        if (string.IsNullOrEmpty(selectedFormat))
+        {
+            formatAvailabilityByDate.Clear();
+        }
+
+        // For each date in the schedule
+        foreach (var day in schedule)
+        {
+            string dateKey = day.Date;
+            
+            // Initialize the format set for this date if it doesn't exist
+            if (!formatAvailabilityByDate.ContainsKey(dateKey))
+            {
+                formatAvailabilityByDate[dateKey] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+            
+            // Add all formats that have showtimes on this date
+            foreach (var movie in day.Movies)
+            {
+                if (movie.Showtimes != null)
+                {
+                    foreach (var showtime in movie.Showtimes)
+                    {
+                        formatAvailabilityByDate[dateKey].Add(showtime.Format);
+                    }
+                }
+            }
+        }
+    }
+
+    // Updated method to check format availability based on our tracking
+    private bool IsFormatAvailableOnSelectedDate(string format)
+    {
+        string dateKey = selectedDate.ToString("yyyy-MM-dd");
+        
+        // If we're filtering by this format, it's obviously "available"
+        if (string.Equals(format, selectedFormat, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        
+        // If we have tracking data for this date, use it
+        if (formatAvailabilityByDate.ContainsKey(dateKey))
+        {
+            return formatAvailabilityByDate[dateKey].Contains(format);
+        }
+        
+        // Otherwise, fall back to the current results (which might be filtered)
+        return IsFormatInCurrentResults(format);
+    }
+} 

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -9,9 +10,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace WebApi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250322143924_AddAvailableSeatsToPresentation")]
+    partial class AddAvailableSeatsToPresentation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -187,6 +190,9 @@ namespace WebApi.Migrations
                     b.Property<int>("HallId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsAvailable")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<int>("RowNumber")
                         .HasColumnType("int");
 
@@ -232,37 +238,6 @@ namespace WebApi.Migrations
                     b.HasIndex("TicketOrderId");
 
                     b.ToTable("SeatLocks");
-                });
-
-            modelBuilder.Entity("WebApi.Models.SeatPresentation", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<bool>("IsAvailable")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<int>("PresentationId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SeatId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PresentationId");
-
-                    b.HasIndex("SeatId", "PresentationId")
-                        .IsUnique();
-
-                    b.ToTable("SeatPresentations");
                 });
 
             modelBuilder.Entity("WebApi.Models.Ticket", b =>
@@ -429,25 +404,6 @@ namespace WebApi.Migrations
                         .HasForeignKey("TicketOrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Seat");
-                });
-
-            modelBuilder.Entity("WebApi.Models.SeatPresentation", b =>
-                {
-                    b.HasOne("WebApi.Models.Presentation", "Presentation")
-                        .WithMany()
-                        .HasForeignKey("PresentationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("WebApi.Models.Seat", "Seat")
-                        .WithMany()
-                        .HasForeignKey("SeatId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Presentation");
 
                     b.Navigation("Seat");
                 });
