@@ -11,17 +11,20 @@ namespace WebApi.Services
     public class TicketService : ITicketService
     {
         private readonly ITicketRepository _repository;
+        private readonly IMailService _mailService;
         private readonly ITicketPdfService _ticketPdfService;
         private readonly ILogger<TicketService> _logger;
         private readonly ApplicationDbContext _context;
 
         public TicketService(
             ITicketRepository repository,
+            IMailService mailService,
             ITicketPdfService ticketPdfService,
             ILogger<TicketService> logger,
             ApplicationDbContext context)
         {
             _repository = repository;
+            _mailService = mailService;
             _ticketPdfService = ticketPdfService;
             _logger = logger;
             _context = context;

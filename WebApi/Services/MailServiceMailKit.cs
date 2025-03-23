@@ -1,6 +1,7 @@
 ﻿using MailKit.Net.Smtp;
 using MimeKit;
 using WebApi.Interfaces.Services;
+using WebApi.Models;
 
 namespace WebApi.Services
 {
@@ -28,12 +29,10 @@ namespace WebApi.Services
             message.From.Add(new MailboxAddress("Cinemagia", "cinemagia@example.com"));
             message.To.Add(new MailboxAddress("recipient", recipient));
             message.Subject = subject;
-            var messageBody = new TextPart("plain")
-            {
-                Text = body
-            };
 
-            var multipart = new Multipart("mixed");
+            var bodyBuilder = new BodyBuilder();
+
+            bodyBuilder.HtmlBody = body;
 
             if (attachments != null && attachments.Count > 0)
             {
@@ -41,7 +40,7 @@ namespace WebApi.Services
                 {
                     if (attachment is MimePart)
                     {
-                        multipart.Add(attachment as MimePart);
+                        bodyBuilder.Attachments.Add(attachment as MimePart);
                     }
                     else
                     {
@@ -50,8 +49,7 @@ namespace WebApi.Services
                 }
             }
 
-            multipart.Add(messageBody);
-            message.Body = multipart;
+            message.Body = bodyBuilder.ToMessageBody();
 
             try
             {
@@ -65,6 +63,13 @@ namespace WebApi.Services
                 logger.LogError(e, "Failed to send email");
                 return false;
             }
+        }
+
+        public async Task<string> TicketOrderCompleteTemplate(string firstName)
+        {
+            string emailTemplate = await File.ReadAllTextAsync(@"") ?? "Hi {firstName}, here are your tickets!";
+            emailTemplate.Replace("{firstName}", firstName);
+            return emailTemplate;
         }
     }
 }
