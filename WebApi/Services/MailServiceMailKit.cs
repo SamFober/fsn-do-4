@@ -23,7 +23,7 @@ namespace WebApi.Services
             }
         }
 
-        public async Task<bool> SendEmai(string recipient, string subject, string body, List<object>? attachments)
+        public async Task<bool> SendEmail(string recipient, string subject, string body, List<object>? attachments)
         {
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress("Cinemagia", "cinemagia@example.com"));
@@ -68,7 +68,7 @@ namespace WebApi.Services
         public async Task<string> TicketOrderCompleteTemplate(string firstName)
         {
             string emailTemplate = await File.ReadAllTextAsync(@"Resources/EmailTemplates/confirm_order_email_template.html") ?? "Hi {firstName}, here are your tickets!";
-            emailTemplate.Replace("{firstName}", firstName);
+            emailTemplate = emailTemplate.Replace("{firstName}", firstName.ToUpper());
             return emailTemplate;
         }
     }
