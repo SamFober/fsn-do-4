@@ -20,6 +20,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<TicketOrderItem> TicketOrderItems { get; set; } = null!;
     public DbSet<SeatLock> SeatLocks { get; set; } = null!;
     public DbSet<MovieFormat> MovieFormats { get; set; } = null!;
+    public DbSet<SeatPresentation> SeatPresentations { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -34,6 +35,21 @@ public class ApplicationDbContext : DbContext
             .HasOne(s => s.Hall)
             .WithMany(h => h.Seats) // Ensure this is set to the collection in Hall
             .HasForeignKey(s => s.HallId);
+
+        // Configure SeatPresentation entity
+        modelBuilder.Entity<SeatPresentation>()
+            .HasIndex(sp => new { sp.SeatId, sp.PresentationId })
+            .IsUnique();
+
+        modelBuilder.Entity<SeatPresentation>()
+            .HasOne(sp => sp.Seat)
+            .WithMany()
+            .HasForeignKey(sp => sp.SeatId);
+
+        modelBuilder.Entity<SeatPresentation>()
+            .HasOne(sp => sp.Presentation)
+            .WithMany()
+            .HasForeignKey(sp => sp.PresentationId);
 
         modelBuilder.Entity<Ticket>()
             .HasIndex(t => new { t.PresentationId, t.SeatId })

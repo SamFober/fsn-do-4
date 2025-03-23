@@ -24,6 +24,8 @@ namespace WebApi.Models
         [StringLength(100)]
         public string HallName { get; set; } = "";
         
+        public int AvailableSeats { get; set; }
+        
         public required Movie Movie { get; set; }
         public required Hall Hall { get; set; }
         public ICollection<Ticket> Tickets { get; set; }

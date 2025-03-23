@@ -1,0 +1,325 @@
+@page "/almost-sold-out-test"
+@using FrontEnd.Models
+@using System.Globalization
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<PageTitle>Almost Sold Out Test - Cinemagia</PageTitle>
+
+<link href="css/schedule.css" rel="stylesheet" />
+<link href="css/home_navbar.css" rel="stylesheet" />
+
+<div class="cinema-container">
+    <!-- Navigation Bar -->
+    <nav class="homepage-navbar">
+        <div class="nav-left-group">
+            <div class="logo-container">
+                <a href="/">
+                    <img src="Cinemagia_logo.jpg" alt="Logo" class="navbar-logo">
+                </a>
+            </div>
+            
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/schedule">Film Schedule</a></li>
+                <li><a href="/almost-sold-out-test" class="active">Almost Sold Out Test</a></li>
+            </ul>
+        </div>
+        
+        <div class="nav-secondary">
+            <div class="search-icon">🔍</div>
+            <div class="account-icon">👤</div>
+            <div class="language-selector">EN</div>
+        </div>
+    </nav>
+
+    <div class="content-with-header-space">
+        <div class="schedule-container">
+            <h1 class="page-title">Almost Sold Out Test</h1>
+            
+            @if (isLoading)
+            {
+                <div class="loading-container">
+                    <div class="spinner-border" role="status"></div>
+                    <p>Setting up test presentations...</p>
+                </div>
+            }
+            else if (testPresentations != null && testPresentations.Any())
+            {
+                <div class="alert alert-info">
+                    <strong>Test Data Created</strong>
+                    <p>These presentations have been created for today (@testDate). You can view them in the regular schedule page too.</p>
+                </div>
+                
+                <div class="mb-4 test-actions">
+                    <button class="btn-primary" @onclick="RefreshTestData">Refresh Test Data</button>
+                    <a href="/schedule" class="btn-secondary">View in Schedule</a>
+                </div>
+                
+                <div class="test-presentations">
+                    <h2>Test Presentations</h2>
+                    <div class="legend">
+                        <div class="legend-item almost-sold-out">
+                            <span class="indicator"></span>
+                            <span>Almost Sold Out (&lt;15% seats available)</span>
+                        </div>
+                        <div class="legend-item moderately-full">
+                            <span class="indicator"></span>
+                            <span>Moderately Full (30-50% seats available)</span>
+                        </div>
+                        <div class="legend-item plenty-available">
+                            <span class="indicator"></span>
+                            <span>Plenty Available (70-90% seats available)</span>
+                        </div>
+                    </div>
+
+                    <table class="test-presentations-table">
+                        <thead>
+                            <tr>
+                                <th>Movie</th>
+                                <th>Hall</th>
+                                <th>Start Time</th>
+                                <th>Format</th>
+                                <th>Available / Total</th>
+                                <th>% Sold</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var presentation in testPresentations)
+                            {
+                                <tr class="@GetAvailabilityClass(presentation.SoldOutPercentage)">
+                                    <td>@presentation.MovieTitle</td>
+                                    <td>@presentation.HallName</td>
+                                    <td>@presentation.StartTime</td>
+                                    <td>@presentation.Format</td>
+                                    <td>@presentation.AvailableSeats / @presentation.TotalSeats</td>
+                                    <td>@presentation.SoldOutPercentage%</td>
+                                    <td>
+                                        @if (presentation.AlmostSoldOut)
+                                        {
+                                            <span class="almost-sold-out-badge">Almost Sold Out!</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Available</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <a href="/seat-selector/@presentation.PresentationId" class="btn-view">View Seats</a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="error-message">
+                    <p>@errorMessage</p>
+                    <button class="btn-primary" @onclick="RefreshTestData">Try Again</button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .test-actions {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .alert {
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+    }
+    
+    .alert-info {
+        background-color: #e8f0fe;
+        border: 1px solid #4285f4;
+        color: #174ea6;
+    }
+    
+    .alert strong {
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+    
+    .btn-primary, .btn-secondary, .btn-view {
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-block;
+        cursor: pointer;
+        font-weight: 500;
+    }
+    
+    .btn-primary {
+        background-color: #1a73e8;
+        color: white;
+        border: none;
+    }
+    
+    .btn-secondary {
+        background-color: #f1f3f4;
+        color: #202124;
+        border: 1px solid #dadce0;
+    }
+    
+    .btn-view {
+        background-color: #f8f9fa;
+        color: #1a73e8;
+        border: 1px solid #dadce0;
+        font-size: 0.85rem;
+    }
+    
+    .legend {
+        display: flex;
+        margin-bottom: 1rem;
+        gap: 1.5rem;
+    }
+    
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .legend-item .indicator {
+        width: 1rem;
+        height: 1rem;
+        border-radius: 50%;
+    }
+    
+    .almost-sold-out .indicator {
+        background-color: #f44336;
+    }
+    
+    .moderately-full .indicator {
+        background-color: #ff9800;
+    }
+    
+    .plenty-available .indicator {
+        background-color: #4caf50;
+    }
+    
+    .test-presentations-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+    }
+    
+    .test-presentations-table th {
+        background-color: #f8f9fa;
+        text-align: left;
+        padding: 0.75rem;
+        border-bottom: 2px solid #dadce0;
+    }
+    
+    .test-presentations-table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid #dadce0;
+    }
+    
+    .test-presentations-table tr.row-almost-sold-out {
+        background-color: rgba(244, 67, 54, 0.1);
+    }
+    
+    .test-presentations-table tr.row-moderately-full {
+        background-color: rgba(255, 152, 0, 0.1);
+    }
+    
+    .test-presentations-table tr.row-plenty-available {
+        background-color: rgba(76, 175, 80, 0.1);
+    }
+    
+    .almost-sold-out-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        background-color: #f44336;
+        color: white;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+</style>
+
+@code {
+    private List<TestPresentation> testPresentations = new List<TestPresentation>();
+    private bool isLoading = true;
+    private string errorMessage = "No test data available. Try refreshing.";
+    private string testDate = DateTime.Today.ToString("yyyy-MM-dd");
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshTestData();
+    }
+
+    private async Task RefreshTestData()
+    {
+        isLoading = true;
+        StateHasChanged();
+        
+        try
+        {
+            var response = await Http.GetFromJsonAsync<TestResponse>("api/tickets/test/almost-sold-out-test");
+            
+            if (response != null)
+            {
+                testPresentations = response.Presentations;
+                testDate = response.TestDate;
+                errorMessage = "";
+            }
+            else
+            {
+                errorMessage = "Failed to get test data from the server.";
+                testPresentations = new List<TestPresentation>();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+            testPresentations = new List<TestPresentation>();
+        }
+        
+        isLoading = false;
+        StateHasChanged();
+    }
+    
+    private string GetAvailabilityClass(int soldOutPercentage)
+    {
+        if (soldOutPercentage >= 85) // Almost sold out
+            return "row-almost-sold-out";
+        else if (soldOutPercentage >= 50 && soldOutPercentage < 70) // Moderately full
+            return "row-moderately-full";
+        else // Plenty available
+            return "row-plenty-available";
+    }
+    
+    // Define classes for deserialization
+    public class TestResponse
+    {
+        public string TestDate { get; set; }
+        public string Note { get; set; }
+        public List<TestPresentation> Presentations { get; set; }
+    }
+    
+    public class TestPresentation
+    {
+        public int PresentationId { get; set; }
+        public string HallName { get; set; }
+        public string MovieTitle { get; set; }
+        public string StartTime { get; set; }
+        public string Format { get; set; }
+        public int TotalSeats { get; set; }
+        public int AvailableSeats { get; set; }
+        public int SoldOutPercentage { get; set; }
+        public bool AlmostSoldOut { get; set; }
+    }
+} 
