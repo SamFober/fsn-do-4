@@ -67,7 +67,7 @@ namespace WebApi.Services
 
         public async Task<string> TicketOrderCompleteTemplate(string firstName)
         {
-            string emailTemplate = await File.ReadAllTextAsync(@"") ?? "Hi {firstName}, here are your tickets!";
+            string emailTemplate = await File.ReadAllTextAsync(@"Resources/EmailTemplates/confirm_order_email_template.html") ?? "Hi {firstName}, here are your tickets!";
             emailTemplate.Replace("{firstName}", firstName);
             return emailTemplate;
         }
