@@ -94,6 +94,7 @@ namespace WebApi.Controllers
                 presentation.StartTime,
                 presentation.EndTime,
                 presentation.Price,
+                presentation.IsSecretMovie,
                 HallName = presentation.Hall.Name,
                 Rows = seatAvailability
             };

@@ -146,10 +146,10 @@
                                         <div class="ticket-type-selector">
                                             <select class="form-select" value="@(ticketTypes.ContainsKey(seat.Id) ? ticketTypes[seat.Id] : "adult")" 
                                             @onchange="@(e => SelectTicketType(seat.Id, e.Value.ToString()))">
-                                                <option value="adult">Adult - €12.50</option>
-                                                <option value="child">Child - €8.50</option>
-                                                <option value="senior">Senior - €10.50</option>
-                                                <option value="student">Student - €9.50</option>
+                                                <option value="adult">Adult - €@GetTicketTypePrice("adult")</option>
+                                                <option value="child">Child - €@GetTicketTypePrice("child")</option>
+                                                <option value="senior">Senior - €@GetTicketTypePrice("senior")</option>
+                                                <option value="student">Student - €@GetTicketTypePrice("student")</option>
                                             </select>
                                         </div>
                                     </div>
@@ -1168,14 +1168,21 @@
 
     private decimal GetTicketTypePrice(string type)
     {
-        return type switch
+        decimal price = type switch
         {
-    "adult" => 12.50m,
-    "child" => 8.50m,
-    "senior" => 10.50m,
-    "student" => 9.50m,
-    _ => 12.50m
+            "adult" => 12.50m,
+            "child" => 8.50m,
+            "senior" => 10.50m,
+            "student" => 9.50m,
+            _ => 12.50m
         };
+
+        if (presentation.IsSecretMovie)
+        {
+            price -= 2.50m;
+        }
+
+        return price;
     }
 
     private decimal CalculateTotalPrice()

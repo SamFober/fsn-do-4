@@ -25,7 +25,8 @@ namespace WebApi.Models
         public string HallName { get; set; } = "";
         
         public int AvailableSeats { get; set; }
-        
+
+        public bool IsSecretMovie { get; set; } = false;
         public required Movie Movie { get; set; }
         public required Hall Hall { get; set; }
         public ICollection<Ticket> Tickets { get; set; }

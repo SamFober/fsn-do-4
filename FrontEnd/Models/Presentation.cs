@@ -21,6 +21,7 @@ namespace FrontEnd.Models
         public string HallName { get; set; }
         public string Format { get; set; }
         public int AvailableSeats { get; set; }
+        public bool IsSecretMovie { get; set; }
         public List<Row> Rows { get; set; } = new List<Row>();
         public ICollection<Ticket> Tickets { get; set; }
     }
