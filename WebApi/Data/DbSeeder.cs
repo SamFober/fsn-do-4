@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using WebApi.Models;
+using static WebApi.Models.TicketStatus;
 
 namespace WebApi.Data
 {
@@ -7,6 +8,9 @@ namespace WebApi.Data
     {
         public static async Task Initialize(ApplicationDbContext context)
         {
+            // Update existing presentations' AvailableSeats if needed
+            await UpdatePresentationsAvailableSeats(context);
+            
             // Seed halls
             if (!await context.Halls.AnyAsync())
             {
@@ -36,7 +40,6 @@ namespace WebApi.Data
                                 HallId = hall.Id, // Set HallId directly
                                 RowNumber = row,
                                 SeatNumber = seatNum,
-                                IsAvailable = true,
                                 CreatedAt = DateTime.UtcNow
                             });
                         }
@@ -243,6 +246,9 @@ namespace WebApi.Data
                                     // Set price between $10.99 and $18.99
                                     decimal price = 10.99m + (decimal)random.Next(0, 9);
                                     
+                                    // Calculate available seats as total hall capacity
+                                    int totalSeats = hall.Rows * hall.SeatsPerRow;
+
                                     // Create the presentation
                                     presentations.Add(new Presentation
                                     {
@@ -255,7 +261,9 @@ namespace WebApi.Data
                                         // Assign a random format from this movie's formats
                                         Format = movie.Formats != null && movie.Formats.Any() 
                                             ? movie.Formats.ElementAt(random.Next(movie.Formats.Count)).Name ?? "Standard"
-                                            : "Standard"
+                                            : "Standard",
+                                        // Set available seats to the total capacity of the hall
+                                        AvailableSeats = totalSeats
                                     });
                                 }
                             }
@@ -266,6 +274,95 @@ namespace WebApi.Data
                     }
                 }
             }
+
+            // Initialize SeatPresentation records for all presentations
+            await InitializeSeatPresentations(context);
+        }
+        
+        private static async Task UpdatePresentationsAvailableSeats(ApplicationDbContext context)
+        {
+            // Get presentations with AvailableSeats = 0
+            var presentationsToUpdate = await context.Presentations
+                .Include(p => p.Hall)
+                .Where(p => p.AvailableSeats == 0)
+                .ToListAsync();
+                
+            if (presentationsToUpdate.Any())
+            {
+                foreach (var presentation in presentationsToUpdate)
+                {
+                    if (presentation.Hall != null)
+                    {
+                        // Calculate total seats in the hall
+                        int totalSeats = presentation.Hall.Rows * presentation.Hall.SeatsPerRow;
+                        
+                        // Count booked tickets
+                        int bookedSeats = await context.Tickets
+                            .CountAsync(t => t.PresentationId == presentation.Id && t.Status != TicketStatus.Cancelled);
+                            
+                        // Set available seats
+                        presentation.AvailableSeats = totalSeats - bookedSeats;
+                    }
+                }
+                
+                await context.SaveChangesAsync();
+                Console.WriteLine($"Updated AvailableSeats for {presentationsToUpdate.Count} presentations");
+            }
+        }
+
+        private static async Task InitializeSeatPresentations(ApplicationDbContext context)
+        {
+            // Get all presentations that don't have any SeatPresentation records
+            var presentationsWithoutSeatPresentations = await context.Presentations
+                .Include(p => p.Hall)
+                .Where(p => !context.SeatPresentations.Any(sp => sp.PresentationId == p.Id))
+                .ToListAsync();
+            
+            if (!presentationsWithoutSeatPresentations.Any())
+            {
+                return; // No presentations need initialization
+            }
+            
+            Console.WriteLine($"Initializing SeatPresentation records for {presentationsWithoutSeatPresentations.Count} presentations...");
+            
+            foreach (var presentation in presentationsWithoutSeatPresentations)
+            {
+                // Get all seats for the presentation's hall
+                var seats = await context.Seats
+                    .Where(s => s.HallId == presentation.HallId)
+                    .ToListAsync();
+                
+                // Get existing tickets for this presentation
+                var bookedSeatIds = await context.Tickets
+                    .Where(t => t.PresentationId == presentation.Id && t.Status != TicketStatus.Cancelled)
+                    .Select(t => t.SeatId)
+                    .ToListAsync();
+                
+                // Create SeatPresentation records
+                var seatPresentations = new List<SeatPresentation>();
+                foreach (var seat in seats)
+                {
+                    seatPresentations.Add(new SeatPresentation
+                    {
+                        SeatId = seat.Id,
+                        PresentationId = presentation.Id,
+                        IsAvailable = !bookedSeatIds.Contains(seat.Id), // Only seats without tickets are available
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    });
+                }
+                
+                // Add the SeatPresentation records to the context
+                await context.SeatPresentations.AddRangeAsync(seatPresentations);
+                
+                // Update the presentation's AvailableSeats count
+                presentation.AvailableSeats = seats.Count - bookedSeatIds.Count;
+                
+                Console.WriteLine($"Initialized {seatPresentations.Count} SeatPresentation records for presentation {presentation.Id}");
+            }
+            
+            // Save all changes to the database
+            await context.SaveChangesAsync();
         }
     }
 }
