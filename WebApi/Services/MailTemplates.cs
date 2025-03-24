@@ -8,12 +8,17 @@ namespace WebApi.Services
         {
             string templatePath = @"Resources/EmailTemplates/confirm_order_email_template.html";
 
-            string emailTemplate = File.Exists(templatePath) ?
-                File.ReadAllText(templatePath) : "Hi {firstName}, here are your tickets!";
+            string emailTemplate = LoadTemplate(templatePath, "Hi {firstName}, here are your tickets!");
 
             emailTemplate = emailTemplate.Replace("{firstName}", "");
 
             return emailTemplate;
+        }
+
+        private static string LoadTemplate(string templatePath, string fallBack)
+        {
+            return File.Exists(templatePath) ?
+                File.ReadAllText(templatePath) : fallBack;
         }
     }
 }
