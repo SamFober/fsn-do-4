@@ -1,6 +1,4 @@
 ﻿@inherits LayoutComponentBase
-@using FrontEnd.Services
-@inject IMobileMenuService MobileMenuService
 @inject NavigationManager NavigationManager
 
 
@@ -23,12 +21,3 @@
         width: 100%;
     }
 </style>
-
-@code {
-    [JSInvokable]
-    
-    public Task CloseMobileMenu()
-    {
-        return MobileMenuService.CloseMobileMenu();
-    }
-}
