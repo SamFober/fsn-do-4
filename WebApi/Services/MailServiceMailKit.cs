@@ -23,7 +23,16 @@ namespace WebApi.Services
             }
         }
 
-        public async Task<bool> SendEmail(string recipientName, string recipientAddress, string subject, string body, List<object>? attachments)
+        /// <summary>
+        /// Sends an email to the given address
+        /// </summary>
+        /// <param name="recipientName">The name of the recipient</param>
+        /// <param name="recipientAddress">The email address of the recipient</param>
+        /// <param name="subject">The subject of the email</param>
+        /// <param name="body">The (HTML) body of the email</param>
+        /// <param name="attachments" cref="MimePart">Attachmants for the email. These need to be in the form of a MimeKit.MimePart object</param>
+        /// <returns>A boolean indicating whether the email is succesfully sent or not.</returns>
+        public bool SendEmail(string recipientName, string recipientAddress, string subject, string body, List<object>? attachments)
         {
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress("Cinemagia", "cinemagia@example.com"));
