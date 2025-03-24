@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using MimeKit;
 using WebApi.Exceptions;
 using WebApi.Interfaces.Repositories;
 using WebApi.Interfaces.Services;
@@ -932,6 +933,35 @@ namespace WebApi.Services
             {
                 _logger.LogError(ex, "Error cancelling order {OrderToken}", orderToken);
                 throw;
+            }
+        }
+
+        public async Task FinalizeOrder(Guid orderToken)
+        {
+            var order = await _repository.FindTicketOrderByOrderToken(orderToken);
+
+            if (order != null)
+            {
+                var tickets = await _repository.FindTicketsByOrderId(order.Id);
+                var customerName = tickets.First().CustomerName;
+                var ticketBytes = await GetTicketsByOrderToken(orderToken);
+
+                var attachments = new List<object>()
+            {
+                new MimePart("application", "pdf")
+                {
+                    Content = new MimeContent(new MemoryStream(ticketBytes)),
+                    ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+                    ContentTransferEncoding = ContentEncoding.Base64,
+                    FileName = $"{orderToken}.pdf"
+                }
+            };
+
+                _mailService.SendEmail(customerName, "j.doe@example.com", "Your tickets are here!", MailTemplates.OrderCompleteMailTemplate(customerName, order.Presentation, tickets.Count), attachments);
+
+            } else
+            {
+                throw new OrderNotFoundException("No order found with the given order token");
             }
         }
 

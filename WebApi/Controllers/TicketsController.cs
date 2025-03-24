@@ -585,6 +585,35 @@ namespace WebApi.Controllers
         }
 
         /// <summary>
+        /// Generates the comfirmation email and sends it to the user
+        /// </summary>
+        /// <param name="orderToken">The unique identifier for the order</param>
+        /// <returns>A status code</returns>
+        /// <response code="200">Order finalized</response>
+        /// <response code="404">If the order is not found or already expired</response>
+        [HttpGet("{orderToken}/finalize")]
+        [ProducesResponseType(typeof(IActionResult), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> FinalizeOrder(Guid orderToken)
+        {
+            try
+            {
+                await _ticketService.FinalizeOrder(orderToken);
+                return Ok();
+            } 
+            catch(OrderNotFoundException ex)
+            {
+                _logger.LogWarning(ex, "Order not found");
+                return NotFound("Order not found");
+            }
+            catch(Exception ex)
+            {
+                _logger.LogError(ex, "Failed to finalize order");
+                return StatusCode(500, "An error occurred while finalizing the order");
+            }
+        }
+
+        /// <summary>
         /// Gets the ordered tickets in the form of a PDF file.
         /// </summary>
         /// <param name="orderToken">The unique identifier for the order</param>

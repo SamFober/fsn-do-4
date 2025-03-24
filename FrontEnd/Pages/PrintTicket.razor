@@ -960,7 +960,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var response = await httpClient.GetAsync($"http://localhost:5213/api/Tickets/{orderToken}/download");
+        var response = await httpClient.GetAsync($"http://localhost:5213/api/Tickets/{orderToken}/finalize");
 
             if (response.IsSuccessStatusCode)
             {
@@ -968,7 +968,7 @@
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                message = "Error: No tickets found.";
+                message = "Error: Order not found";
                 //alertColor = "color: red;";
             }
             else

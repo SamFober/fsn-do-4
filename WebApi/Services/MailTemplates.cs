@@ -9,7 +9,7 @@ namespace WebApi.Services
 
             string emailTemplate = LoadTemplate("confirm_order_email_template.html", "Hi {firstName}, here are your tickets!");
 
-            emailTemplate = emailTemplate.Replace("{firstName}", customerName);
+            emailTemplate = emailTemplate.Replace("{firstName}", customerName.ToUpper());
             emailTemplate = emailTemplate.Replace("{movieName}", presentation.Movie.Title);
             emailTemplate = emailTemplate.Replace("{presentationDate}", presentation.StartTime.ToString());
             emailTemplate = emailTemplate.Replace("{ticketCount}", ticketCount.ToString());
