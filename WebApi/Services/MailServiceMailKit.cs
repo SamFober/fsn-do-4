@@ -9,18 +9,24 @@ namespace WebApi.Services
     {
         private readonly SmtpClient client;
         private readonly ILogger<MailServiceMailKit> logger;
+
         private readonly string clientHost;
         private readonly int clientPort;
+        private readonly string senderName;
+        private readonly string senderAddress;
 
         public MailServiceMailKit(ILogger<MailServiceMailKit> logger, IConfiguration config)
         {
-            this.client = new SmtpClient();
+            client = new SmtpClient();
             this.logger = logger;
-            this.clientHost = config["MailKitConfig:Host"] ?? "localhost";
+
+            clientHost = config["MailKitConfig:Host"] ?? "localhost";
             if (!Int32.TryParse(config["MailKitConfig:Port"], out clientPort))
             {
                 clientPort = 1025;
             }
+            senderAddress = config["MailKitConfig:SenderAddress"] ?? "default@example.com";
+            senderName = config["MailKitConfig:SenderName"] ?? "Default Sender";
         }
 
         /// <summary>
@@ -35,7 +41,7 @@ namespace WebApi.Services
         public bool SendEmail(string recipientName, string recipientAddress, string subject, string body, List<object>? attachments)
         {
             var message = new MimeMessage();
-            message.From.Add(new MailboxAddress("Cinemagia", "cinemagia@example.com"));
+            message.From.Add(new MailboxAddress(senderName, senderAddress));
             message.To.Add(new MailboxAddress(recipientName, recipientAddress));
             message.Subject = subject;
 
