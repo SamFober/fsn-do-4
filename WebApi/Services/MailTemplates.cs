@@ -4,12 +4,15 @@ namespace WebApi.Services
 {
     public class MailTemplates
     {
-        public static string OrderCompleteMailTemplate(TicketOrder ticketOrder)
+        public static string OrderCompleteMailTemplate(string customerName, Presentation presentation, int ticketCount)
         {
 
             string emailTemplate = LoadTemplate("confirm_order_email_template.html", "Hi {firstName}, here are your tickets!");
 
-            emailTemplate = emailTemplate.Replace("{firstName}", "");
+            emailTemplate = emailTemplate.Replace("{firstName}", customerName);
+            emailTemplate = emailTemplate.Replace("{movieName}", presentation.Movie.Title);
+            emailTemplate = emailTemplate.Replace("{presentationDate}", presentation.StartTime.ToString());
+            emailTemplate = emailTemplate.Replace("{ticketCount}", ticketCount.ToString());
 
             return emailTemplate;
         }

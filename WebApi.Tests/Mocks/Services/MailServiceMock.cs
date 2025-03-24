@@ -9,14 +9,9 @@ namespace WebApi.Tests.Mocks.Services
 {
     class MailServiceMock : IMailService
     {
-        public async Task<bool> SendEmail(string recipient, string subject, string body, List<object>? attachments)
+        public bool SendEmail(string recipientName, string recipientAddress, string subject, string body, List<object>? attachments)
         {
             return true;
-        }
-
-        public async Task<string> TicketOrderCompleteTemplate(string firstName)
-        {
-            return "";
         }
     }
 }
