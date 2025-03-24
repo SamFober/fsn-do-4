@@ -15,6 +15,12 @@ namespace WebApi.Services
             return emailTemplate;
         }
 
+        /// <summary>
+        /// Loads an email HTML template file
+        /// </summary>
+        /// <param name="templatePath">The path to the HTML file</param>
+        /// <param name="fallBack">Fallback (HTML) string when failing to load the template.</param>
+        /// <returns>The HTML template file as a string</returns>
         private static string LoadTemplate(string templatePath, string fallBack)
         {
             return File.Exists(templatePath) ?
