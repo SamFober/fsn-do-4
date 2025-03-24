@@ -2,7 +2,6 @@
 {
     public interface IMailService
     {
-        Task<bool> SendEmail(string recipient, string subject, string body, List<object>? attachments);
-        Task<string> TicketOrderCompleteTemplate(string firstName);
+        Task<bool> SendEmail(string recipientName, string recipientAddress, string subject, string body, List<object>? attachments);
     }
 }
