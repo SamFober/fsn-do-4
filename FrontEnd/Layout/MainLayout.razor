@@ -1,9 +1,8 @@
 ﻿@inherits LayoutComponentBase
+@using FrontEnd.Services
+@inject IMobileMenuService MobileMenuService
 @inject NavigationManager NavigationManager
 
-@{
-    bool isSeatSelector = NavigationManager.Uri.Contains("/seat-selector");
-}
 
 <div class="full-width-page">
     <main class="full-width-main">
@@ -24,3 +23,12 @@
         width: 100%;
     }
 </style>
+
+@code {
+    [JSInvokable]
+    
+    public Task CloseMobileMenu()
+    {
+        return MobileMenuService.CloseMobileMenu();
+    }
+}
