@@ -1,0 +1,457 @@
+﻿@page "/web/film/{Id:int}"
+@using FrontEnd.Models
+@using FrontEnd.Models.Responses
+@using System.Globalization
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<PageTitle>Movie Details</PageTitle>
+
+<link href="css/movie-detail.css" rel="stylesheet" />
+<script src="js/site.js"></script>
+
+<div class="movie-detail-container">
+    @if (Movie != null)
+    {
+        <div class="movie-header" style="background-image: url('@Movie.BackdropUrl')">
+            <div class="gradient-overlay"></div>
+            <div class="movie-details">
+                <div class="nav-buttons">
+                    <a href="/" class="back-home-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M19 12H6M12 5l-7 7 7 7"></path>
+                        </svg>
+                        Home
+                    </a>
+                </div>
+                <h1 class="movie-title">@Movie.Title</h1>
+                <div class="movie-meta">
+                    <span>@Movie.Genre</span>
+                    <span>•</span>
+                    <span>@Movie.DurationMinutes min</span>
+                    <span>•</span>
+                    <span class="age-rating">@Movie.AgeRating</span>
+                </div>
+                <p class="movie-description">@Movie.Description</p>
+
+                <div class="movie-actions">
+                    <div class="btn-trailer" @onclick="OpenTrailer">
+                        <i class="fas fa-play"></i> Watch Trailer
+                    </div>
+                    <button class="btn-book" @onclick="OpenFormatSelectionModal">Book now</button>
+                </div>
+
+                <div class="movie-details format-icons">
+                    @if (Movie.Formats != null && Movie.Formats.Any())
+                    {
+                        @foreach (var format in Movie.Formats)
+                        {
+                            @if (format != null)
+                            {
+                                <div class="format-icon-wrapper" title="@(format.Description ?? "")">
+                                    <span class="format-label">@(format.Name ?? "")</span>
+                                </div>
+                            }
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Show times section -->
+        <div id="showtimes" class="showtimes-section">
+            <h2 class="section-heading">Available Showtimes</h2>
+
+            @if (selectedFormat != "")
+            {
+                <div class="selected-format">
+                    <div class="format-info">
+                        <span>Currently showing</span>
+                        <span class="format-name">@selectedFormat</span>
+                        <span>showtimes</span>
+                    </div>
+                    <div class="format-actions">
+                        <button class="change-format" @onclick="OpenFormatSelectionModal">Change</button>
+                        <button class="clear-format" @onclick="ClearFormatSelection">Show All</button>
+                    </div>
+                </div>
+            }
+
+            <div class="dates-nav">
+                @foreach (var date in NextSevenDays)
+                {
+                    <button class="date-btn @(date.Date == SelectedDate.Date ? "active" : "")" @onclick="() => ChangeDate(date)">
+                        <span class="date-day">@date.ToString("ddd", CultureInfo.InvariantCulture)</span>
+                        <span class="date-num">@date.Day</span>
+                        <span class="date-month">@date.ToString("MMM", CultureInfo.InvariantCulture)</span>
+                    </button>
+                }
+            </div>
+
+            <div class="showtimes-date-heading">
+                <h3>@SelectedDate.ToString("dddd, MMMM d", CultureInfo.InvariantCulture)</h3>
+                <a href="/schedule?movieId=@Id" class="view-all-showtimes">View all showtimes</a>
+            </div>
+
+            <div class="showtimes-list">
+                @if (GroupedPresentations.ContainsKey(SelectedDate) && GroupedPresentations[SelectedDate].Any())
+                {
+                    @foreach (var presentation in GroupedPresentations[SelectedDate])
+                    {
+                        @if (presentation != null &&
+                       (string.IsNullOrEmpty(selectedFormat) ||
+                       (presentation.Format != null && string.Equals(presentation.Format, selectedFormat, StringComparison.OrdinalIgnoreCase))))
+                        {
+                            <div class="showtime-item">
+                                <div class="showtime-format">@(presentation.Format ?? "Standard")</div>
+                                <div class="showtime-content">
+                                    <div class="showtime-time">@presentation.StartTime.ToString("h:mm tt")</div>
+                                    <div class="showtime-duration">@(presentation.EndTime.ToString("h:mm tt")) • @(presentation.HallName ?? "Hall " + presentation.HallId)</div>
+                                </div>
+                                <a href="/seat-selector/@presentation.Id" class="btn-select-seats">SELECT SEATS</a>
+                            </div>
+                        }
+                    }
+                }
+                else
+                {
+                    <div class="no-showings-message">
+                        <p>No showings available for this date or format.</p>
+                        @if (!string.IsNullOrEmpty(selectedFormat))
+                        {
+                            <p>You've selected: <strong>@selectedFormat</strong></p>
+                            <p>Available formats on this date:</p>
+                            <ul style="list-style: none; padding: 0;">
+                                @if (GroupedPresentations.ContainsKey(SelectedDate))
+                                {
+                                    var uniqueFormats = GroupedPresentations[SelectedDate]
+                                    .Where(p => p != null && p.Format != null)
+                                    .Select(p => p.Format)
+                                    .Distinct()
+                                    .ToList();
+
+                                    if (uniqueFormats.Any())
+                                    {
+                                        @foreach (var format in uniqueFormats)
+                                        {
+                                            <li>- @format</li>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <li>No format information found in presentations</li>
+                                    }
+
+                                    <p style="margin-top: 20px;">Debug - All presentations for this date:</p>
+                                    <ul style="font-size: 0.9rem; color: #999;">
+                                        @foreach (var p in GroupedPresentations[SelectedDate])
+                                        {
+                                            <li>
+                                                @p.StartTime.ToString("h:mm tt") -
+                                                Hall: @p.HallName -
+                                                Format: @(string.IsNullOrEmpty(p.Format) ? "NULL" : p.Format)
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                                else
+                                {
+                                    <li>No presentations available on this date</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                }
+            </div>
+
+        </div>
+    }
+    else
+    {
+        <div class="loading-container">
+            <div class="spinner-border" role="status"></div>
+            <p>Loading movie details...</p>
+        </div>
+    }
+
+    <!-- Format Selection Modal -->
+    @if (isFormatModalOpen && Movie != null)
+    {
+        <div class="format-selection-modal">
+            <div class="format-modal-content">
+                <div class="format-modal-header">
+                    <h3>Select Your Experience</h3>
+                    <button class="close-modal" @onclick="CloseFormatSelectionModal">×</button>
+                </div>
+                <div class="format-modal-body">
+                    <p>Choose your preferred viewing experience for @Movie.Title:</p>
+
+                    @if (GroupedPresentations.ContainsKey(SelectedDate))
+                    {
+                        <div style="margin-bottom: 15px; font-size: 0.9rem; color: #a9a9a9;">
+                            Available formats for @SelectedDate.ToString("MMMM d"):
+                            @string.Join(", ", GroupedPresentations[SelectedDate]
+                                     .Where(p => p != null && !string.IsNullOrEmpty(p.Format))
+                                     .Select(p => p.Format)
+                                     .Distinct())
+                        </div>
+                    }
+
+                    <div class="format-options">
+                        @if (Movie.Formats != null && Movie.Formats.Any())
+                        {
+                            <div class="format-option @(string.IsNullOrEmpty(selectedFormat) ? "selected" : "")"
+                                 @onclick='() => SelectFormat("")'>
+                                <div class="format-option-name">All Formats</div>
+                                <div class="format-option-desc">View showtimes for all available formats</div>
+                            </div>
+
+                            @foreach (var format in Movie.Formats)
+                            {
+                                @if (format != null && format.Name != null)
+                                {
+                                    <div class="format-option @(selectedFormat == format.Name ? "selected" : "")"
+                                         @onclick='() => SelectFormat(format.Name)'>
+                                        <div class="format-option-name">@format.Name</div>
+                                        <div class="format-option-desc">@(format.Description ?? "No description available")</div>
+                                    </div>
+                                }
+                            }
+                        }
+                        else
+                        {
+                            <div class="format-option selected" @onclick='() => SelectFormat("Standard")'>
+                                <div class="format-option-name">Standard</div>
+                                <div class="format-option-desc">Standard viewing experience</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="format-modal-footer">
+                    <button class="modal-btn cancel" @onclick="CloseFormatSelectionModal">Cancel</button>
+                    <button class="modal-btn confirm" @onclick="ConfirmFormatSelection">Continue</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Movie Movie { get; set; }
+    private DateTime SelectedDate { get; set; } = DateTime.Today;
+    private Dictionary<DateTime, List<Presentation>> GroupedPresentations { get; set; } = new();
+    private List<DateTime> NextSevenDays { get; set; } = new();
+    private string RawApiResponse { get; set; } = "Not loaded yet";
+    private string DirectPresentationsResponse { get; set; } = "";
+    private bool isFormatModalOpen = false;
+    private string selectedFormat = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Initialize NextSevenDays
+        NextSevenDays = Enumerable.Range(0, 7)
+            .Select(i => DateTime.Today.AddDays(i))
+            .ToList();
+
+        try
+        {
+            // Get movie details from API
+            var response = await Http.GetAsync($"api/movies/{Id}");
+            RawApiResponse = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Movie = await response.Content.ReadFromJsonAsync<Movie>();
+
+                if (Movie?.Presentations != null)
+                {
+                    // Temporary fix: If presentations don't have format data, assign random formats
+                    // from the movie's available formats
+                    if (Movie.Formats != null && Movie.Formats.Any())
+                    {
+                        var formatNames = Movie.Formats
+                            .Where(f => f != null && !string.IsNullOrEmpty(f.Name))
+                            .Select(f => f.Name)
+                            .ToList();
+
+                        if (formatNames.Any())
+                        {
+                            var random = new Random(DateTime.Now.Millisecond);
+                            foreach (var presentation in Movie.Presentations)
+                            {
+                                if (presentation != null && string.IsNullOrEmpty(presentation.Format))
+                                {
+                                    // Assign a random format
+                                    presentation.Format = formatNames[random.Next(formatNames.Count)];
+                                }
+
+                                // Fix hall names if they're missing
+                                if (presentation != null && string.IsNullOrEmpty(presentation.HallName))
+                                {
+                                    presentation.HallName = $"Hall {presentation.HallId}";
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Even if no formats available, still fix hall names
+                        foreach (var presentation in Movie.Presentations)
+                        {
+                            if (presentation != null && string.IsNullOrEmpty(presentation.HallName))
+                            {
+                                presentation.HallName = $"Hall {presentation.HallId}";
+                            }
+                        }
+                    }
+
+                    // Group presentations by date
+                    GroupedPresentations = Movie.Presentations
+                        .GroupBy(p => p.StartTime.Date)
+                        .ToDictionary(g => g.Key, g => g.ToList());
+
+                    // Set selected date to the first date with presentations, or today if none
+                    if (GroupedPresentations.Count > 0)
+                    {
+                        var dates = GroupedPresentations.Keys.OrderBy(d => d).ToList();
+                        SelectedDate = dates.FirstOrDefault(d => d >= DateTime.Today.Date, DateTime.Today.Date);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading movie: {ex.Message}");
+        }
+    }
+
+    private void ChangeDate(DateTime date)
+    {
+        SelectedDate = date;
+    }
+
+    private async Task OpenTrailer()
+    {
+        if (Movie != null && !string.IsNullOrEmpty(Movie.TrailerUrl))
+        {
+            await JS.InvokeVoidAsync("open", Movie.TrailerUrl, "_blank");
+        }
+        else if (Movie != null)
+        {
+            // If trailer URL is missing, provide a fallback behavior
+            // For example, show a notification or search for the trailer on YouTube
+            string searchQuery = Uri.EscapeDataString($"{Movie.Title} official trailer");
+            await JS.InvokeVoidAsync("open", $"https://www.youtube.com/results?search_query={searchQuery}", "_blank");
+        }
+    }
+
+    private void OpenFormatSelectionModal()
+    {
+        // Find which formats are actually available for the selected date
+        var availableFormats = new List<string>();
+        if (GroupedPresentations.ContainsKey(SelectedDate))
+        {
+            availableFormats = GroupedPresentations[SelectedDate]
+                .Select(p => p.Format)
+                .Where(f => !string.IsNullOrEmpty(f))
+                .Distinct()
+                .ToList();
+        }
+
+        // If no format is already selected, try to find a recommended one
+        if (string.IsNullOrEmpty(selectedFormat))
+        {
+            // Try to match a movie format with an available format
+            if (Movie?.Formats != null && Movie.Formats.Any() && availableFormats.Any())
+            {
+                // Try to find a format that matches what's actually in the presentations
+                foreach (var format in Movie.Formats)
+                {
+                    if (format?.Name != null && availableFormats.Any(f =>
+                        f != null && f.Equals(format.Name, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        // Use the actual format name from the presentations to ensure an exact match
+                        var matchingFormat = availableFormats.FirstOrDefault(f =>
+                            f != null && f.Equals(format.Name, StringComparison.OrdinalIgnoreCase));
+
+                        // Only set selectedFormat if we found a matching format
+                        if (!string.IsNullOrEmpty(matchingFormat))
+                        {
+                            selectedFormat = matchingFormat;
+                            break;
+                        }
+                    }
+                }
+
+                // If no match found, use the first available format
+                if (string.IsNullOrEmpty(selectedFormat) && availableFormats.Any())
+                {
+                    selectedFormat = availableFormats.First();
+                }
+                // If still no match, use the first format from the movie
+                else if (string.IsNullOrEmpty(selectedFormat) && Movie.Formats.Any(f => f?.Name != null))
+                {
+                    selectedFormat = Movie.Formats.First(f => f?.Name != null).Name;
+                }
+            }
+            else
+            {
+                selectedFormat = "Standard";
+            }
+        }
+
+        isFormatModalOpen = true;
+    }
+
+    private void CloseFormatSelectionModal()
+    {
+        isFormatModalOpen = false;
+    }
+
+    private void SelectFormat(string formatName)
+    {
+        selectedFormat = formatName;
+    }
+
+    private void ClearFormatSelection()
+    {
+        selectedFormat = "";
+        StateHasChanged();
+    }
+
+    private async Task ConfirmFormatSelection()
+    {
+        isFormatModalOpen = false;
+
+        // Try multiple approaches to scroll to the element
+        try
+        {
+            // Try using our global cinemaFunctions object first
+            await JS.InvokeVoidAsync("cinemaFunctions.scrollToElement", "showtimes");
+        }
+        catch
+        {
+            try
+            {
+                // Next try direct window function
+                await JS.InvokeVoidAsync("scrollToElement", "showtimes");
+            }
+            catch
+            {
+                // Final fallback to direct JavaScript
+                await JS.InvokeVoidAsync("eval", @"
+                    const element = document.getElementById('showtimes');
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                ");
+            }
+        }
+
+        // The page will now automatically filter showtimes by the selected format
+        StateHasChanged();
+    }
+}

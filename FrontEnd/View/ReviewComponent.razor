@@ -1,0 +1,32 @@
+﻿@page "/review"
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+<div class="rating">
+    <span class="fa fa-star" data-value="1"></span>
+    <span class="fa fa-star" data-value="2"></span>
+    <span class="fa fa-star" data-value="3"></span>
+    <span class="fa fa-star" data-value="4"></span>
+    <span class="fa fa-star" data-value="5"></span>
+</div>
+
+<style>
+    .rating {
+        display: flex;
+        flex-direction: row-reverse; /* Makes ~ work */
+        justify-content: start;
+        font-size: 2rem;
+        cursor: pointer;
+    }
+
+    .fa-star {
+        color: lightgray;
+        transition: color 0.2s;
+    }
+
+        /* Stars and all previous fill by hover */
+        .fa-star:hover,
+        .fa-star:hover ~ .fa-star {
+            color: orange;
+        }
+</style>
