@@ -34,6 +34,7 @@ services:
         max-file: "3"
 
   # Backend Web API
+  # Swagger UI available at: http://localhost:5001/swagger
   webapi:
     build:
       context: ./WebApi
