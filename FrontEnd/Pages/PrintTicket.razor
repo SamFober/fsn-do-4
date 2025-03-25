@@ -960,7 +960,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var response = await httpClient.GetAsync($"http://localhost:5213/api/Tickets/{orderToken}/finalize");
+        var response = await httpClient.GetAsync($"api/Tickets/{orderToken}/finalize");
 
             if (response.IsSuccessStatusCode)
             {
@@ -980,6 +980,6 @@
 
     private async Task PrintTickets()
     {
-        await JSRuntime.InvokeVoidAsync("openPrintDialog", $"http://localhost:5213/api/Tickets/{orderToken}/download");
+        await JSRuntime.InvokeVoidAsync("openPrintDialog", $"api/Tickets/{orderToken}/download");
     }
 }

@@ -88,7 +88,6 @@ using (var scope = app.Services.CreateScope())
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    Process.Start("mailpit.exe");
     app.UseSwagger();
     app.UseSwaggerUI();
 }

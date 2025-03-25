@@ -14,6 +14,7 @@ namespace WebApi.Services
         private readonly int clientPort;
         private readonly string senderName;
         private readonly string senderAddress;
+        private readonly string baseUrl; // Base URL for application links in emails
 
         public MailServiceMailKit(ILogger<MailServiceMailKit> logger, IConfiguration config)
         {
@@ -27,6 +28,19 @@ namespace WebApi.Services
             }
             senderAddress = config["MailKitConfig:SenderAddress"] ?? "default@example.com";
             senderName = config["MailKitConfig:SenderName"] ?? "Default Sender";
+            
+            // Get the base URL from configuration, or use a default
+            // This should match the external URL users will access the app from
+            baseUrl = config["AppConfig:BaseUrl"] ?? "http://localhost:5002"; 
+        }
+
+        // Helper method to replace placeholders in templates
+        private string PrepareTemplate(string template)
+        {
+            if (string.IsNullOrEmpty(template))
+                return template;
+                
+            return template.Replace("{BaseUrl}", baseUrl);
         }
 
         /// <summary>
@@ -47,7 +61,8 @@ namespace WebApi.Services
 
             var bodyBuilder = new BodyBuilder();
 
-            bodyBuilder.HtmlBody = body;
+            // Replace placeholders in the HTML body
+            bodyBuilder.HtmlBody = PrepareTemplate(body);
 
             if (attachments != null && attachments.Count > 0)
             {

@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  # Frontend Blazor WebAssembly
+  frontend:
+    build:
+      context: ./FrontEnd
+      dockerfile: Dockerfile
+    container_name: cinemagia-frontend
+    ports:
+      - "5002:80"
+    volumes:
+      - ./FrontEnd:/app
+      - frontend_obj:/app/obj
+      - frontend_bin:/app/bin
+    depends_on:
+      - webapi
+    networks:
+      - cinemagia-network
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - WebApiBaseUrl=http://webapi:5001
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Backend Web API
+  webapi:
+    build:
+      context: ./WebApi
+      dockerfile: Dockerfile
+    container_name: cinemagia-webapi
+    ports:
+      - "5001:5001"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5001
+      - ConnectionStrings__DefaultConnection=Server=db;Port=3306;Database=fsn-do-4;User=root;Password=password;
+      - MailKitConfig__Host=mailpit
+      - MailKitConfig__Port=1025
+      - MailKitConfig__SenderName=Cinemagia
+      - MailKitConfig__SenderAddress=cinemagia@example.com
+      - AppConfig__BaseUrl=http://localhost:5002
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    networks:
+      - cinemagia-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: cinemagia-mysql
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: "password"
+      MYSQL_DATABASE: fsn-do-4
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - cinemagia-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-ppassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Mailpit voor lokale e-mails
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: cinemagia-mailpit
+    ports:
+      - "1025:1025"  # SMTP-poort
+      - "8025:8025"  # Web UI
+    networks:
+      - cinemagia-network
+
+networks:
+  cinemagia-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  frontend_obj:
+  frontend_bin:
+  webapi_obj:
+  webapi_bin:
