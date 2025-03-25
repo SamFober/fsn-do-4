@@ -5,6 +5,7 @@ using System.Reflection;
 using WebApi.Interfaces.Services;
 using QuestPDF.Infrastructure;
 using WebApi.Services;
+using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -87,6 +88,7 @@ using (var scope = app.Services.CreateScope())
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
+    Process.Start("mailpit.exe");
     app.UseSwagger();
     app.UseSwaggerUI();
 }

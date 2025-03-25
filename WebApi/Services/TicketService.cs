@@ -944,6 +944,7 @@ namespace WebApi.Services
             {
                 var tickets = await _repository.FindTicketsByOrderId(order.Id);
                 var customerName = tickets.First().CustomerName;
+                var customerEmail = tickets.First().CustomerEmail;
                 var ticketBytes = await GetTicketsByOrderToken(orderToken);
 
                 var attachments = new List<object>()
@@ -957,7 +958,7 @@ namespace WebApi.Services
                 }
             };
 
-                _mailService.SendEmail(customerName, "j.doe@example.com", "Your tickets are here!", MailTemplates.OrderCompleteMailTemplate(customerName, order.Presentation, tickets.Count), attachments);
+                _mailService.SendEmail(customerName, customerEmail, "Your tickets are here!", MailTemplates.OrderCompleteMailTemplate(customerName, order.Presentation, tickets.Count), attachments);
 
             } else
             {
