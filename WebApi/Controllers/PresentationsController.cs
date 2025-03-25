@@ -1,10 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using WebApi.Models;
 
 namespace WebApi.Controllers
@@ -247,7 +243,7 @@ namespace WebApi.Controllers
                     .Include(p => p.Movie)
                     .Include(p => p.Hall)
                     .Include(p => p.Tickets.Where(t => t.Status != TicketStatus.Cancelled))
-                    .Where(p => p.StartTime.Date >= actualStartDate.Date && 
+                    .Where(p => p.StartTime.Date >= actualStartDate.Date &&
                                 p.StartTime.Date <= actualEndDate.Date);
 
                 // Apply optional filters
@@ -309,29 +305,29 @@ namespace WebApi.Controllers
                                 Duration = movieGroup.First().Movie.DurationMinutes,
                                 Formats = movieGroup.Select(p => p.Format).Distinct().ToList(),
                                 PosterUrl = movieGroup.First().Movie.PosterUrl,
-                                Showtimes = movieGroup.Select(p => 
+                                Showtimes = movieGroup.Select(p =>
                                 {
                                     // Calculate total seats and available seats
                                     int totalSeats = p.Hall.Rows * p.Hall.SeatsPerRow;
                                     int availableSeats = p.AvailableSeats;
-                                    
+
                                     // Calculate if it's almost full - less than 15% seats available
                                     bool isAlmostFull = availableSeats <= totalSeats * 0.15 && availableSeats > 0;
                                     bool isSoldOut = availableSeats == 0;
-                                    
+
                                     // Log for debugging
                                     if (isAlmostFull)
                                     {
                                         _logger.LogInformation("Found almost full presentation: ID {PresentationId}, Movie: {Title}, Available: {Available}/{Total} ({Percentage:F1}%)",
                                             p.Id, p.Movie.Title, availableSeats, totalSeats, (double)availableSeats / totalSeats * 100);
                                     }
-                                    
+
                                     if (isSoldOut)
                                     {
                                         _logger.LogInformation("Found sold out presentation: ID {PresentationId}, Movie: {Title}, Available: 0/{Total}",
                                             p.Id, p.Movie.Title, totalSeats);
                                     }
-                                    
+
                                     return new
                                     {
                                         p.Id,
@@ -362,7 +358,7 @@ namespace WebApi.Controllers
                 return StatusCode(500, "An error occurred while retrieving the schedule");
             }
         }
-        
+
         /// <summary>
         /// Get presentations for a specific movie by date range
         /// </summary>

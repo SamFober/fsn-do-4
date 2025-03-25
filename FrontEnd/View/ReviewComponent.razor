@@ -1,32 +1,66 @@
 ﻿@page "/review"
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<link href="css/movie-detail.css" rel="stylesheet" />
+<link href="css/review.css" rel="stylesheet" />
 
-<div class="rating">
-    <span class="fa fa-star" data-value="1"></span>
-    <span class="fa fa-star" data-value="2"></span>
-    <span class="fa fa-star" data-value="3"></span>
-    <span class="fa fa-star" data-value="4"></span>
-    <span class="fa fa-star" data-value="5"></span>
+<h2 class="section-heading">Reviews</h2>
+<!--Form-->
+<div class="formContainer">
+    <div class="row">
+        <div class="col-25">
+            <label for="fname">First Name</label>
+        </div>
+        <div class="col-75">
+            <input type="text" id="fname" name="firstname" placeholder="Your name..">
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-25">
+            <label for="email">Email</label>
+        </div>
+        <div class="col-75">
+            <input type="text" id="email" name="email" placeholder="Your email..">
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-25">
+            <label for="rating">Rating</label>
+        </div>
+        <div class="col-75">
+            <!--Star rating-->
+            <div id="divRating" class="rating">
+                <span id="spanRatingExcellent" title="Excellent">☆</span>
+                <span id="spanRatingGood" title="Good">☆</span>
+                <span id="spanRatingFair" title="Fair">☆</span>
+                <span id="spanRatingPoor" title="Poor">☆</span>
+                <span id="spanRatingAwful" title="Awful">☆</span>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-25">
+            <label for="review">Review</label>
+        </div>
+        <div class="col-75">
+            <textarea id="review" name="review" placeholder="Write something.." style="height:200px"></textarea>
+        </div>
+    </div>
+    <div class="row">
+        <input type="submit" value="Submit">
+    </div>
 </div>
 
-<style>
-    .rating {
-        display: flex;
-        flex-direction: row-reverse; /* Makes ~ work */
-        justify-content: start;
-        font-size: 2rem;
-        cursor: pointer;
-    }
+<script>
+    document.getElementById('divRating').addEventListener('click', function(event) {
+        if (event.target.tagName.toLowerCase() != 'span') return;
 
-    .fa-star {
-        color: lightgray;
-        transition: color 0.2s;
-    }
-
-        /* Stars and all previous fill by hover */
-        .fa-star:hover,
-        .fa-star:hover ~ .fa-star {
-            color: orange;
+        if (event.target.classList.contains('rated')) {
+            event.target.classList.remove('rated');
+        } else {
+            Array.prototype.forEach.call(document.getElementsByClassName('rated'), function(el) {
+                el.classList.remove('rated');
+            });
+            event.target.classList.add('rated');
         }
-</style>
+    });
+</script>

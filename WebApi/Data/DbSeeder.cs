@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using WebApi.Models;
-using static WebApi.Models.TicketStatus;
 
 namespace WebApi.Data
 {
@@ -10,7 +9,7 @@ namespace WebApi.Data
         {
             // Update existing presentations' AvailableSeats if needed
             await UpdatePresentationsAvailableSeats(context);
-            
+
             // Seed halls
             if (!await context.Halls.AnyAsync())
             {
@@ -142,27 +141,27 @@ namespace WebApi.Data
 
                 context.Movies.AddRange(movies);
                 await context.SaveChangesAsync();
-                
+
                 // Add movie formats
                 if (!await context.MovieFormats.AnyAsync())
                 {
                     var formats = new List<MovieFormat>();
-                    
+
                     // Common formats for all movies
                     string[] formatNames = { "2D", "3D", "IMAX", "4DX", "Dolby Atmos", "ScreenX" };
-                    string[] formatDescriptions = { 
-                        "Standard 2D format", 
-                        "Immersive 3D experience", 
+                    string[] formatDescriptions = {
+                        "Standard 2D format",
+                        "Immersive 3D experience",
                         "IMAX premium large-format experience",
                         "Full sensory immersion with motion and environmental effects",
                         "Enhanced audio experience",
                         "270-degree panoramic movie viewing experience"
                     };
                     string[] formatIcons = { "2d", "3d", "imax", "4dx", "dolby", "screenx" };
-                    
+
                     // Assign 2-4 random formats to each movie
                     Random random = new Random(42); // Fixed seed for consistent results
-                    
+
                     foreach (var movie in movies)
                     {
                         // Each movie gets at least 2D
@@ -174,16 +173,16 @@ namespace WebApi.Data
                             Icon = formatIcons[0],
                             CreatedAt = DateTime.UtcNow
                         });
-                        
+
                         // Add 1-3 more random formats
                         int additionalFormats = random.Next(1, 4);
                         var availableFormats = Enumerable.Range(1, formatNames.Length - 1).ToList(); // Skip 2D which is already added
-                        
+
                         for (int i = 0; i < additionalFormats && availableFormats.Count > 0; i++)
                         {
                             int formatIndex = availableFormats[random.Next(availableFormats.Count)];
                             availableFormats.Remove(formatIndex);
-                            
+
                             formats.Add(new MovieFormat
                             {
                                 MovieId = movie.Id,
@@ -194,7 +193,7 @@ namespace WebApi.Data
                             });
                         }
                     }
-                    
+
                     context.MovieFormats.AddRange(formats);
                     await context.SaveChangesAsync();
                 }
@@ -209,17 +208,17 @@ namespace WebApi.Data
                     {
                         var presentations = new List<Presentation>();
                         var random = new Random(42); // Fixed seed for consistent results
-                        
+
                         // Create presentations for the next 14 days
                         for (int day = 0; day < 14; day++)
                         {
                             DateTime currentDate = DateTime.Today.AddDays(day);
-                            
+
                             // Each hall gets 3-5 showings per day
                             foreach (var hall in halls)
                             {
                                 int showingsCount = random.Next(3, 6);
-                                
+
                                 // Starting times between 10:00 and 22:00
                                 var startTimes = new List<DateTime>();
                                 for (int i = 0; i < showingsCount; i++)
@@ -227,25 +226,25 @@ namespace WebApi.Data
                                     // Start times at 10:00, 13:00, 16:00, 19:00, 22:00
                                     int hour = 10 + (i * 3);
                                     if (hour > 22) continue;
-                                    
+
                                     // Add some randomness to the minutes
                                     int minutes = random.Next(0, 4) * 15; // 0, 15, 30, or 45 minutes
-                                    
+
                                     startTimes.Add(currentDate.AddHours(hour).AddMinutes(minutes));
                                 }
-                                
+
                                 // Assign movies to start times
                                 foreach (var startTime in startTimes)
                                 {
                                     // Randomly select a movie
                                     var movie = existingMovies[random.Next(existingMovies.Count)];
-                                    
+
                                     // Calculate end time based on movie duration
                                     var endTime = startTime.AddMinutes(movie.DurationMinutes);
-                                    
+
                                     // Set price between $10.99 and $18.99
                                     decimal price = 10.99m + (decimal)random.Next(0, 9);
-                                    
+
                                     // Calculate available seats as total hall capacity
                                     int totalSeats = hall.Rows * hall.SeatsPerRow;
 
@@ -259,7 +258,7 @@ namespace WebApi.Data
                                         Price = price,
                                         HallName = hall.Name,
                                         // Assign a random format from this movie's formats
-                                        Format = movie.Formats != null && movie.Formats.Any() 
+                                        Format = movie.Formats != null && movie.Formats.Any()
                                             ? movie.Formats.ElementAt(random.Next(movie.Formats.Count)).Name ?? "Standard"
                                             : "Standard",
                                         // Set available seats to the total capacity of the hall
@@ -268,7 +267,7 @@ namespace WebApi.Data
                                 }
                             }
                         }
-                        
+
                         context.Presentations.AddRange(presentations);
                         await context.SaveChangesAsync();
                     }
@@ -278,7 +277,7 @@ namespace WebApi.Data
             // Initialize SeatPresentation records for all presentations
             await InitializeSeatPresentations(context);
         }
-        
+
         private static async Task UpdatePresentationsAvailableSeats(ApplicationDbContext context)
         {
             // Get presentations with AvailableSeats = 0
@@ -286,7 +285,7 @@ namespace WebApi.Data
                 .Include(p => p.Hall)
                 .Where(p => p.AvailableSeats == 0)
                 .ToListAsync();
-                
+
             if (presentationsToUpdate.Any())
             {
                 foreach (var presentation in presentationsToUpdate)
@@ -295,16 +294,16 @@ namespace WebApi.Data
                     {
                         // Calculate total seats in the hall
                         int totalSeats = presentation.Hall.Rows * presentation.Hall.SeatsPerRow;
-                        
+
                         // Count booked tickets
                         int bookedSeats = await context.Tickets
                             .CountAsync(t => t.PresentationId == presentation.Id && t.Status != TicketStatus.Cancelled);
-                            
+
                         // Set available seats
                         presentation.AvailableSeats = totalSeats - bookedSeats;
                     }
                 }
-                
+
                 await context.SaveChangesAsync();
                 Console.WriteLine($"Updated AvailableSeats for {presentationsToUpdate.Count} presentations");
             }
@@ -317,27 +316,27 @@ namespace WebApi.Data
                 .Include(p => p.Hall)
                 .Where(p => !context.SeatPresentations.Any(sp => sp.PresentationId == p.Id))
                 .ToListAsync();
-            
+
             if (!presentationsWithoutSeatPresentations.Any())
             {
                 return; // No presentations need initialization
             }
-            
+
             Console.WriteLine($"Initializing SeatPresentation records for {presentationsWithoutSeatPresentations.Count} presentations...");
-            
+
             foreach (var presentation in presentationsWithoutSeatPresentations)
             {
                 // Get all seats for the presentation's hall
                 var seats = await context.Seats
                     .Where(s => s.HallId == presentation.HallId)
                     .ToListAsync();
-                
+
                 // Get existing tickets for this presentation
                 var bookedSeatIds = await context.Tickets
                     .Where(t => t.PresentationId == presentation.Id && t.Status != TicketStatus.Cancelled)
                     .Select(t => t.SeatId)
                     .ToListAsync();
-                
+
                 // Create SeatPresentation records
                 var seatPresentations = new List<SeatPresentation>();
                 foreach (var seat in seats)
@@ -351,16 +350,16 @@ namespace WebApi.Data
                         UpdatedAt = DateTime.UtcNow
                     });
                 }
-                
+
                 // Add the SeatPresentation records to the context
                 await context.SeatPresentations.AddRangeAsync(seatPresentations);
-                
+
                 // Update the presentation's AvailableSeats count
                 presentation.AvailableSeats = seats.Count - bookedSeatIds.Count;
-                
+
                 Console.WriteLine($"Initialized {seatPresentations.Count} SeatPresentation records for presentation {presentation.Id}");
             }
-            
+
             // Save all changes to the database
             await context.SaveChangesAsync();
         }

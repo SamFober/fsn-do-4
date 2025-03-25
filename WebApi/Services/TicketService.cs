@@ -96,9 +96,9 @@ namespace WebApi.Services
         {
             try
             {
-                _logger.LogInformation("Starting group order for presentation {PresentationId} with {NumberOfSeats} seats", 
+                _logger.LogInformation("Starting group order for presentation {PresentationId} with {NumberOfSeats} seats",
                     request.PresentationId, request.NumberOfSeats);
-                
+
                 if (request.NumberOfSeats <= 0 || request.NumberOfSeats > 20)
                 {
                     _logger.LogWarning("Invalid number of seats requested: {NumberOfSeats}", request.NumberOfSeats);
@@ -116,7 +116,7 @@ namespace WebApi.Services
                 // Initialize seat presentations if they don't exist yet
                 bool hasExistingRecords = await _context.SeatPresentations
                     .AnyAsync(sp => sp.PresentationId == request.PresentationId);
-                    
+
                 if (!hasExistingRecords)
                 {
                     _logger.LogWarning("No seat presentations found for presentation {PresentationId}, initializing them now", request.PresentationId);
@@ -125,8 +125,8 @@ namespace WebApi.Services
 
                 // Try to find consecutive seats first
                 var consecutiveSeats = await FindConsecutiveSeats(request.PresentationId, request.NumberOfSeats);
-                
-                _logger.LogInformation("Found {SeatCount} consecutive seats for presentation {PresentationId}", 
+
+                _logger.LogInformation("Found {SeatCount} consecutive seats for presentation {PresentationId}",
                     consecutiveSeats.Count, request.PresentationId);
 
                 // Options to offer to the user
@@ -137,50 +137,50 @@ namespace WebApi.Services
                 {
                     // Select best consecutive seats
                     var bestConsecutiveSeats = consecutiveSeats.Take(request.NumberOfSeats).ToList();
-                    
+
                     // Get row grouping information
                     var rows = await _repository.GetSeatsByIds(bestConsecutiveSeats);
                     var rowGroups = rows
                         .GroupBy(s => s.RowNumber)
                         .Select(g => new RowGroup(
-                            g.Key, 
+                            g.Key,
                             g.Select(s => s.Id).ToList(),
-                            $"{g.Count()} seats in row {g.Key}" 
+                            $"{g.Count()} seats in row {g.Key}"
                         ))
                         .ToList();
-                        
+
                     var option = new SeatingOption(
                         "Consecutive seats together",
                         bestConsecutiveSeats,
                         DateTime.UtcNow.AddMinutes(10),
                         rowGroups
                     );
-                    
+
                     options["consecutive"] = option;
                 }
                 else if (consecutiveSeats.Count >= request.NumberOfSeats - 1)
                 {
                     // Offer smaller consecutive group (one less seat)
                     var smallerConsecutiveSeats = consecutiveSeats.Take(request.NumberOfSeats - 1).ToList();
-                    
+
                     // Get row grouping information
                     var rows = await _repository.GetSeatsByIds(smallerConsecutiveSeats);
                     var rowGroups = rows
                         .GroupBy(s => s.RowNumber)
                         .Select(g => new RowGroup(
-                            g.Key, 
+                            g.Key,
                             g.Select(s => s.Id).ToList(),
-                            $"{g.Count()} seats in row {g.Key}" 
+                            $"{g.Count()} seats in row {g.Key}"
                         ))
                         .ToList();
-                        
+
                     var option = new SeatingOption(
                         $"{request.NumberOfSeats - 1} consecutive seats together",
                         smallerConsecutiveSeats,
                         DateTime.UtcNow.AddMinutes(10),
                         rowGroups
                     );
-                    
+
                     options["smaller_consecutive"] = option;
                 }
 
@@ -188,39 +188,39 @@ namespace WebApi.Services
                 if (options.Count == 0)
                 {
                     var splitSeats = await FindBestSplitSeats(request.PresentationId, request.NumberOfSeats);
-                    
+
                     if (splitSeats.Count < request.NumberOfSeats)
                     {
-                        _logger.LogWarning("Not enough seats available for presentation {PresentationId} - requested {RequestedSeats}, found {FoundSeats}", 
+                        _logger.LogWarning("Not enough seats available for presentation {PresentationId} - requested {RequestedSeats}, found {FoundSeats}",
                             request.PresentationId, request.NumberOfSeats, splitSeats.Count);
                         throw new NoSeatsAvailableException("Not enough available seats");
                     }
-                    
+
                     // Get row grouping information
                     var rows = await _repository.GetSeatsByIds(splitSeats);
                     var rowGroups = rows
                         .GroupBy(s => s.RowNumber)
                         .Select(g => new RowGroup(
-                            g.Key, 
+                            g.Key,
                             g.Select(s => s.Id).ToList(),
-                            $"{g.Count()} seats in row {g.Key}" 
+                            $"{g.Count()} seats in row {g.Key}"
                         ))
                         .OrderBy(g => g.RowNumber)
                         .ToList();
-                        
+
                     var option = new SeatingOption(
                         "Best available seats (split across rows)",
                         splitSeats,
                         DateTime.UtcNow.AddMinutes(10),
                         rowGroups
                     );
-                    
+
                     options["split"] = option;
                 }
 
                 if (options.Count == 0)
                 {
-                    _logger.LogWarning("No seating options found for presentation {PresentationId} with {NumberOfSeats} seats", 
+                    _logger.LogWarning("No seating options found for presentation {PresentationId} with {NumberOfSeats} seats",
                         request.PresentationId, request.NumberOfSeats);
                     throw new NoSeatsAvailableException("No available seating options");
                 }
@@ -237,8 +237,8 @@ namespace WebApi.Services
                     RequestedSeats = request.NumberOfSeats,
                     AvailableOptions = options
                 };
-                
-                _logger.LogInformation("Creating initial order {OrderToken} for presentation {PresentationId} with options: {Options}", 
+
+                _logger.LogInformation("Creating initial order {OrderToken} for presentation {PresentationId} with options: {Options}",
                     orderToken, request.PresentationId, string.Join(", ", options.Keys));
 
                 // Save the order
@@ -251,7 +251,7 @@ namespace WebApi.Services
 
                 // Get the seat IDs from the first available option
                 var initialSeatIds = options.Values.FirstOrDefault()?.SeatIds ?? new List<int>();
-                
+
                 if (initialSeatIds.Any())
                 {
                     // Create locks for the selected seats
@@ -264,26 +264,26 @@ namespace WebApi.Services
                         CreatedAt = DateTime.UtcNow,
                         ExpiresAt = DateTime.UtcNow.AddMinutes(10)
                     }).ToList();
-                    
+
                     var addedLocks = await _repository.AddSeatLocks(locks);
-                    
-                    _logger.LogInformation("Created {LockCount} locks for order {OrderToken} presentation {PresentationId}", 
+
+                    _logger.LogInformation("Created {LockCount} locks for order {OrderToken} presentation {PresentationId}",
                         locks.Count, orderToken, request.PresentationId);
-                    
+
                     if (!addedLocks)
                     {
                         _logger.LogError("Failed to create locks for order {OrderToken}", orderToken);
                     }
-                    
+
                     // Update seat availability for the initially locked seats
-                    _logger.LogInformation("Marking {SeatCount} initial seats as unavailable for presentation {PresentationId}", 
+                    _logger.LogInformation("Marking {SeatCount} initial seats as unavailable for presentation {PresentationId}",
                         initialSeatIds.Count, request.PresentationId);
                     await _repository.UpdateSeatAvailability(initialSeatIds, false, request.PresentationId);
                 }
-                
+
                 // Construct the response with the proper constructor that sets HasConsecutiveSeats
                 var response = new GroupOrderResponse(
-                    orderToken, 
+                    orderToken,
                     initialSeatIds,
                     options.ContainsKey("consecutive")
                 )
@@ -291,7 +291,7 @@ namespace WebApi.Services
                     AvailableOptions = options
                 };
 
-                _logger.LogInformation("Returning group order response with token {OrderToken} and {OptionCount} options", 
+                _logger.LogInformation("Returning group order response with token {OrderToken} and {OptionCount} options",
                     orderToken, options.Count);
                 return response;
             }
@@ -312,7 +312,7 @@ namespace WebApi.Services
             try
             {
                 _logger.LogInformation("Selecting option {Option} for order {OrderToken}", option, request.OrderToken);
-                
+
                 var order = await _repository.GetOrderByToken(request.OrderToken);
                 if (order == null || order.Status != OrderStatus.Pending)
                 {
@@ -320,7 +320,7 @@ namespace WebApi.Services
                     throw new OrderNotFoundException("Order not found or expired");
                 }
 
-                _logger.LogInformation("Found order {OrderToken} for presentation {PresentationId}", 
+                _logger.LogInformation("Found order {OrderToken} for presentation {PresentationId}",
                     request.OrderToken, order.PresentationId);
 
                 if (!order.AvailableOptions.TryGetValue(option, out var seatingOption))
@@ -335,7 +335,7 @@ namespace WebApi.Services
                     // This option is valid as long as it provides the advertised number of seats
                     if (seatingOption.SeatIds.Count != order.RequestedSeats - 1)
                     {
-                        _logger.LogWarning("Selected option {Option} provides {SeatCount} seats, but expected {ExpectedSeatCount} seats", 
+                        _logger.LogWarning("Selected option {Option} provides {SeatCount} seats, but expected {ExpectedSeatCount} seats",
                             option, seatingOption.SeatIds.Count, order.RequestedSeats - 1);
                         throw new ArgumentException($"Selected option provides {seatingOption.SeatIds.Count} seats, but expected {order.RequestedSeats - 1} seats");
                     }
@@ -345,7 +345,7 @@ namespace WebApi.Services
                     // For all other options, verify we get the full number of requested seats
                     if (seatingOption.SeatIds.Count != order.RequestedSeats)
                     {
-                        _logger.LogWarning("Selected option {Option} provides {SeatCount} seats, but {RequestedSeatCount} were requested", 
+                        _logger.LogWarning("Selected option {Option} provides {SeatCount} seats, but {RequestedSeatCount} were requested",
                             option, seatingOption.SeatIds.Count, order.RequestedSeats);
                         throw new ArgumentException($"Selected option provides {seatingOption.SeatIds.Count} seats, but {order.RequestedSeats} were requested");
                     }
@@ -361,8 +361,8 @@ namespace WebApi.Services
                     .Where(l => !seatingOption.SeatIds.Contains(l.SeatId))
                     .ToList();
 
-                _logger.LogInformation("Unlocking {UnlockCount} unselected seats for order {OrderToken}: {SeatIds}", 
-                    seatsToUnlock.Count, request.OrderToken, 
+                _logger.LogInformation("Unlocking {UnlockCount} unselected seats for order {OrderToken}: {SeatIds}",
+                    seatsToUnlock.Count, request.OrderToken,
                     seatsToUnlock.Any() ? string.Join(", ", seatsToUnlock.Select(l => l.SeatId)) : "none");
 
                 // Remove locks for unselected seats
@@ -384,12 +384,12 @@ namespace WebApi.Services
                 var seatsNeedingLocks = seatingOption.SeatIds
                     .Where(seatId => !lockedSeatIds.Contains(seatId))
                     .ToList();
-                
+
                 if (seatsNeedingLocks.Any())
                 {
-                    _logger.LogInformation("Creating new locks for {LockCount} seats for order {OrderToken}: {SeatIds}", 
+                    _logger.LogInformation("Creating new locks for {LockCount} seats for order {OrderToken}: {SeatIds}",
                         seatsNeedingLocks.Count, request.OrderToken, string.Join(", ", seatsNeedingLocks));
-                    
+
                     var newLocks = seatsNeedingLocks.Select(seatId => new SeatLock
                     {
                         SeatId = seatId,
@@ -399,11 +399,11 @@ namespace WebApi.Services
                         CreatedAt = DateTime.UtcNow,
                         ExpiresAt = DateTime.UtcNow.AddMinutes(10)
                     }).ToList();
-                    
+
                     var added = await _repository.AddSeatLocks(newLocks);
                     if (!added)
                     {
-                        _logger.LogError("Failed to create locks for seats {SeatIds}", 
+                        _logger.LogError("Failed to create locks for seats {SeatIds}",
                             string.Join(", ", seatsNeedingLocks));
                     }
                 }
@@ -411,7 +411,7 @@ namespace WebApi.Services
                 // Verify seats are still available (excluding our own remaining locks)
                 if (!await _repository.AreSeatAvailable(order.PresentationId, seatingOption.SeatIds, order.OrderToken))
                 {
-                    _logger.LogError("Selected seats {SeatIds} are no longer available for order {OrderToken}, presentation {PresentationId}", 
+                    _logger.LogError("Selected seats {SeatIds} are no longer available for order {OrderToken}, presentation {PresentationId}",
                         string.Join(", ", seatingOption.SeatIds), request.OrderToken, order.PresentationId);
                     throw new SeatNotAvailableException("Selected seats are no longer available");
                 }
@@ -427,7 +427,7 @@ namespace WebApi.Services
                     });
                 }
 
-                _logger.LogInformation("Updating order {OrderToken} with {SeatCount} selected seats: {SeatIds}", 
+                _logger.LogInformation("Updating order {OrderToken} with {SeatCount} selected seats: {SeatIds}",
                     request.OrderToken, seatingOption.SeatIds.Count, string.Join(", ", seatingOption.SeatIds));
 
                 if (!await _repository.SaveOrder(order))
@@ -437,11 +437,11 @@ namespace WebApi.Services
                 }
 
                 // After successfully updating the order, update seat availability for selected seats
-                _logger.LogInformation("Marking {SeatCount} selected seats as unavailable for presentation {PresentationId}", 
+                _logger.LogInformation("Marking {SeatCount} selected seats as unavailable for presentation {PresentationId}",
                     seatingOption.SeatIds.Count, order.PresentationId);
                 await _repository.UpdateSeatAvailability(seatingOption.SeatIds, false, order.PresentationId);
-                
-                _logger.LogInformation("Successfully selected option {Option} for order {OrderToken} with {SeatCount} seats: {SeatIds}", 
+
+                _logger.LogInformation("Successfully selected option {Option} for order {OrderToken} with {SeatCount} seats: {SeatIds}",
                     option, request.OrderToken, seatingOption.SeatIds.Count, string.Join(", ", seatingOption.SeatIds));
 
                 return new OrderResponse(order.OrderToken, seatingOption.SeatIds);
@@ -455,10 +455,10 @@ namespace WebApi.Services
 
         public async Task<List<TicketResponse>> ConfirmOrder(Guid orderToken, ConfirmOrderRequest request)
         {
-            try 
+            try
             {
                 _logger.LogInformation("Starting to confirm order {OrderToken}", orderToken);
-                
+
                 var order = await _repository.GetOrderByToken(orderToken, true);
                 if (order == null || order.Status != OrderStatus.Pending)
                 {
@@ -468,21 +468,21 @@ namespace WebApi.Services
 
                 // Get the seat IDs from the order items
                 var seatIds = order.Items.Select(i => i.SeatId).ToList();
-                
+
                 if (seatIds.Count == 0)
                 {
                     _logger.LogWarning("Order {OrderToken} has no seats selected", orderToken);
                     throw new ArgumentException("No seats selected");
                 }
-                
-                _logger.LogInformation("Confirming order {OrderToken} for presentation {PresentationId} with {SeatCount} seats: {SeatIds}", 
+
+                _logger.LogInformation("Confirming order {OrderToken} for presentation {PresentationId} with {SeatCount} seats: {SeatIds}",
                     orderToken, order.PresentationId, seatIds.Count, string.Join(", ", seatIds));
 
                 // Get the presentation to make sure it exists
                 var presentation = await _repository.GetPresentationById(order.PresentationId);
                 if (presentation == null)
                 {
-                    _logger.LogWarning("Presentation {PresentationId} not found for order {OrderToken}", 
+                    _logger.LogWarning("Presentation {PresentationId} not found for order {OrderToken}",
                         order.PresentationId, orderToken);
                     throw new Exception($"Presentation {order.PresentationId} not found");
                 }
@@ -498,12 +498,12 @@ namespace WebApi.Services
                 {
                     if (!existingLocks.Any(l => l.SeatId == seatId))
                     {
-                        _logger.LogWarning("Seat {SeatId} is not locked for order {OrderToken} - will create lock", 
+                        _logger.LogWarning("Seat {SeatId} is not locked for order {OrderToken} - will create lock",
                             seatId, orderToken);
                         seatsNeedingLocks.Add(seatId);
                     }
                 }
-                
+
                 // Create locks for any seats that don't have them
                 if (seatsNeedingLocks.Any())
                 {
@@ -516,16 +516,16 @@ namespace WebApi.Services
                         CreatedAt = DateTime.UtcNow,
                         ExpiresAt = DateTime.UtcNow.AddMinutes(10)
                     }).ToList();
-                    
+
                     var added = await _repository.AddSeatLocks(newLocks);
                     if (!added)
                     {
-                        _logger.LogError("Failed to create locks for seats {SeatIds} for order {OrderToken}", 
+                        _logger.LogError("Failed to create locks for seats {SeatIds} for order {OrderToken}",
                             string.Join(", ", seatsNeedingLocks), orderToken);
                     }
                     else
                     {
-                        _logger.LogInformation("Created {LockCount} new locks for order {OrderToken}", 
+                        _logger.LogInformation("Created {LockCount} new locks for order {OrderToken}",
                             newLocks.Count, orderToken);
                     }
                 }
@@ -533,7 +533,7 @@ namespace WebApi.Services
                 // Verify seats are still available (excluding our own locks)
                 if (!await _repository.AreSeatAvailable(order.PresentationId, seatIds, orderToken))
                 {
-                    _logger.LogError("Seats {SeatIds} are no longer available for order {OrderToken}, presentation {PresentationId}", 
+                    _logger.LogError("Seats {SeatIds} are no longer available for order {OrderToken}, presentation {PresentationId}",
                         string.Join(", ", seatIds), orderToken, order.PresentationId);
                     throw new SeatNotAvailableException("Some selected seats are no longer available");
                 }
@@ -549,13 +549,13 @@ namespace WebApi.Services
 
                 // Create tickets for the order
                 var tickets = new List<Ticket>();
-                
+
                 foreach (var item in order.Items)
                 {
                     // Get the seat and presentation entities for this ticket
                     var seat = await _repository.GetSeatById(item.SeatId);
                     var ticketPresentation = await _repository.GetPresentationById(order.PresentationId);
-                    
+
                     if (seat != null && ticketPresentation != null)
                     {
                         var ticket = new Ticket
@@ -573,15 +573,15 @@ namespace WebApi.Services
                             Seat = seat,
                             TicketOrder = order
                         };
-                        
+
                         tickets.Add(ticket);
                     }
                 }
 
                 // Create the tickets
                 var createdTickets = await _repository.CreateTickets(tickets);
-                
-                _logger.LogInformation("Successfully confirmed order {OrderToken} with {TicketCount} tickets", 
+
+                _logger.LogInformation("Successfully confirmed order {OrderToken} with {TicketCount} tickets",
                     orderToken.ToString(), createdTickets.Count);
 
                 // Now, fetch the full ticket information including navigation properties for the response
@@ -591,7 +591,7 @@ namespace WebApi.Services
                     // Load related entities for each ticket
                     var ticketPresentation = await _repository.GetPresentationById(ticket.PresentationId);
                     var seat = await _repository.GetSeatById(ticket.SeatId);
-                    
+
                     if (ticketPresentation != null && seat != null)
                     {
                         fullTickets.Add(new TicketResponse(
@@ -610,7 +610,7 @@ namespace WebApi.Services
                     }
                 }
 
-                _logger.LogInformation("Returning {TicketCount} ticket details for order {OrderToken}", 
+                _logger.LogInformation("Returning {TicketCount} ticket details for order {OrderToken}",
                     fullTickets.Count, orderToken);
                 return fullTickets;
             }
@@ -707,12 +707,12 @@ namespace WebApi.Services
                 order.Items.Remove(itemToRemove);
 
                 // Get and remove seat locks for this specific seat
-                var locks = await _repository.GetLocksByOrder(orderToken); 
+                var locks = await _repository.GetLocksByOrder(orderToken);
                 var seatLocks = locks.Where(l => l.SeatId == seatId).ToList();
-                
-                _logger.LogInformation("Removing {LockCount} locks for seat {SeatId} from order {OrderToken}", 
+
+                _logger.LogInformation("Removing {LockCount} locks for seat {SeatId} from order {OrderToken}",
                     seatLocks.Count, seatId, orderToken);
-                    
+
                 await _repository.RemoveSeatLocks(seatLocks);
 
                 if (!await _repository.SaveOrder(order))
@@ -721,7 +721,7 @@ namespace WebApi.Services
                 }
 
                 // After successfully removing the seat, update its availability to available (true)
-                _logger.LogInformation("Marking seat {SeatId} as available for presentation {PresentationId}", 
+                _logger.LogInformation("Marking seat {SeatId} as available for presentation {PresentationId}",
                     seatId, order.PresentationId);
                 await _repository.UpdateSeatAvailability(new List<int> { seatId }, true, order.PresentationId);
 
@@ -953,7 +953,7 @@ namespace WebApi.Services
             {
                 throw new TicketNotFoundException($"No tickets found with phone booking code {phoneBookingCode}");
             }
-            
+
             return _ticketPdfService.CreatePdfTicketsAsByteArray(tickets, Guid.NewGuid());
         }
 

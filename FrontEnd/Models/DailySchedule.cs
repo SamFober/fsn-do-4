@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace FrontEnd.Models
 {
     public class DailySchedule
@@ -8,4 +6,4 @@ namespace FrontEnd.Models
         public string DayOfWeek { get; set; }
         public List<MovieScheduleItem> Movies { get; set; } = new List<MovieScheduleItem>();
     }
-} 
+}

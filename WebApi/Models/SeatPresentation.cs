@@ -1,5 +1,3 @@
-using System;
-
 namespace WebApi.Models
 {
     public class SeatPresentation
@@ -15,4 +13,4 @@ namespace WebApi.Models
         public Seat? Seat { get; set; }
         public Presentation? Presentation { get; set; }
     }
-} 
+}

@@ -14,7 +14,7 @@ namespace WebApi.Services
 
         public TicketPdfServiceQuestPdf()
         {
-            headerImageBytes = File.Exists("Resources/Images/Cinemagia_logo.jpg") ? 
+            headerImageBytes = File.Exists("Resources/Images/Cinemagia_logo.jpg") ?
                 File.ReadAllBytes("Resources/Images/Cinemagia_logo.jpg") : Placeholders.Image(10, 10);
 
             this.qRCodeGenerator = new QRCodeGenerator();

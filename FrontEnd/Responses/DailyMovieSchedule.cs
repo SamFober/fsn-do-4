@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using FrontEnd.Models;
 
 namespace FrontEnd.Responses
@@ -9,4 +8,4 @@ namespace FrontEnd.Responses
         public string DayOfWeek { get; set; }
         public List<ShowtimeItem> Showtimes { get; set; } = new List<ShowtimeItem>();
     }
-} 
+}

@@ -1,5 +1,3 @@
-using System;
-
 namespace WebApi.Models.Exceptions
 {
     public class TicketNotFoundException : Exception
@@ -12,9 +10,9 @@ namespace WebApi.Models.Exceptions
         {
         }
 
-        public TicketNotFoundException(string message, Exception innerException) 
+        public TicketNotFoundException(string message, Exception innerException)
             : base(message, innerException)
         {
         }
     }
-} 
+}

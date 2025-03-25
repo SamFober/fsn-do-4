@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
-using WebApi.Data;
 using WebApi.Models;
 using WebApi.Repositories;
 using Xunit;
@@ -286,8 +285,8 @@ namespace WebApi.Tests.Repositories
 
             // Book all seats except corners and front row
             var seatsToBook = await _context.Seats
-                .Where(s => s.RowNumber > 1 && 
-                           s.SeatNumber > 1 && 
+                .Where(s => s.RowNumber > 1 &&
+                           s.SeatNumber > 1 &&
                            s.SeatNumber < 15)
                 .ToListAsync();
 
@@ -332,8 +331,8 @@ namespace WebApi.Tests.Repositories
 
             // Book all seats except corners and front row
             var seatsToBook = await _context.Seats
-                .Where(s => s.RowNumber > 1 && 
-                           s.SeatNumber > 1 && 
+                .Where(s => s.RowNumber > 1 &&
+                           s.SeatNumber > 1 &&
                            s.SeatNumber < 15)
                 .ToListAsync();
 
@@ -367,4 +366,4 @@ namespace WebApi.Tests.Repositories
             Assert.True(bestSeat.SeatNumber > 3 && bestSeat.SeatNumber < 13, "Should avoid corner seats");
         }
     }
-} 
+}
