@@ -1,15 +1,15 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# Kopieer csproj en herstel afhankelijkheden
+# Copy csproj and restore dependencies
 COPY ["FrontEnd.csproj", "./"]
 RUN dotnet restore
 
-# Kopieer de rest van de code
+# Copy the rest of the code
 COPY . .
 RUN dotnet build -c Debug -o /app/build
 
-# Publiceren
+# Publish
 FROM build AS publish
 RUN dotnet publish -c Debug -o /app/publish
 
@@ -20,8 +20,8 @@ WORKDIR /usr/share/nginx/html
 COPY --from=publish /app/publish/wwwroot .
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Belangrijke fix: nginx moet draaien in de voorgrond (niet als daemon)
-# anders stopt de container direct
+# Important fix: nginx must run in the foreground (not as daemon)
+# otherwise the container stops immediately
 CMD ["nginx", "-g", "daemon off;"]
 
 EXPOSE 80

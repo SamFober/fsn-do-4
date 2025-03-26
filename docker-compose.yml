@@ -1,16 +1,16 @@
 version: '3.8'
 
 services:
-  # Frontend Blazor WebAssembly
+  # Frontend Blazor WebAssembly - Development Mode
   frontend:
     build:
       context: ./FrontEnd
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev  # Use the development Dockerfile
     container_name: cinemagia-frontend
     ports:
       - "5002:80"
     volumes:
-      - ./FrontEnd:/app
+      - ./FrontEnd:/app   # Mount source code for live editing
       - frontend_obj:/app/obj
       - frontend_bin:/app/bin
     depends_on:
@@ -20,9 +20,12 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - WebApiBaseUrl=http://webapi:5001
+      - DOTNET_WATCH_RESTART_ON_RUDE_EDIT=1
+      - ASPNETCORE_BROWSER_REFRESH=false
+      - DOTNET_WATCH_SUPPRESS_BROWSER_REFRESH=true
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -90,12 +93,12 @@ services:
       timeout: 5s
       retries: 10
 
-  # Mailpit voor lokale e-mails
+  # Mailpit for local emails
   mailpit:
     image: axllent/mailpit:latest
     container_name: cinemagia-mailpit
     ports:
-      - "1025:1025"  # SMTP-poort
+      - "1025:1025"  # SMTP port
       - "8025:8025"  # Web UI
     networks:
       - cinemagia-network
