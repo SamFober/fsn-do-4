@@ -36,4 +36,28 @@ public class MoviesController : ControllerBase
 
         return Ok(movies);
     }
+
+public async Task<IActionResult> GetMovies([FromQuery] string? search, [FromQuery] string? genre)
+{
+    var movies = await _context.Movies.ToListAsync();
+
+    if (!string.IsNullOrEmpty(search))
+    {
+        movies = movies.Where(m => m.Title.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
+    }
+
+    if (!string.IsNullOrEmpty(genre))
+    {
+        movies = movies.Where(m => m.Genre.Equals(genre, StringComparison.OrdinalIgnoreCase)).ToList();
+    }
+
+    // If no movies match, return the full list instead of an empty list
+    if (!movies.Any())
+    {
+        movies = await _context.Movies.ToListAsync(); // Reset to all movies
+    }
+
+    return Ok(movies);
+}
+
 }
