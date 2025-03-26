@@ -1,0 +1,30 @@
+# Development Dockerfile for Frontend
+FROM mcr.microsoft.com/dotnet/sdk:9.0
+
+WORKDIR /app
+
+# Install helpful development tools
+RUN apt-get update && apt-get install -y \
+    curl \
+    procps \
+    vim \
+    net-tools
+
+# Copy csproj and restore dependencies
+COPY ["FrontEnd.csproj", "./"]
+RUN dotnet restore
+
+# Copy everything else
+COPY . .
+
+# Set environment variables for development
+ENV ASPNETCORE_ENVIRONMENT=Development
+ENV DOTNET_WATCH_RESTART_ON_RUDE_EDIT=1
+ENV ASPNETCORE_BROWSER_REFRESH=false
+ENV DOTNET_WATCH_SUPPRESS_BROWSER_REFRESH=true
+
+# Default port
+EXPOSE 80
+
+# Start with file watching (no hot reload)
+CMD ["dotnet", "watch", "--no-hot-reload", "--project", ".", "run", "--urls", "http://0.0.0.0:80"] 

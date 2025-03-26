@@ -986,7 +986,7 @@
             validationTimer.Stop();
             orderExpirationTime = null;
 
-            var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { customerName = "NamHere", customerEmail = "validEmailHere" });
+            var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { customerName = "John Doe", customerEmail = "j.doe@example.com" });
 
             if (confirmationResponse.IsSuccessStatusCode)
                 /*{
@@ -1272,7 +1272,8 @@
 
     private void GetTickets()
     {
-        string url = $"http://localhost:5270/{orderToken}/finish";
+        // Use a relative path instead of hardcoded URL
+        string url = $"/{orderToken}/finish";
         Navigation.NavigateTo(url, true);
     }
 

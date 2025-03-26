@@ -4,6 +4,99 @@ A .NET Web API for booking movie theater tickets, supporting both individual and
 
 ## Getting Started
 
+There are two ways to set up this project:
+1. **Docker Setup (Recommended)** - Easiest method, no manual installations required
+2. **Manual Setup** - For development without Docker, requires manual installation of dependencies
+
+## Docker Setup (Recommended)
+
+This application is fully containerized with Docker for easier setup and deployment.
+
+### Prerequisites
+- Docker and Docker Compose installed on your system
+- No need for local .NET SDK or MySQL installation
+
+### 1. Running with Docker Compose
+
+1. Clone and navigate to the repository:
+   ```bash
+   git clone <repository-url>
+   cd <repository-directory>
+   ```
+
+2. Start the containers:
+   ```bash
+   docker compose up -d
+   ```
+   This will:
+   - Build all required containers (.NET, MySQL, frontend, mailpit)
+   - Run database migrations automatically
+   - Seed the database with sample data
+   - Start all services
+
+3. To rebuild containers after making changes:
+   ```bash
+   docker compose up -d --build
+   ```
+
+4. To stop the containers:
+   ```bash
+   docker compose down
+   ```
+
+5. To remove all containers and volumes (when you want to reset the database):
+   ```bash
+   docker compose down -v
+   ```
+
+### 2. Accessing Services
+
+After starting the containers, you can access:
+
+- **Frontend Application**: http://localhost:5002
+- **API Swagger Documentation**: http://localhost:5001/swagger
+- **API Health Check**: http://localhost:5001/health
+- **Mailpit (Email Testing)**: http://localhost:8025
+
+### 3. Environment Configuration
+
+The Docker setup uses the following configuration:
+- MySQL database with authentication (password: "password")
+- Environment variables configured in docker-compose.yml
+- Shared network between all services
+- Email sent via Mailpit (view in the Mailpit UI)
+
+### 4. Troubleshooting Docker Setup
+
+If you encounter issues:
+
+1. Check container status:
+   ```bash
+   docker compose ps
+   ```
+
+2. View container logs:
+   ```bash
+   docker compose logs webapi
+   docker compose logs frontend
+   docker compose logs db
+   ```
+
+3. Access the database directly:
+   ```bash
+   docker exec -it cinemagia-mysql mysql -uroot -ppassword
+   ```
+
+4. Restart individual services:
+   ```bash
+   docker restart cinemagia-webapi
+   docker restart cinemagia-frontend
+   ```
+
+## Manual Setup (Alternative)
+
+If you prefer not to use Docker, you can set up the project manually. This is more involved and requires installing dependencies directly on your system.
+
 ### Prerequisites
 - .NET 9.0 SDK
 - MySQL Server

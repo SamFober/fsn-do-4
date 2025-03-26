@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using MimeKit;
 using WebApi.Exceptions;
 using WebApi.Interfaces.Repositories;
 using WebApi.Interfaces.Services;
@@ -12,17 +13,20 @@ namespace WebApi.Services
     public class TicketService : ITicketService
     {
         private readonly ITicketRepository _repository;
+        private readonly IMailService _mailService;
         private readonly ITicketPdfService _ticketPdfService;
         private readonly ILogger<TicketService> _logger;
         private readonly ApplicationDbContext _context;
 
         public TicketService(
             ITicketRepository repository,
+            IMailService mailService,
             ITicketPdfService ticketPdfService,
             ILogger<TicketService> logger,
             ApplicationDbContext context)
         {
             _repository = repository;
+            _mailService = mailService;
             _ticketPdfService = ticketPdfService;
             _logger = logger;
             _context = context;
@@ -929,6 +933,36 @@ namespace WebApi.Services
             {
                 _logger.LogError(ex, "Error cancelling order {OrderToken}", orderToken);
                 throw;
+            }
+        }
+
+        public async Task FinalizeOrder(Guid orderToken)
+        {
+            var order = await _repository.FindTicketOrderByOrderToken(orderToken);
+
+            if (order != null)
+            {
+                var tickets = await _repository.FindTicketsByOrderId(order.Id);
+                var customerName = tickets.First().CustomerName;
+                var customerEmail = tickets.First().CustomerEmail;
+                var ticketBytes = await GetTicketsByOrderToken(orderToken);
+
+                var attachments = new List<object>()
+            {
+                new MimePart("application", "pdf")
+                {
+                    Content = new MimeContent(new MemoryStream(ticketBytes)),
+                    ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+                    ContentTransferEncoding = ContentEncoding.Base64,
+                    FileName = $"{orderToken}.pdf"
+                }
+            };
+
+                _mailService.SendEmail(customerName, customerEmail, "Your tickets are here!", MailTemplates.OrderCompleteMailTemplate(customerName, order.Presentation, tickets.Count), attachments);
+
+            } else
+            {
+                throw new OrderNotFoundException("No order found with the given order token");
             }
         }
 
