@@ -628,7 +628,11 @@ namespace WebApi.Controllers
             try
             {
                 var pdf = await _ticketService.GetTicketsByOrderToken(orderToken);
-                return File(pdf, "application/pdf", orderToken + ".pdf");
+
+                Response.Headers.Add("Content-Disposition", $"inline; filename=\"ticket-{orderToken}.pdf\"");
+                Response.Headers.Add("Cache-Control", "public, max-age=60");
+                
+                return File(pdf, "application/pdf");
             }
             catch (OrderNotFoundException)
             {
@@ -656,7 +660,11 @@ namespace WebApi.Controllers
             try
             {
                 var pdf = await _ticketService.GetTicketsByPhoneBookingCode(phoneBookingCode);
-                return File(pdf, "application/pdf", phoneBookingCode + ".pdf");
+                
+                Response.Headers.Add("Content-Disposition", $"inline; filename=\"ticket-{phoneBookingCode}.pdf\"");
+                Response.Headers.Add("Cache-Control", "public, max-age=60");
+                
+                return File(pdf, "application/pdf");
             }
             catch (OrderNotFoundException)
             {

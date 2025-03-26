@@ -980,6 +980,31 @@
 
     private async Task PrintTickets()
     {
-        await JSRuntime.InvokeVoidAsync("openPrintDialog", $"api/Tickets/{orderToken}/download");
+        try {
+            // Show a message to the user
+            message = "Processing your tickets...";
+            StateHasChanged();
+            
+            // Use the full URL to ensure correct API endpoint
+            var baseUrl = httpClient.BaseAddress?.ToString() ?? "http://localhost:5001/";
+            if (!baseUrl.EndsWith("/")) baseUrl += "/";
+            
+            var pdfUrl = $"{baseUrl}api/Tickets/{orderToken}/download";
+            Console.WriteLine($"Opening PDF URL: {pdfUrl}");
+            
+            // Call JavaScript to open the PDF
+            await JSRuntime.InvokeVoidAsync("openPrintDialog", pdfUrl);
+            
+            // Clear the message after a delay
+            await Task.Delay(2000);
+            message = null;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            message = $"Error preparing tickets: {ex.Message}";
+            Console.Error.WriteLine($"Error in PrintTickets: {ex}");
+            StateHasChanged();
+        }
     }
 }
