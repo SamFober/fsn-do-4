@@ -5,19 +5,20 @@ using WebApi.Exceptions;
 using WebApi.Interfaces.Services;
 using WebApi.Models;
 using WebApi.Models.Responses;
+using WebApi.Interfaces.Repositories;
 
 [Route("api/concessions")]
 [ApiController]
 public class ConcessionsController : ControllerBase
 {
     private readonly ITicketService _ticketService;
-    private readonly ApplicationDbContext _context;
+    private readonly IConcessionRepository _repository;
     private readonly ILogger<ConcessionsController> _logger;
 
-    public ConcessionsController(ITicketService ticketService, ApplicationDbContext dbContext, ILogger<ConcessionsController> logger)
+    public ConcessionsController(ITicketService ticketService, IConcessionRepository concessionRepository, ILogger<ConcessionsController> logger)
     {
         _ticketService = ticketService;
-        _context = dbContext;
+        _repository = concessionRepository;
         _logger = logger;
     }
 
@@ -52,7 +53,7 @@ public class ConcessionsController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetConcessionByID(int id)
     {
-        var concession = await _context.ConcessionItems.FindAsync(id);
+        var concession = await _repository.GetConcessionItemById(id);
         if (concession == null)
         {
             return NotFound();
@@ -62,7 +63,7 @@ public class ConcessionsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetConcessions()
     {
-        var concessions = await _context.ConcessionItems.ToListAsync();
+        var concessions = await _repository.GetConcessionItems();
         return Ok(concessions);
     }
     
@@ -74,9 +75,7 @@ public class ConcessionsController : ControllerBase
             return BadRequest("Concession item cannot be null.");
         }
 
-        // Add new item to the database
-        _context.ConcessionItems.Add(concessionItem);
-        await _context.SaveChangesAsync();
+        _repository.CreateConcession(concessionItem);
 
         // Return the created item with a 201 Created response
         return CreatedAtAction(nameof(GetConcessionByID), new { id = concessionItem.Id }, concessionItem);

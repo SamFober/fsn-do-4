@@ -5,6 +5,8 @@ using System.Reflection;
 using WebApi.Interfaces.Services;
 using QuestPDF.Infrastructure;
 using WebApi.Services;
+using WebApi.Interfaces.Repositories;
+using WebApi.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,6 +46,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddMemoryCache(); // For seat locking
 builder.Services.AddScoped<ITicketPdfService, TicketPdfServiceQuestPdf>();
 builder.Services.AddScoped<WebApi.Interfaces.Repositories.ITicketRepository, WebApi.Repositories.TicketRepository>();
+builder.Services.AddScoped<IConcessionRepository, ConcessionRepository>();
 builder.Services.AddScoped<WebApi.Interfaces.Services.ITicketService, WebApi.Services.TicketService>();
 
 // Add CORS
