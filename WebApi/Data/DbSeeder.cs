@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System;
 using WebApi.Models;
 using static WebApi.Models.TicketStatus;
 
@@ -203,6 +204,7 @@ namespace WebApi.Data
                 if (!await context.Presentations.AnyAsync())
                 {
                     var existingMovies = await context.Movies.ToListAsync();
+
                     var halls = await context.Halls.ToListAsync();
 
                     if (existingMovies.Any() && halls.Any())
@@ -248,6 +250,9 @@ namespace WebApi.Data
                                     
                                     // Calculate available seats as total hall capacity
                                     int totalSeats = hall.Rows * hall.SeatsPerRow;
+                                    
+                                    // Randomly decide if this presentation is secret (~0.5% chance)
+                                    bool isSecret = random.NextDouble() < 0.005;
 
                                     // Create the presentation
                                     presentations.Add(new Presentation
@@ -263,7 +268,8 @@ namespace WebApi.Data
                                             ? movie.Formats.ElementAt(random.Next(movie.Formats.Count)).Name ?? "Standard"
                                             : "Standard",
                                         // Set available seats to the total capacity of the hall
-                                        AvailableSeats = totalSeats
+                                        AvailableSeats = totalSeats,
+                                        IsSecretMovie = isSecret
                                     });
                                 }
                             }
