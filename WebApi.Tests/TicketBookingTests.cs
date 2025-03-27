@@ -23,9 +23,11 @@ public class TicketBookingTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
     private readonly TicketsController _controller;
+    private readonly Mock<ILogger<IMailService>> _mailLoggerMock;
     private readonly Mock<ILogger<TicketsController>> _loggerMock;
     private readonly Mock<ILogger<TicketService>> _serviceLoggerMock;
     private readonly Mock<ITicketRepository> _repositoryMock;
+    private readonly IMailService _mailService;
     private readonly ITicketPdfService _ticketPdfService;
     private readonly ITicketService _ticketService;
     private readonly IServiceProvider _services;  // Add this for cleanup service testing
@@ -69,7 +71,8 @@ public class TicketBookingTests : IDisposable
         }));
 
         _ticketPdfService = new TicketPdfServiceMock();
-        _ticketService = new TicketService(_repositoryMock.Object, _ticketPdfService, loggerMock.Object, _context);
+        _mailService = new MailServiceMock();
+        _ticketService = new TicketService(_repositoryMock.Object, _mailService, _ticketPdfService, loggerMock.Object, _context);
         _controller = new TicketsController(_ticketService, _context, _loggerMock.Object);
 
         // Setup services for cleanup service testing

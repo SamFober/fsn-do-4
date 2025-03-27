@@ -54,11 +54,11 @@
 
         try
         {
-            var response = await Http.GetAsync($"http://localhost:5213/api/Tickets/phone-booking/{code}/download");
+            var response = await Http.GetAsync($"api/Tickets/phone-booking/{code}/download");
 
             if (response.IsSuccessStatusCode)
             {
-                await JSRuntime.InvokeVoidAsync("openPrintDialog", $"http://localhost:5213/api/Tickets/phone-booking/{code}/download");
+                await JSRuntime.InvokeVoidAsync("openPrintDialog", $"api/Tickets/phone-booking/{code}/download");
                 alertMessage = "Here are your tickets! Enjoy!";
                 alertColor = "color: green;";
             }
