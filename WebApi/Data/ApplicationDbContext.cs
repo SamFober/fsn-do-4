@@ -21,6 +21,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<SeatLock> SeatLocks { get; set; } = null!;
     public DbSet<MovieFormat> MovieFormats { get; set; } = null!;
     public DbSet<SeatPresentation> SeatPresentations { get; set; } = null!;
+    public DbSet<Review> Reviews { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -81,5 +82,11 @@ public class ApplicationDbContext : DbContext
                     c => c != null ? new Dictionary<string, SeatingOption>(c) : new Dictionary<string, SeatingOption>()
                 )
             );
+        // Configure Review entity
+        modelBuilder.Entity<Review>()
+            .HasOne(r => r.Movie)
+            .WithMany(m => m.Reviews)  // One movie has many reviews
+            .HasForeignKey(r => r.MovieId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
