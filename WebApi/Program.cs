@@ -7,6 +7,8 @@ using QuestPDF.Infrastructure;
 using WebApi.Services;
 using WebApi.Interfaces.Repositories;
 using WebApi.Repositories;
+using WebApi.Interfaces.Repositories;
+using WebApi.Repositories;
 using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -53,6 +55,7 @@ builder.Services.AddScoped<IMovieService, MovieService>();
 
 builder.Services.AddScoped<ITicketRepository, TicketRepository>();
 builder.Services.AddScoped<ITicketService, TicketService>();
+builder.Services.AddScoped<IConcessionRepository, ConcessionRepository>();
 
 // Add CORS
 builder.Services.AddCors(options =>
