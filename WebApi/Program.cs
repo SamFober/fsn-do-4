@@ -7,6 +7,7 @@ using QuestPDF.Infrastructure;
 using WebApi.Services;
 using WebApi.Interfaces.Repositories;
 using WebApi.Repositories;
+using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,7 +45,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySQL(connectionString));
 
 builder.Services.AddMemoryCache(); // For seat locking
-
+builder.Services.AddScoped<IMailService, MailServiceMailKit>();
 builder.Services.AddScoped<ITicketPdfService, TicketPdfServiceQuestPdf>();
 
 builder.Services.AddScoped<IMovieRepository, MovieRepository>();
@@ -91,11 +92,9 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// Always enable Swagger for easier API testing
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 

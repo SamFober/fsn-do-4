@@ -986,7 +986,7 @@
             validationTimer.Stop();
             orderExpirationTime = null;
 
-            var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { customerName = "NamHere", customerEmail = "validEmailHere" });
+            var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { customerName = "John Doe", customerEmail = "j.doe@example.com" });
 
             if (confirmationResponse.IsSuccessStatusCode)
                 /*{
@@ -1089,57 +1089,54 @@
     {
         try
         {
-    string? tokenToCancel = orderToken ?? pendingGroupOrder?.OrderToken;
-    if (tokenToCancel != null)
-    {
-        // Hide any open modals
-        showSeatSelectionModal = false;
-        await JSRuntime.InvokeVoidAsync("hideModal", "seatingOptionsModal");
-        await JSRuntime.InvokeVoidAsync("hideModal", "singleOptionConfirmModal");
-        await JSRuntime.InvokeVoidAsync("hideModal", "numpadModal");
+            string? tokenToCancel = orderToken ?? pendingGroupOrder?.OrderToken;
+            if (tokenToCancel != null)
+            {
+                // Hide any open modals
+                showSeatSelectionModal = false;
+                await JSRuntime.InvokeVoidAsync("hideModal", "seatingOptionsModal");
+                await JSRuntime.InvokeVoidAsync("hideModal", "singleOptionConfirmModal");
+                await JSRuntime.InvokeVoidAsync("hideModal", "numpadModal");
 
-        // Call the API to cancel the order
-        var response = await Http.PostAsync($"api/tickets/orders/{tokenToCancel}/cancel", null);
+                // Call the API to cancel the order
+                var response = await Http.PostAsync($"api/tickets/orders/{tokenToCancel}/cancel", null);
 
-        if (response.IsSuccessStatusCode)
-        {
-            // Stop both timers
-            expirationTimer.Stop();
-            validationTimer.Stop();
-            orderExpirationTime = null;
+                if (response.IsSuccessStatusCode)
+                {
+                    // Stop both timers
+                    expirationTimer.Stop();
+                    validationTimer.Stop();
+                    orderExpirationTime = null;
 
-            // Clear local state
-            orderToken = null;
-            pendingGroupOrder = null;
-            selectedSeats.Clear();
-            availableOptions = null;
-            selectedOption = null;
-            SetMessage("Order cancelled successfully.");
-            numpadPinConfirmed = false;
-            NumpadClearInput();
+                    // Clear local state
+                    orderToken = null;
+                    pendingGroupOrder = null;
+                    selectedSeats.Clear();
+                    availableOptions = null;
+                    selectedOption = null;
+                    SetMessage("Order cancelled successfully.");
+                    numpadPinConfirmed = false;
+                    NumpadClearInput();
 
-            // Refresh the seats to show updated availability
-            await LoadSeats();
-
-            // Go back to the seat selection modal
-            showSeatSelectionModal = true;
-        }
-        else
-        {
-            var error = await response.Content.ReadAsStringAsync();
-            SetMessage($"Failed to cancel order: {error}");
-        }
-    }
-    else
-    {
-        // If there's no active order yet, just show the modal again
-        showSeatSelectionModal = true;
-    }
+                    // Navigate back to the previous page using our custom navigateBack function
+                    await JSRuntime.InvokeVoidAsync("navigateBack");
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    SetMessage($"Failed to cancel order: {error}");
+                }
+            }
+            else
+            {
+                // If there's no active order yet, just navigate back to the previous page
+                await JSRuntime.InvokeVoidAsync("navigateBack");
+            }
         }
         catch (Exception ex)
         {
-    SetMessage($"Error cancelling order: {ex.Message}");
-    Console.WriteLine($"Error cancelling order: {ex}");
+            SetMessage($"Error cancelling order: {ex.Message}");
+            Console.WriteLine($"Error cancelling order: {ex}");
         }
     }
 
@@ -1275,7 +1272,8 @@
 
     private void GetTickets()
     {
-        string url = $"http://localhost:5270/{orderToken}/finish";
+        // Use a relative path instead of hardcoded URL
+        string url = $"/{orderToken}/finish";
         Navigation.NavigateTo(url, true);
     }
 

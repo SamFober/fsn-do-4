@@ -672,4 +672,33 @@
     text-align: center;
     margin-bottom: 30px;
     color: #fff;
+}
+
+.showtimes-date-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 30px;
+}
+
+.showtimes-date-heading h3 {
+    font-size: 24px;
+    font-weight: 600;
+    color: #f5c518;
+    margin: 0;
+}
+
+.view-all-showtimes {
+    color: #f5c518;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    transition: color 0.2s;
+}
+
+.view-all-showtimes:hover {
+    color: #ffce29;
+    text-decoration: underline;
 } 

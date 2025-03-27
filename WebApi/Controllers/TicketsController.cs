@@ -68,12 +68,9 @@ namespace WebApi.Controllers
 
                 await _context.SaveChangesAsync();
 
-                // Reset all seats to available first
-                foreach (var seat in presentation.Hall.Seats)
-                {
-                    seat.IsAvailable = true;
-                }
-                await _context.SaveChangesAsync();
+                // Reset all seats to available first using the service
+                var allSeatIds = presentation.Hall.Seats.Select(s => s.Id).ToList();
+                await _ticketService.UpdateSeatAvailability(allSeatIds, true, presentationId);
 
                 // Get all seats in the hall
                 var allSeats = presentation.Hall.Seats
@@ -96,12 +93,18 @@ namespace WebApi.Controllers
                     row5.Where(s => !seatsToLeaveEmpty.Contains(s.SeatNumber)) // Add row 5 seats that should be booked
                 ).ToList();
 
-                // Set IsAvailable = false for all seats that will be booked
-                foreach (var seat in seatsToBook)
+                // Mark seats as unavailable using the service
+                var seatIds = seatsToBook.Select(s => s.Id).ToList();
+                await _ticketService.UpdateSeatAvailability(seatIds, false, presentationId);
+
+                // Update the presentation's AvailableSeats to match
+                if (presentation != null && presentation.Hall != null)
                 {
-                    seat.IsAvailable = false;
+                    int totalSeats = presentation.Hall.Rows * presentation.Hall.SeatsPerRow;
+                    int bookedSeats = seatsToBook.Count;
+                    presentation.AvailableSeats = totalSeats - bookedSeats;
+                    await _context.SaveChangesAsync();
                 }
-                await _context.SaveChangesAsync();
 
                 // Create a mock ticket order for our test tickets
                 var mockOrder = new TicketOrder
@@ -153,6 +156,51 @@ namespace WebApi.Controllers
                 await transaction.RollbackAsync();
                 _logger.LogError(ex, "Error setting up split scenario");
                 return new ObjectResult("An error occurred") { StatusCode = 500 };
+            }
+        }
+
+        [HttpPost("test/reset-seats")]
+        public async Task<ActionResult> ResetSeatAvailability(int presentationId)
+        {
+            try
+            {
+                // Get the presentation
+                var presentation = await _context.Presentations
+                    .Include(p => p.Hall)
+                    .FirstOrDefaultAsync(p => p.Id == presentationId);
+                
+                if (presentation == null || presentation.Hall == null)
+                {
+                    return NotFound($"Presentation {presentationId} not found");
+                }
+
+                // Get all seats for this hall
+                var seats = await _context.Seats
+                    .Where(s => s.HallId == presentation.HallId)
+                    .ToListAsync();
+                    
+                var seatIds = seats.Select(s => s.Id).ToList();
+                
+                // Call the service to mark all seats as available
+                await _ticketService.UpdateSeatAvailability(seatIds, true, presentationId);
+                
+                // Also remove any existing seat locks
+                var existingLocks = await _context.SeatLocks
+                    .Where(l => l.PresentationId == presentationId)
+                    .ToListAsync();
+                    
+                if (existingLocks.Any())
+                {
+                    _context.SeatLocks.RemoveRange(existingLocks);
+                    await _context.SaveChangesAsync();
+                }
+                
+                return Ok($"Reset {seatIds.Count} seats to available for presentation {presentationId}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error resetting seat availability for presentation {PresentationId}", presentationId);
+                return StatusCode(500, "An error occurred while resetting seat availability");
             }
         }
 
@@ -288,43 +336,41 @@ namespace WebApi.Controllers
         {
             try
             {
+                _logger.LogInformation("StartGroupOrder called with PresentationId: {PresentationId}, NumberOfSeats: {NumberOfSeats}", 
+                    request.PresentationId, request.NumberOfSeats);
+
                 if (request.PresentationId <= 0)
                 {
+                    _logger.LogWarning("Invalid presentation ID: {PresentationId}", request.PresentationId);
                     return NotFound("Presentation not found");
                 }
 
                 if (request.NumberOfSeats <= 0 || request.NumberOfSeats > 20)
                 {
+                    _logger.LogWarning("Invalid number of seats requested: {NumberOfSeats}", request.NumberOfSeats);
                     return BadRequest("Invalid number of seats requested");
                 }
 
                 var response = await _ticketService.StartGroupOrder(request);
                 if (response == null)
                 {
-                    return BadRequest("No seats available");
+                    _logger.LogWarning("StartGroupOrder returned null response for presentation {PresentationId}", request.PresentationId);
+                    return BadRequest("Failed to create order");
                 }
 
-                // Lock all potential seats across all options
-                var allPotentialSeatIds = response.AvailableOptions.Values
-                    .SelectMany(o => o.SeatIds)
-                    .Distinct()
-                    .ToList();
-
-                var success = await TryLockSeats(allPotentialSeatIds, response.OrderToken, request.PresentationId);
-                if (!success)
-                {
-                    return BadRequest("Failed to lock seats");
-                }
-
+                _logger.LogInformation("Successfully created group order with token {OrderToken} for presentation {PresentationId}", 
+                    response.OrderToken, request.PresentationId);
                 return Ok(response);
             }
-            catch (NoSeatsAvailableException ex)
+            catch (NoSeatsAvailableException)
             {
-                return BadRequest(ex.Message);
+                _logger.LogWarning("No seats available for presentation {PresentationId}", request.PresentationId);
+                return BadRequest("No seats available");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error starting group order");
+                _logger.LogError(ex, "Error starting group order for presentation {PresentationId}, seats: {NumberOfSeats}: {ErrorMessage}",
+                    request.PresentationId, request.NumberOfSeats, ex.Message);
                 return StatusCode(500, "An error occurred");
             }
         }
@@ -379,15 +425,9 @@ namespace WebApi.Controllers
 
                     // Make unselected seats available again
                     var seatIdsToMakeAvailable = seatsToUnlock.Select(l => l.SeatId).ToList();
-                    var seatsToMakeAvailable = await _context.Seats
-                        .Where(s => seatIdsToMakeAvailable.Contains(s.Id))
-                        .ToListAsync();
 
-                    foreach (var seat in seatsToMakeAvailable)
-                    {
-                        seat.IsAvailable = true;
-                    }
-                    await _context.SaveChangesAsync();
+                    // Make seats available again using the service
+                    await _ticketService.UpdateSeatAvailability(seatIdsToMakeAvailable, true, order.PresentationId);
                 }
 
                 return Ok(response);
@@ -545,6 +585,35 @@ namespace WebApi.Controllers
         }
 
         /// <summary>
+        /// Generates the comfirmation email and sends it to the user
+        /// </summary>
+        /// <param name="orderToken">The unique identifier for the order</param>
+        /// <returns>A status code</returns>
+        /// <response code="200">Order finalized</response>
+        /// <response code="404">If the order is not found or already expired</response>
+        [HttpGet("{orderToken}/finalize")]
+        [ProducesResponseType(typeof(IActionResult), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> FinalizeOrder(Guid orderToken)
+        {
+            try
+            {
+                await _ticketService.FinalizeOrder(orderToken);
+                return Ok();
+            } 
+            catch(OrderNotFoundException ex)
+            {
+                _logger.LogWarning(ex, "Order not found");
+                return NotFound("Order not found");
+            }
+            catch(Exception ex)
+            {
+                _logger.LogError(ex, "Failed to finalize order");
+                return StatusCode(500, "An error occurred while finalizing the order");
+            }
+        }
+
+        /// <summary>
         /// Gets the ordered tickets in the form of a PDF file.
         /// </summary>
         /// <param name="orderToken">The unique identifier for the order</param>
@@ -559,7 +628,11 @@ namespace WebApi.Controllers
             try
             {
                 var pdf = await _ticketService.GetTicketsByOrderToken(orderToken);
-                return File(pdf, "application/pdf", orderToken + ".pdf");
+
+                Response.Headers.Add("Content-Disposition", $"inline; filename=\"ticket-{orderToken}.pdf\"");
+                Response.Headers.Add("Cache-Control", "public, max-age=60");
+                
+                return File(pdf, "application/pdf");
             }
             catch (OrderNotFoundException)
             {
@@ -587,7 +660,11 @@ namespace WebApi.Controllers
             try
             {
                 var pdf = await _ticketService.GetTicketsByPhoneBookingCode(phoneBookingCode);
-                return File(pdf, "application/pdf", phoneBookingCode + ".pdf");
+                
+                Response.Headers.Add("Content-Disposition", $"inline; filename=\"ticket-{phoneBookingCode}.pdf\"");
+                Response.Headers.Add("Cache-Control", "public, max-age=60");
+                
+                return File(pdf, "application/pdf");
             }
             catch (OrderNotFoundException)
             {
@@ -598,6 +675,463 @@ namespace WebApi.Controllers
                 _logger.LogError(ex, "An error occurred while creating the tickets");
                 return StatusCode(500, "An error occurred while creating the tickets");
             }
+        }
+
+        [HttpGet("test/almost-sold-out-test")]
+        public async Task<ActionResult> SetupAlmostSoldOutTest()
+        {
+            try
+            {
+                // First, let's get a movie to create presentations for
+                var movie = await _context.Movies
+                    .FirstOrDefaultAsync(m => m.IsActive);
+                
+                if (movie == null)
+                {
+                    return NotFound("No active movies found in the database");
+                }
+                
+                // Get halls to use for our test presentations
+                var halls = await _context.Halls.Take(3).ToListAsync();
+                if (halls.Count < 1)
+                {
+                    return NotFound("No halls found in the database");
+                }
+                
+                // Create presentations for the next 7 days instead of just today
+                var startDate = DateTime.Today;
+                var endDate = startDate.AddDays(6); // 7 days total (today + 6 more days)
+                
+                // Get the current time to ensure we don't create presentations in the past for today
+                var currentTime = DateTime.Now.TimeOfDay;
+                
+                var allResults = new List<object>();
+                var allCreatedOrUpdated = new List<Presentation>();
+                
+                // Iterate through each day in our date range
+                for (var testDate = startDate; testDate <= endDate; testDate = testDate.AddDays(1))
+                {
+                    var isToday = testDate.Date == DateTime.Today;
+                    
+                    // Create startTimes - for today, ensure they're in the future
+                    // For other days, use consistent times
+                    var startTimes = new List<TimeSpan>();
+                    
+                    // Base times that will be used for all days
+                    var baseTimes = new List<TimeSpan>
+                    {
+                        new TimeSpan(10, 0, 0),   // 10:00 AM
+                        new TimeSpan(14, 30, 0),  // 2:30 PM
+                        new TimeSpan(17, 0, 0),   // 5:00 PM
+                        new TimeSpan(19, 30, 0),  // 7:30 PM
+                        new TimeSpan(21, 0, 0),   // 9:00 PM
+                        new TimeSpan(22, 15, 0)   // 10:15 PM
+                    };
+                    
+                    // For today, filter out times that have already passed
+                    if (isToday)
+                    {
+                        startTimes = baseTimes.Where(t => t > currentTime.Add(new TimeSpan(0, 30, 0))).ToList();
+                        
+                        // If all times have passed for today, add some times for late evening
+                        if (!startTimes.Any())
+                        {
+                            // Add a couple of late evening times if it's still early enough
+                            var currentHour = currentTime.Hours;
+                            if (currentHour < 22)
+                            {
+                                startTimes.Add(new TimeSpan(22, 0, 0));  // 10:00 PM
+                                startTimes.Add(new TimeSpan(23, 30, 0));  // 11:30 PM
+                            }
+                            else if (currentHour < 23)
+                            {
+                                startTimes.Add(new TimeSpan(23, 30, 0));  // 11:30 PM
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // For future days, use all base times
+                        startTimes = baseTimes;
+                    }
+                    
+                    // Skip this day if we don't have any valid start times
+                    if (!startTimes.Any())
+                    {
+                        continue;
+                    }
+                    
+                    var results = new List<object>();
+                    var createdOrUpdated = new List<Presentation>();
+                    
+                    // For each hall, set up presentations with different levels of availability
+                    foreach (var hall in halls)
+                    {
+                        // Get total seats in this hall
+                        int totalSeats = hall.Rows * hall.SeatsPerRow;
+                        
+                        // Create availability scenarios:
+                        // 1. Completely sold out (0% seats remaining)
+                        // 2. Almost sold out (less than 15% seats remaining)
+                        // 3. Moderately full (30-50% seats remaining)
+                        // 4. Plenty available (70-90% seats remaining)
+                        var availabilityScenarios = new[] {
+                            0,                          // 0% available (completely sold out)
+                            (int)(totalSeats * 0.05),   // 5% available (almost sold out)
+                            (int)(totalSeats * 0.35),   // 35% available (moderately full)
+                            (int)(totalSeats * 0.8)     // 80% available (plenty available)
+                        };
+                        
+                        // Limit how many scenarios we use based on available time slots
+                        int maxScenarios = Math.Min(startTimes.Count, availabilityScenarios.Length);
+                        
+                        for (int i = 0; i < maxScenarios; i++)
+                        {
+                            var startTime = startTimes[i];
+                            var availableSeats = availabilityScenarios[i];
+                            
+                            // Create a start DateTime and calculate end time based on movie duration
+                            var presentationStart = testDate.Add(startTime);
+                            var presentationEnd = presentationStart.AddMinutes(movie.DurationMinutes);
+                            
+                            // Create or update a test presentation
+                            var presentation = await _context.Presentations
+                                .FirstOrDefaultAsync(p => 
+                                    p.MovieId == movie.Id && 
+                                    p.HallId == hall.Id && 
+                                    p.StartTime.Date == testDate.Date && 
+                                    p.StartTime.Hour == presentationStart.Hour);
+                                    
+                            if (presentation == null)
+                            {
+                                // Create new presentation
+                                presentation = new Presentation
+                                {
+                                    MovieId = movie.Id,
+                                    Movie = movie,
+                                    HallId = hall.Id,
+                                    Hall = hall,
+                                    StartTime = presentationStart,
+                                    EndTime = presentationEnd,
+                                    Price = 12.50m,
+                                    Format = i == 0 ? "2D" : (i == 1 ? "3D" : "IMAX"),
+                                    HallName = hall.Name,
+                                    AvailableSeats = availableSeats,
+                                    CreatedAt = DateTime.UtcNow,
+                                    UpdatedAt = DateTime.UtcNow
+                                };
+                                
+                                _context.Presentations.Add(presentation);
+                            }
+                            else
+                            {
+                                // Update existing presentation
+                                presentation.AvailableSeats = availableSeats;
+                                presentation.UpdatedAt = DateTime.UtcNow;
+                            }
+                            
+                            await _context.SaveChangesAsync();
+                            createdOrUpdated.Add(presentation);
+                            
+                            // Create or update seat presentations for this presentation
+                            await EnsureSeatPresentationsExist(presentation.Id, availableSeats, totalSeats);
+                            
+                            // Add presentation with availability info to results
+                            results.Add(new {
+                                PresentationId = presentation.Id,
+                                Date = presentation.StartTime.ToShortDateString(),
+                                HallName = hall.Name,
+                                MovieTitle = movie.Title,
+                                StartTime = presentation.StartTime.ToString("HH:mm"),
+                                Format = presentation.Format,
+                                TotalSeats = totalSeats,
+                                AvailableSeats = availableSeats,
+                                SoldOutPercentage = 100 - (availableSeats * 100 / totalSeats),
+                                AlmostSoldOut = availableSeats > 0 && availableSeats <= totalSeats * 0.15,
+                                SoldOut = availableSeats == 0
+                            });
+                        }
+                    }
+                    
+                    // Add this day's results to the overall results
+                    allResults.AddRange(results);
+                    allCreatedOrUpdated.AddRange(createdOrUpdated);
+                }
+                
+                // Group results by date for better presentation
+                var groupedResults = allResults
+                    .GroupBy(r => ((dynamic)r).Date)
+                    .Select(g => new {
+                        Date = g.Key,
+                        Presentations = g.ToList()
+                    })
+                    .OrderBy(g => DateTime.Parse(g.Date))
+                    .ToList();
+                
+                return Ok(new {
+                    DateRange = $"{startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}",
+                    PresentationsCreated = allCreatedOrUpdated.Count,
+                    Note = "These presentations are available in the regular schedule. Refresh the schedule page to view them.",
+                    ScheduleByDay = groupedResults
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting up almost sold out test");
+                return StatusCode(500, $"Error setting up test: {ex.Message}");
+            }
+        }
+        
+        // Helper method to create or update seat presentations for a given presentation
+        private async Task EnsureSeatPresentationsExist(int presentationId, int availableSeats, int totalSeats)
+        {
+            // Get seats for this presentation's hall
+            var presentation = await _context.Presentations
+                .Include(p => p.Hall)
+                .ThenInclude(h => h.Seats)
+                .FirstOrDefaultAsync(p => p.Id == presentationId);
+                
+            if (presentation == null || presentation.Hall == null || !presentation.Hall.Seats.Any())
+                return;
+                
+            // Get all the seats
+            var seats = presentation.Hall.Seats.ToList();
+            if (!seats.Any())
+                return;
+                
+            // Calculate how many seats should be unavailable
+            int unavailableCount = totalSeats - availableSeats;
+            
+            // Get existing seat presentations
+            var existingSeatPresentations = await _context.SeatPresentations
+                .Where(sp => sp.PresentationId == presentationId)
+                .ToListAsync();
+                
+            // If no existing seat presentations, create them
+            if (!existingSeatPresentations.Any())
+            {
+                _logger.LogInformation($"Creating {seats.Count} new seat presentations for presentation {presentationId}");
+                
+                // Shuffle the seats to randomize which ones are available
+                var random = new Random(presentationId); // Use presentation ID as seed for consistent results
+                var shuffledSeats = seats.OrderBy(s => random.Next()).ToList();
+                
+                // Create seat presentations for all seats
+                var seatPresentations = new List<SeatPresentation>();
+                
+                for (int i = 0; i < shuffledSeats.Count; i++)
+                {
+                    var seat = shuffledSeats[i];
+                    var isAvailable = i >= unavailableCount; // First 'unavailableCount' seats are not available
+                    
+                    seatPresentations.Add(new SeatPresentation
+                    {
+                        SeatId = seat.Id,
+                        PresentationId = presentationId,
+                        IsAvailable = isAvailable,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    });
+                }
+                
+                await _context.SeatPresentations.AddRangeAsync(seatPresentations);
+                await _context.SaveChangesAsync();
+                
+                _logger.LogInformation($"Created {seatPresentations.Count} seat presentations with {availableSeats} available seats");
+
+                // Create actual ticket orders and tickets for unavailable seats
+                await CreateFakeTicketOrders(shuffledSeats.Take(unavailableCount).Select(s => s.Id).ToList(), presentationId);
+            }
+            else
+            {
+                _logger.LogInformation($"Updating {existingSeatPresentations.Count} existing seat presentations for presentation {presentationId}");
+                
+                // Update existing seat presentations
+                // Make sure we have a record for every seat
+                var existingSeatIds = existingSeatPresentations.Select(sp => sp.SeatId).ToHashSet();
+                var missingSeatPresentations = new List<SeatPresentation>();
+                
+                foreach (var seat in seats)
+                {
+                    if (!existingSeatIds.Contains(seat.Id))
+                    {
+                        missingSeatPresentations.Add(new SeatPresentation
+                        {
+                            SeatId = seat.Id,
+                            PresentationId = presentationId,
+                            IsAvailable = true, // Default to available
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+                
+                if (missingSeatPresentations.Any())
+                {
+                    _logger.LogInformation($"Adding {missingSeatPresentations.Count} missing seat presentations");
+                    await _context.SeatPresentations.AddRangeAsync(missingSeatPresentations);
+                    await _context.SaveChangesAsync();
+                    
+                    // Refresh the list of all seat presentations
+                    existingSeatPresentations = await _context.SeatPresentations
+                        .Where(sp => sp.PresentationId == presentationId)
+                        .ToListAsync();
+                }
+                
+                // Shuffle for random availability - use a combination of presentation ID and current time
+                // for a different result each time
+                var random = new Random(presentationId + (int)DateTime.Now.Ticks % 10000);
+                var shuffledPresentations = existingSeatPresentations.OrderBy(s => random.Next()).ToList();
+                
+                // Get the unavailable seat IDs
+                var unavailableSeatIds = new List<int>();
+                
+                // Update availability based on our desired number of available seats
+                for (int i = 0; i < shuffledPresentations.Count; i++)
+                {
+                    var isAvailable = i >= unavailableCount;
+                    if (shuffledPresentations[i].IsAvailable != isAvailable)
+                    {
+                        shuffledPresentations[i].IsAvailable = isAvailable;
+                        shuffledPresentations[i].UpdatedAt = DateTime.UtcNow;
+                        
+                        if (!isAvailable)
+                        {
+                            unavailableSeatIds.Add(shuffledPresentations[i].SeatId);
+                        }
+                    }
+                }
+                
+                await _context.SaveChangesAsync();
+                _logger.LogInformation($"Updated seat presentations to have {availableSeats} available seats");
+                
+                // Create tickets for the newly unavailable seats
+                if (unavailableSeatIds.Any())
+                {
+                    // First, remove any existing tickets or locks for these seats to avoid conflicts
+                    var existingTickets = await _context.Tickets
+                        .Where(t => t.PresentationId == presentationId && unavailableSeatIds.Contains(t.SeatId))
+                        .ToListAsync();
+                    
+                    if (existingTickets.Any())
+                    {
+                        _context.Tickets.RemoveRange(existingTickets);
+                        await _context.SaveChangesAsync();
+                    }
+                    
+                    var existingLocks = await _context.SeatLocks
+                        .Where(l => l.PresentationId == presentationId && unavailableSeatIds.Contains(l.SeatId))
+                        .ToListAsync();
+                    
+                    if (existingLocks.Any())
+                    {
+                        _context.SeatLocks.RemoveRange(existingLocks);
+                        await _context.SaveChangesAsync();
+                    }
+                    
+                    // Now create new ticket orders and tickets
+                    await CreateFakeTicketOrders(unavailableSeatIds, presentationId);
+                }
+            }
+        }
+        
+        // Helper method to create fake ticket orders and tickets
+        private async Task CreateFakeTicketOrders(List<int> seatIds, int presentationId)
+        {
+            if (!seatIds.Any())
+                return;
+                
+            _logger.LogInformation($"Creating fake ticket orders for {seatIds.Count} seats in presentation {presentationId}");
+            
+            // Create tickets in batches of 1-4 seats per order
+            var random = new Random(presentationId);
+            var remainingSeats = new List<int>(seatIds);
+            
+            while (remainingSeats.Any())
+            {
+                // Determine batch size (1-4 seats per order)
+                int batchSize = Math.Min(random.Next(1, 5), remainingSeats.Count);
+                var batchSeatIds = remainingSeats.Take(batchSize).ToList();
+                remainingSeats.RemoveRange(0, batchSize);
+                
+                // Create a new ticket order
+                var orderToken = Guid.NewGuid();
+                var orderTimestamp = DateTime.UtcNow.AddMinutes(-random.Next(5, 60)); // Random time in the past
+                
+                // Get the presentation
+                var presentation = await _context.Presentations.FindAsync(presentationId);
+                if (presentation == null)
+                {
+                    _logger.LogError($"Presentation {presentationId} not found when creating fake orders");
+                    continue;
+                }
+                
+                var order = new TicketOrder
+                {
+                    PresentationId = presentationId,
+                    OrderToken = orderToken,
+                    Status = OrderStatus.Confirmed, // Order is confirmed
+                    CreatedAt = orderTimestamp,
+                    ExpiresAt = orderTimestamp.AddMinutes(10), // Already expired
+                    Items = new List<TicketOrderItem>()
+                };
+                
+                _context.TicketOrders.Add(order);
+                await _context.SaveChangesAsync(); // Save to get the order ID
+                
+                // Create order items
+                foreach (var seatId in batchSeatIds)
+                {
+                    order.Items.Add(new TicketOrderItem
+                    {
+                        TicketOrderId = order.Id,
+                        SeatId = seatId,
+                        CreatedAt = orderTimestamp
+                    });
+                }
+                
+                await _context.SaveChangesAsync();
+                
+                // Create tickets
+                var tickets = new List<Ticket>();
+                var customerName = $"Test Customer {random.Next(1000, 9999)}";
+                var customerEmail = $"test{random.Next(1000, 9999)}@example.com";
+                
+                foreach (var seatId in batchSeatIds)
+                {
+                    var seat = await _context.Seats.FindAsync(seatId);
+                    
+                    if (seat != null)
+                    {
+                        // Create a new ticket with all required properties
+                        var ticket = new Ticket
+                        {
+                            PresentationId = presentationId,
+                            SeatId = seatId,
+                            TicketOrderId = order.Id,
+                            CustomerName = customerName,
+                            CustomerEmail = customerEmail,
+                            Status = TicketStatus.Reserved,
+                            PurchaseDate = orderTimestamp,
+                            CreatedAt = orderTimestamp,
+                            UpdatedAt = orderTimestamp,
+                            Presentation = presentation,
+                            Seat = seat,
+                            TicketOrder = order
+                        };
+                        
+                        tickets.Add(ticket);
+                    }
+                }
+                
+                if (tickets.Any())
+                {
+                    await _context.Tickets.AddRangeAsync(tickets);
+                    await _context.SaveChangesAsync();
+                }
+            }
+            
+            _logger.LogInformation($"Successfully created fake ticket orders for presentation {presentationId}");
         }
 
         private async Task<bool> TryLockSeats(List<int> seatIds, Guid orderToken, int presentationId)
@@ -637,16 +1171,9 @@ namespace WebApi.Controllers
 
                 await _context.SaveChangesAsync();
 
-                // Now update the seat availability
-                foreach (var seatId in seatIds)
-                {
-                    var seat = await _context.Seats.FindAsync(seatId);
-                    if (seat != null)
-                    {
-                        seat.IsAvailable = false; // Set the seat availability to false
-                        await _context.SaveChangesAsync(); // Save changes to the database
-                    }
-                }
+                // Use the ticket service to update seat availability 
+                // This will also update the presentation's AvailableSeats count
+                await _ticketService.UpdateSeatAvailability(seatIds, false, presentationId);
 
                 return true;
             }
