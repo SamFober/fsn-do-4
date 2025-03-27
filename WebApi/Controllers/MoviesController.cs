@@ -1,25 +1,25 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using WebApi.Interfaces.Services;
 
-[Route("api/movies")]
 [ApiController]
+[Route("api/[controller]")]
+[Produces("application/json")]
 public class MoviesController : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IMovieService _movieService;
+    private readonly ILogger<MoviesController> _logger;
 
-    public MoviesController(ApplicationDbContext context)
+    public MoviesController(IMovieService movieService, ILogger<MoviesController> logger)
     {
-        _context = context;
+        _movieService = movieService;
+        _logger = logger;
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetMovieById(int id)
     {
-        var movie = await _context.Movies
-            .Include(m => m.Presentations) // Include presentations for the movie
-            .Include(m => m.Formats)      // Include formats for the movie
-            .Where(m => m.Id == id)
-            .FirstOrDefaultAsync();
+        var movie = await _movieService.GetMovieById(id);
 
         if (movie == null) return NotFound();
 
@@ -28,12 +28,32 @@ public class MoviesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetMovies()
     {
-        var movies = await _context.Movies
-            .Include(m => m.Presentations) // Include presentations for each movie
-            .Include(m => m.Formats)       // Include formats for each movie
-            .Where(m => m.IsActive) // Optionally filter by active status
-            .ToListAsync();
+        var movies = await _movieService.GetAllMovies();
 
         return Ok(movies);
     }
+
+    public async Task<IActionResult> GetMovies([FromQuery] string? search, [FromQuery] string? genre)
+    {
+        var movies = await _movieService.GetAllMovies();
+
+        if (!string.IsNullOrEmpty(search))
+        {
+            movies = movies.Where(m => m.Title.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        if (!string.IsNullOrEmpty(genre))
+        {
+            movies = movies.Where(m => m.Genre.Equals(genre, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        // If no movies match, return the full list instead of an empty list
+        if (!movies.Any())
+        {
+            movies = await _movieService.GetAllMovies(); // Reset to all movies
+        }
+
+        return Ok(movies);
+    }
+
 }

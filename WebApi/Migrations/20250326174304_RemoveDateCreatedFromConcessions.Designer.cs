@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -9,9 +10,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace WebApi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250326174304_RemoveDateCreatedFromConcessions")]
+    partial class RemoveDateCreatedFromConcessions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -195,9 +198,6 @@ namespace WebApi.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
-
-                    b.Property<bool>("IsSecretMovie")
-                        .HasColumnType("tinyint(1)");
 
                     b.Property<int>("MovieId")
                         .HasColumnType("int");
@@ -433,10 +433,10 @@ namespace WebApi.Migrations
 
             modelBuilder.Entity("WebApi.Models.OrderConcessionItem", b =>
                 {
-                    b.HasOne("WebApi.Models.ConcessionItem", "ConcessionItem")
+                    b.HasOne("WebApi.Models.OrderConcessionItem", "ConcessionItem")
                         .WithMany()
                         .HasForeignKey("ConcessionItemId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("WebApi.Models.TicketOrder", "Order")

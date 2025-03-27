@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -9,9 +10,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace WebApi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250326151855_AddConcessionItemsFix")]
+    partial class AddConcessionItemsFix
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -23,6 +26,9 @@ namespace WebApi.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -153,8 +159,14 @@ namespace WebApi.Migrations
                     b.Property<int>("ConcessionItemId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<int>("OrderId")
                         .HasColumnType("int");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
@@ -195,9 +207,6 @@ namespace WebApi.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
-
-                    b.Property<bool>("IsSecretMovie")
-                        .HasColumnType("tinyint(1)");
 
                     b.Property<int>("MovieId")
                         .HasColumnType("int");
@@ -433,14 +442,14 @@ namespace WebApi.Migrations
 
             modelBuilder.Entity("WebApi.Models.OrderConcessionItem", b =>
                 {
-                    b.HasOne("WebApi.Models.ConcessionItem", "ConcessionItem")
+                    b.HasOne("WebApi.Models.OrderConcessionItem", "ConcessionItem")
                         .WithMany()
                         .HasForeignKey("ConcessionItemId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("WebApi.Models.TicketOrder", "Order")
-                        .WithMany("ConcessionItems")
+                        .WithMany()
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -599,8 +608,6 @@ namespace WebApi.Migrations
 
             modelBuilder.Entity("WebApi.Models.TicketOrder", b =>
                 {
-                    b.Navigation("ConcessionItems");
-
                     b.Navigation("Items");
 
                     b.Navigation("SeatLocks");

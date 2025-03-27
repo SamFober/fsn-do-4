@@ -21,6 +21,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<SeatLock> SeatLocks { get; set; } = null!;
     public DbSet<MovieFormat> MovieFormats { get; set; } = null!;
     public DbSet<SeatPresentation> SeatPresentations { get; set; } = null!;
+    public DbSet<ConcessionItem> ConcessionItems { get; set; } = null!;
+    public DbSet<OrderConcessionItem> OrderConcessionItems { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -81,5 +83,17 @@ public class ApplicationDbContext : DbContext
                     c => c != null ? new Dictionary<string, SeatingOption>(c) : new Dictionary<string, SeatingOption>()
                 )
             );
+
+        modelBuilder.Entity<OrderConcessionItem>()
+            .HasOne(oci => oci.Order)
+            .WithMany(o => o.ConcessionItems)
+            .HasForeignKey(oci => oci.OrderId)
+            .OnDelete(DeleteBehavior.Cascade); 
+
+        modelBuilder.Entity<OrderConcessionItem>()
+            .HasOne(oci => oci.ConcessionItem)
+            .WithMany()
+            .HasForeignKey(oci => oci.ConcessionItemId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

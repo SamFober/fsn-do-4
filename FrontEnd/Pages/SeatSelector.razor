@@ -153,6 +153,13 @@
                                                 <option value="senior">Senior - €@GetTicketTypePrice("senior")</option>
                                                 <option value="student">Student - €@GetTicketTypePrice("student")</option>
                                             </select>
+                                            <select class="form-select" @onchange="@(e => SelectPopcornType(seat.Id, e.Value.ToString()))">
+                                                <option value="">Concessions</option>
+                                                @foreach (var item in concessions)
+                                                {
+                                                    <option value="@item.Id">@item.Name (€@item.Price.ToString("F2"))</option>
+                                                }
+                                            </select>
                                         </div>
                                     </div>
                                 }
@@ -164,6 +171,13 @@
                                             <div class="price-row">
                                                 <span>@GetTicketTypeName(ticketGroup.Key) (@ticketGroup.Count())</span>
                                                 <span>€@((GetTicketTypePrice(ticketGroup.Key) * ticketGroup.Count()).ToString("F2"))</span>
+                                            </div>
+                                        }
+                                        @foreach (var popcornType in popcornTypes.GroupBy(t => t.Value))
+                                        {
+                                            <div class="price-row">
+                                                <span>@GetConcessionTypeName(int.Parse(popcornType.Key)) (@popcornType.Count())</span>
+                                                <span>€@(GetConcessionTypePrice(int.Parse(popcornType.Key)) * (popcornType.Count()))</span>
                                             </div>
                                         }
                                     </div>
@@ -387,6 +401,7 @@
     private string? message;
     private int numberOfSeats = 1;
     private List<Seat> selectedSeats = new List<Seat>();
+    private List<ConcessionItem> concessions = new List<ConcessionItem>();
     private string? orderToken;
     private int? preselectedSeatId;
     private Dictionary<string, SeatingOption>? availableOptions;
@@ -403,6 +418,7 @@
     private TimeSpan timeRemaining = TimeSpan.Zero;
 
     private Dictionary<int, string> ticketTypes = new Dictionary<int, string>();
+    private Dictionary<int, string> popcornTypes = new Dictionary<int, string>();
     private int activeStep = 1;
 
     private Timer messageTimer = new Timer(5000); // 5 seconds
@@ -597,6 +613,7 @@
         try
         {
             presentation = await Http.GetFromJsonAsync<Presentation>($"api/presentations/{PresentationId}/seats");
+            concessions = await Http.GetFromJsonAsync<List<ConcessionItem>>("api/concessions");
 
             if (presentation == null || presentation.Rows.Count == 0)
             {
@@ -988,7 +1005,12 @@
             validationTimer.Stop();
             orderExpirationTime = null;
 
-            var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { customerName = "NamHere", customerEmail = "validEmailHere" });
+            foreach (var popcornType in popcornTypes.GroupBy(t => t.Value))
+            {
+                var concessionsResponse = await Http.PostAsJsonAsync($"api/concessions/{orderToken}", new { ConcessionItemId = popcornType.Key, quantity = popcornType.Count() });
+            }
+
+            var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { customerName = "John Doe", customerEmail = "j.doe@example.com" });
 
             if (confirmationResponse.IsSuccessStatusCode)
                 /*{
@@ -1091,54 +1113,54 @@
     {
         try
         {
-            string? tokenToCancel = orderToken ?? pendingGroupOrder?.OrderToken;
-            if (tokenToCancel != null)
-            {
-                // Hide any open modals
-                showSeatSelectionModal = false;
-                await JSRuntime.InvokeVoidAsync("hideModal", "seatingOptionsModal");
-                await JSRuntime.InvokeVoidAsync("hideModal", "singleOptionConfirmModal");
-                await JSRuntime.InvokeVoidAsync("hideModal", "numpadModal");
+    string? tokenToCancel = orderToken ?? pendingGroupOrder?.OrderToken;
+    if (tokenToCancel != null)
+    {
+        // Hide any open modals
+        showSeatSelectionModal = false;
+        await JSRuntime.InvokeVoidAsync("hideModal", "seatingOptionsModal");
+        await JSRuntime.InvokeVoidAsync("hideModal", "singleOptionConfirmModal");
+        await JSRuntime.InvokeVoidAsync("hideModal", "numpadModal");
 
-                // Call the API to cancel the order
-                var response = await Http.PostAsync($"api/tickets/orders/{tokenToCancel}/cancel", null);
+        // Call the API to cancel the order
+        var response = await Http.PostAsync($"api/tickets/orders/{tokenToCancel}/cancel", null);
 
-                if (response.IsSuccessStatusCode)
-                {
-                    // Stop both timers
-                    expirationTimer.Stop();
-                    validationTimer.Stop();
-                    orderExpirationTime = null;
+        if (response.IsSuccessStatusCode)
+        {
+            // Stop both timers
+            expirationTimer.Stop();
+            validationTimer.Stop();
+            orderExpirationTime = null;
 
-                    // Clear local state
-                    orderToken = null;
-                    pendingGroupOrder = null;
-                    selectedSeats.Clear();
-                    availableOptions = null;
-                    selectedOption = null;
-                    SetMessage("Order cancelled successfully.");
-                    numpadPinConfirmed = false;
-                    NumpadClearInput();
+            // Clear local state
+            orderToken = null;
+            pendingGroupOrder = null;
+            selectedSeats.Clear();
+            availableOptions = null;
+            selectedOption = null;
+            SetMessage("Order cancelled successfully.");
+            numpadPinConfirmed = false;
+            NumpadClearInput();
 
-                    // Navigate back to the previous page using our custom navigateBack function
-                    await JSRuntime.InvokeVoidAsync("navigateBack");
-                }
-                else
-                {
-                    var error = await response.Content.ReadAsStringAsync();
-                    SetMessage($"Failed to cancel order: {error}");
-                }
-            }
-            else
-            {
-                // If there's no active order yet, just navigate back to the previous page
-                await JSRuntime.InvokeVoidAsync("navigateBack");
-            }
+            // Navigate back to the previous page using our custom navigateBack function
+            await JSRuntime.InvokeVoidAsync("navigateBack");
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            SetMessage($"Failed to cancel order: {error}");
+        }
+    }
+    else
+    {
+        // If there's no active order yet, just navigate back to the previous page
+        await JSRuntime.InvokeVoidAsync("navigateBack");
+    }
         }
         catch (Exception ex)
         {
-            SetMessage($"Error cancelling order: {ex.Message}");
-            Console.WriteLine($"Error cancelling order: {ex}");
+    SetMessage($"Error cancelling order: {ex.Message}");
+    Console.WriteLine($"Error cancelling order: {ex}");
         }
     }
 
@@ -1154,6 +1176,30 @@
         }
 
         StateHasChanged();
+    }
+
+    private void SelectPopcornType(int seatId, string popcornType = null)
+    {
+        if (string.IsNullOrEmpty(popcornType)) 
+        {
+    if (popcornTypes.ContainsKey(seatId))
+    {
+        popcornTypes.Remove(seatId);
+        StateHasChanged(); 
+    }
+        }
+        else
+        {
+    if (popcornTypes.ContainsKey(seatId))
+    {
+        popcornTypes[seatId] = popcornType;
+    }
+    else
+    {
+        popcornTypes.Add(seatId, popcornType);
+    }
+    StateHasChanged();
+        }
     }
 
     private string GetTicketTypeName(string type)
@@ -1187,6 +1233,16 @@
         return price;
     }
 
+        private string GetConcessionTypeName(int id)
+    {
+        return concessions.FirstOrDefault(c => c.Id == id)?.Name ?? "Unknown";
+    }
+
+    private decimal GetConcessionTypePrice(int id)
+    {
+        return concessions.FirstOrDefault(c => c.Id == id)?.Price ?? 0;
+    }
+
     private decimal CalculateTotalPrice()
     {
         decimal total = 0;
@@ -1202,6 +1258,11 @@
     }
 
     total += GetTicketTypePrice(ticketType);
+        }
+
+        foreach (var type in popcornTypes)
+        {
+            total += GetConcessionTypePrice(int.Parse(type.Value));
         }
 
         return total;
@@ -1222,6 +1283,11 @@
     {
         ticketTypes.Add(seat.Id, "adult");
     }
+
+    if (!popcornTypes.ContainsKey(seat.Id))
+    {
+        popcornTypes.Add(seat.Id, "");
+    }
         }
 
         // Remove ticket types for seats that are no longer selected
@@ -1231,6 +1297,12 @@
         foreach (var key in keysToRemove)
         {
     ticketTypes.Remove(key);
+        }
+
+        keysToRemove = popcornTypes.Keys.Where(k => !seatIds.Contains(k)).ToList();
+        foreach (var key in keysToRemove)
+        {
+    popcornTypes.Remove(key);
         }
     }
 
@@ -1281,7 +1353,8 @@
 
     private void GetTickets()
     {
-        string url = $"http://localhost:5270/{orderToken}/finish";
+        // Use a relative path instead of hardcoded URL
+        string url = $"/{orderToken}/finish";
         Navigation.NavigateTo(url, true);
     }
 
