@@ -26,6 +26,7 @@
             <ul class="nav-links @(isMobileMenuOpen ? "active" : "")">
                 <li><a href="#film-posters">Movies</a></li>
                 <li><a href="/schedule">Schedule</a></li>
+                <li><a href="/secret-movies">Secret Movies</a></li>
             </ul>
         </div>
         
@@ -161,7 +162,7 @@
         try
         {
             Movies = await Http.GetFromJsonAsync<List<Movie>>("api/movies") ?? new List<Movie>();
-            
+
             // Default backdrop URL if none exists
             foreach (var movie in Movies)
             {
@@ -261,7 +262,7 @@
         }
         return Task.CompletedTask;
     }
-    
+
     public void Dispose()
     {
         objRef?.Dispose();

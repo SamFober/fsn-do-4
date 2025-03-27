@@ -49,7 +49,9 @@
                 }
             </div>
             <div class="sticky-title-container">
-                <h3 class="cinema-title sticky-title">@(presentation?.Title ?? "Unknown Movie") - @(presentation?.HallName ?? "Unknown Hall")</h3>
+                <h3 class="cinema-title sticky-title">
+                    @(presentation?.IsSecretMovie == true ? "Secret Movie" : (presentation?.Title ?? "Unknown Movie")) - @(presentation?.HallName ?? "Unknown Hall")
+                </h3>
             </div>
         </div>
     </div>
@@ -146,10 +148,10 @@
                                         <div class="ticket-type-selector">
                                             <select class="form-select" value="@(ticketTypes.ContainsKey(seat.Id) ? ticketTypes[seat.Id] : "adult")" 
                                             @onchange="@(e => SelectTicketType(seat.Id, e.Value.ToString()))">
-                                                <option value="adult">Adult - €12.50</option>
-                                                <option value="child">Child - €8.50</option>
-                                                <option value="senior">Senior - €10.50</option>
-                                                <option value="student">Student - €9.50</option>
+                                                <option value="adult">Adult - €@GetTicketTypePrice("adult")</option>
+                                                <option value="child">Child - €@GetTicketTypePrice("child")</option>
+                                                <option value="senior">Senior - €@GetTicketTypePrice("senior")</option>
+                                                <option value="student">Student - €@GetTicketTypePrice("student")</option>
                                             </select>
                                             <select class="form-select" @onchange="@(e => SelectPopcornType(seat.Id, e.Value.ToString()))">
                                                 <option value="">Concessions</option>
@@ -202,7 +204,7 @@
 <div class="overlay-modal @(showSeatSelectionModal ? "show" : "")" id="seatSelectionModal">
     <div class="overlay-modal-content">
         <div class="overlay-modal-header">
-            <h3 class="modal-title">Select Seats for @(presentation?.Title ?? "Unknown Movie")</h3>
+            <h3 class="modal-title">Select Seats for @(presentation?.IsSecretMovie == true ? "Secret Movie" : (presentation?.Title ?? "Unknown Movie"))</h3>
         </div>
         <div class="overlay-modal-body">
             @if (!string.IsNullOrEmpty(groupOrderError))
@@ -1214,14 +1216,21 @@
 
     private decimal GetTicketTypePrice(string type)
     {
-        return type switch
+        decimal price = type switch
         {
-    "adult" => 12.50m,
-    "child" => 8.50m,
-    "senior" => 10.50m,
-    "student" => 9.50m,
-    _ => 12.50m
+            "adult" => 12.50m,
+            "child" => 8.50m,
+            "senior" => 10.50m,
+            "student" => 9.50m,
+            _ => 12.50m
         };
+
+        if (presentation.IsSecretMovie)
+        {
+            price -= 2.50m;
+        }
+
+        return price;
     }
 
         private string GetConcessionTypeName(int id)

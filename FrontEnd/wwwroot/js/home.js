@@ -35,3 +35,15 @@ document.addEventListener('click', function(event) {
         }
     }
 }); 
+
+// Close mobile menu when clicking outside
+document.addEventListener('click', function (event) {
+    const mobileMenu = document.querySelector('.nav-links.active');
+    const menuIcon = document.querySelector('.menu-icon');
+
+    if (mobileMenu && !mobileMenu.contains(event.target) && !menuIcon.contains(event.target)) {
+        if (window.DotNet) {
+            DotNet.invokeMethodAsync('FrontEnd', 'CloseMobileMenuSecretMovies');
+        }
+    }
+}); 
