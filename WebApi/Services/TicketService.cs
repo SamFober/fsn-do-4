@@ -620,7 +620,34 @@ namespace WebApi.Services
                 throw;
             }
         }
+        public async Task<OrderConcessionItem?> AddConcessionToOrder(Guid orderToken, AddConcessionRequest request)
+        {
+            var order = await _repository.GetOrderByToken(orderToken);
+            if (order == null)
+            {
+                throw new OrderNotFoundException("Order not found or expired");
+            }
 
+            var concessionItem = await _repository.GetConcessionById(request.ConcessionItemId);
+            if (concessionItem == null)
+            {
+                throw new ConcessionNotFoundException("Concession item not available.");
+            }
+
+            var orderConcession = new OrderConcessionItem
+            {
+                OrderId = order.Id,
+                ConcessionItemId = request.ConcessionItemId,
+                Quantity = request.Quantity
+            };
+
+            bool success= await _repository.AddConcessionToOrder(orderConcession);
+            if (!success)
+            {
+                throw new Exception("Failed to add concession item to order.");
+            }
+            return orderConcession;
+        }
         public async Task<OrderResponse> AddSeatsToOrder(Guid orderToken, AddSeatsRequest request)
         {
             try
@@ -935,6 +962,7 @@ namespace WebApi.Services
         public async Task<byte[]> GetTicketsByOrderToken(Guid orderToken)
         {
             var ticketOrder = await _repository.FindTicketOrderByOrderToken(orderToken);
+            var concessionItems = await _repository.FindConcessionItemsByOrderToken(orderToken);
 
             if (ticketOrder == null)
             {
@@ -943,18 +971,18 @@ namespace WebApi.Services
 
             var tickets = await _repository.FindTicketsByOrderId(ticketOrder.Id);
 
-            return _ticketPdfService.CreatePdfTicketsAsByteArray(tickets, ticketOrder.OrderToken);
+            return _ticketPdfService.CreatePdfTicketsAsByteArray(tickets, concessionItems, ticketOrder.OrderToken);
         }
 
         public async Task<byte[]> GetTicketsByPhoneBookingCode(string phoneBookingCode)
         {
-            var tickets = await _repository.FindTicketsByPhoneBookingCode(phoneBookingCode);
+            var tickets = await _repository.FindTicketsByPhoneBookingCode(phoneBookingCode); 
             if (!tickets.Any())
             {
                 throw new TicketNotFoundException($"No tickets found with phone booking code {phoneBookingCode}");
             }
             
-            return _ticketPdfService.CreatePdfTicketsAsByteArray(tickets, Guid.NewGuid());
+            return _ticketPdfService.CreatePdfTicketsAsByteArray(tickets, null ,Guid.NewGuid());
         }
 
         public async Task UpdateSeatAvailability(List<int> seatIds, bool isAvailable, int presentationId)

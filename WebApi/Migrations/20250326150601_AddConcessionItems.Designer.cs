@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -9,9 +10,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace WebApi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250326150601_AddConcessionItems")]
+    partial class AddConcessionItems
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -23,6 +26,9 @@ namespace WebApi.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -153,17 +159,19 @@ namespace WebApi.Migrations
                     b.Property<int>("ConcessionItemId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<int>("OrderId")
                         .HasColumnType("int");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ConcessionItemId");
-
-                    b.HasIndex("OrderId");
 
                     b.ToTable("OrderConcessionItems");
                 });
@@ -428,25 +436,6 @@ namespace WebApi.Migrations
                     b.Navigation("Movie");
                 });
 
-            modelBuilder.Entity("WebApi.Models.OrderConcessionItem", b =>
-                {
-                    b.HasOne("WebApi.Models.ConcessionItem", "ConcessionItem")
-                        .WithMany()
-                        .HasForeignKey("ConcessionItemId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("WebApi.Models.TicketOrder", "Order")
-                        .WithMany("ConcessionItems")
-                        .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ConcessionItem");
-
-                    b.Navigation("Order");
-                });
-
             modelBuilder.Entity("WebApi.Models.Presentation", b =>
                 {
                     b.HasOne("WebApi.Models.Hall", "Hall")
@@ -596,8 +585,6 @@ namespace WebApi.Migrations
 
             modelBuilder.Entity("WebApi.Models.TicketOrder", b =>
                 {
-                    b.Navigation("ConcessionItems");
-
                     b.Navigation("Items");
 
                     b.Navigation("SeatLocks");

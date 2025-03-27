@@ -1,3 +1,4 @@
+using WebApi.Models;
 using WebApi.Models.Requests;
 using WebApi.Models.Responses;
 
@@ -17,5 +18,6 @@ namespace WebApi.Interfaces.Services
         Task<byte[]> GetTicketsByOrderToken(Guid orderToken);
         Task<byte[]> GetTicketsByPhoneBookingCode(string phoneBookingCode);
         Task UpdateSeatAvailability(List<int> seatIds, bool isAvailable, int presentationId);
+        Task<OrderConcessionItem?> AddConcessionToOrder(Guid orderToken, AddConcessionRequest request);
     }
 }

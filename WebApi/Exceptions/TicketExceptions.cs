@@ -14,3 +14,8 @@ public class SeatNotAvailableException : Exception
 {
     public SeatNotAvailableException(string message) : base(message) { }
 }
+
+public class ConcessionNotFoundException : Exception
+{
+    public ConcessionNotFoundException(string message) : base(message) { }
+}

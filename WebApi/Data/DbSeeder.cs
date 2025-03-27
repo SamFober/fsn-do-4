@@ -199,6 +199,42 @@ namespace WebApi.Data
                     await context.SaveChangesAsync();
                 }
 
+                // Add concessions
+                if (!await context.ConcessionItems.AnyAsync())
+                {
+                    var concessionItems = new[]
+                    {
+                        new ConcessionItem
+                        {
+                            Name = "Regular Popcorn",
+                            Price = 5.00m
+                        },
+                        new ConcessionItem
+                        {
+                            Name = "Large Popcorn",
+                            Price = 7.50m
+                        },
+                        new ConcessionItem
+                        {
+                            Name = "Cheese Popcorn",
+                            Price = 6.00m
+                        },
+                        new ConcessionItem
+                        {
+                            Name = "Caramel Popcorn",
+                            Price = 6.50m
+                        },
+                        new ConcessionItem
+                        {
+                            Name = "Popcorn Combo (Regular + Drink)",
+                            Price = 9.00m
+                        }
+                    };
+
+                    context.ConcessionItems.AddRange(concessionItems);
+                    await context.SaveChangesAsync();
+                }
+
                 // Add presentations
                 if (!await context.Presentations.AnyAsync())
                 {
@@ -278,6 +314,8 @@ namespace WebApi.Data
             // Initialize SeatPresentation records for all presentations
             await InitializeSeatPresentations(context);
         }
+
+
         
         private static async Task UpdatePresentationsAvailableSeats(ApplicationDbContext context)
         {

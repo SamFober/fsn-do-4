@@ -204,6 +204,21 @@ namespace WebApi.Controllers
             }
         }
 
+        [HttpGet("test/order/{id}")]
+        public async Task<ActionResult> GetOrder(int id)
+        {
+            var order = await _context.TicketOrders
+                .Include(o => o.Tickets)
+                .Include(o => o.ConcessionItems)
+                .ThenInclude(oci => oci.ConcessionItem)
+                .FirstOrDefaultAsync(o => o.Id == id);
+            if (order == null)
+            {
+                return NotFound("Order not found");
+            }
+            return Ok(order);
+        }
+
         /// <summary>
         /// Starts a new ticket order with automatic best seat selection
         /// </summary>
