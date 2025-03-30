@@ -198,6 +198,137 @@ namespace WebApi.Data
                     await context.SaveChangesAsync();
                 }
 
+                //Add reviews for movies
+                if (!await context.Reviews.AnyAsync())
+                {
+                    var reviews = new[]
+                    {
+                        new Review
+                        {
+                            Id = 1,
+                            MovieId = 1,
+                            AuthorName = "Jan Jansen",
+                            Email = "jan.jansen@example.com",
+                            Rating = 5,
+                            Content = "Fantastische film! Geweldige verhaallijn en top acteerwerk.",
+                            CreatedAt = DateTime.UtcNow.AddDays(-10)
+                        },
+                        new Review
+                        {
+                            Id = 2,
+                            MovieId = 2,
+                            AuthorName = "Piet de Vries",
+                            Email = "piet.vries@example.com",
+                            Rating = 3,
+                            Content = "Het was een vermakelijke film, maar het einde was voorspelbaar.",
+                            CreatedAt = DateTime.UtcNow.AddDays(-8)
+                        },
+                        new Review
+                        {
+                            Id = 3,
+                            MovieId = 3,
+                            AuthorName = "Sanne de Boer",
+                            Email = "sanne.boer@example.com",
+                            Rating = 4,
+                            Content = "Mooie cinematografie en een boeiend verhaal!",
+                            CreatedAt = DateTime.UtcNow.AddDays(-7)
+                        },
+                        new Review
+                        {
+                            Id = 4,
+                            MovieId = 4,
+                            AuthorName = "Mark van Dijk",
+                            Email = "mark.dijk@example.com",
+                            Rating = 2,
+                            Content = "Vond het persoonlijk een beetje saai, had meer actie verwacht.",
+                            CreatedAt = DateTime.UtcNow.AddDays(-5)
+                        },
+                        new Review
+                        {
+                            Id = 5,
+                            MovieId = 5,
+                            AuthorName = "Lisa Vermeer",
+                            Email = "lisa.vermeer@example.com",
+                            Rating = 5,
+                            Content = "Eén van de beste films die ik in lange tijd heb gezien!",
+                            CreatedAt = DateTime.UtcNow.AddDays(-3)
+                        },
+                        new Review
+                        {
+                            Id = 6,
+                            MovieId = 6,
+                            AuthorName = "Tom Willems",
+                            Email = "tom.willems@example.com",
+                            Rating = 1,
+                            Content = "Helemaal niks aan, ik vond het een verspilling van tijd.",
+                            CreatedAt = DateTime.UtcNow.AddDays(-2)
+                        },
+                        new Review
+                        {
+                            Id = 7,
+                            MovieId = 1,
+                            AuthorName = "Eva de Groot",
+                            Email = "eva.groot@example.com",
+                            Rating = 4,
+                            Content = "Sterke personages en een meeslepende verhaallijn!",
+                            CreatedAt = DateTime.UtcNow.AddDays(-9)
+                        },
+                        new Review
+                        {
+                            Id = 8,
+                            MovieId = 2,
+                            AuthorName = "Daan Smits",
+                            Email = "daan.smits@example.com",
+                            Rating = 2,
+                            Content = "Niet helemaal mijn ding, vond het wat traag.",
+                            CreatedAt = DateTime.UtcNow.AddDays(-6)
+                        },
+                        new Review
+                        {
+                            Id = 9,
+                            MovieId = 3,
+                            AuthorName = "Sophie Mulder",
+                            Email = "sophie.mulder@example.com",
+                            Rating = 5,
+                            Content = "Adembenemend! Ik zou deze film zo nog een keer kijken.",
+                            CreatedAt = DateTime.UtcNow.AddDays(-4)
+                        },
+                        new Review
+                        {
+                            Id = 10,
+                            MovieId = 4,
+                            AuthorName = "Bas Meijer",
+                            Email = "bas.meijer@example.com",
+                            Rating = 3,
+                            Content = "Redelijke film, maar niet echt memorabel.",
+                            CreatedAt = DateTime.UtcNow.AddDays(-3)
+                        },
+                        new Review
+                        {
+                            Id = 11,
+                            MovieId = 5,
+                            AuthorName = "Emma de Wit",
+                            Email = "emma.dewit@example.com",
+                            Rating = 4,
+                            Content = "Leuk om te kijken, goed verhaal en prima acteerwerk!",
+                            CreatedAt = DateTime.UtcNow.AddDays(-2)
+                        },
+                        new Review
+                        {
+                            Id = 12,
+                            MovieId = 6,
+                            AuthorName = "Ruben Visser",
+                            Email = "ruben.visser@example.com",
+                            Rating = 2,
+                            Content = "Helaas voldeed deze film niet aan mijn verwachtingen.",
+                            CreatedAt = DateTime.UtcNow.AddDays(-1)
+                        }
+                    };
+
+                    context.Reviews.AddRange(reviews);
+                    await context.SaveChangesAsync();
+                }
+
                 // Add presentations
                 if (!await context.Presentations.AnyAsync())
                 {

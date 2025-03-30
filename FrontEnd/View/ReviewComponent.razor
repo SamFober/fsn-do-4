@@ -1,5 +1,7 @@
 ﻿@using FrontEnd.Models
 @inject HttpClient httpClient
+@inject IJSRuntime JS
+
 
 <link href="css/movie-detail.css" rel="stylesheet" />
 <link href="css/review.css" rel="stylesheet" />
@@ -88,6 +90,12 @@
     event.target.classList.add('rated');
     }
     });
+
+    function resetStars() {
+        document.querySelectorAll('.rating span').forEach(function (star) {
+            star.classList.remove('rated');
+        });
+    }
 </script>
 
 @code {
@@ -104,9 +112,25 @@
     {
         this.rating = rating;
     }
-    
+
     private async Task SubmitReview()
     {
+        //Check if form is valid
+        if (string.IsNullOrEmpty(firstName) ||
+            string.IsNullOrEmpty(email) ||
+            string.IsNullOrEmpty(review) ||
+            rating == 0)
+        {
+            await JS.InvokeVoidAsync("alert", "Please fill in all fields.");
+            return;
+        }
+
+        if (!IsValidEmail(email))
+        {
+            await JS.InvokeVoidAsync("alert", "Please enter a valid email address.");
+            return;
+        }
+
         var newReview = new Review()
             {
                 MovieId = movieId,
@@ -119,6 +143,7 @@
 
         var response = await httpClient.PostAsJsonAsync("api/review", newReview);
 
+        //Reset form
         if (response.IsSuccessStatusCode)
         {
             await LoadReviews();
@@ -126,6 +151,21 @@
             email = "";
             review = "";
             rating = 0;
+            await JS.InvokeVoidAsync("resetStars");
+            await JS.InvokeVoidAsync("alert", "Review submitted successfully.");
+        }
+    }
+
+    private bool IsValidEmail(string email)
+    {
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email);
+            return addr.Address == email;
+        }
+        catch
+        {
+            return false;
         }
     }
 
