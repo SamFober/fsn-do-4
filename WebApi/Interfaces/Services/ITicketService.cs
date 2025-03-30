@@ -1,3 +1,4 @@
+using WebApi.Models;
 using WebApi.Models.Requests;
 using WebApi.Models.Responses;
 
@@ -14,8 +15,10 @@ namespace WebApi.Interfaces.Services
         Task<List<TicketResponse>> ConfirmOrder(Guid orderToken, ConfirmOrderRequest request);
         Task<OrderResponse> SelectGroupSeatingOption(string option, StartGroupOptionRequest request);
         Task CancelOrder(Guid orderToken);
+        Task FinalizeOrder(Guid orderToken);
         Task<byte[]> GetTicketsByOrderToken(Guid orderToken);
         Task<byte[]> GetTicketsByPhoneBookingCode(string phoneBookingCode);
         Task UpdateSeatAvailability(List<int> seatIds, bool isAvailable, int presentationId);
+        Task<OrderConcessionItem?> AddConcessionToOrder(Guid orderToken, AddConcessionRequest request);
     }
 }
