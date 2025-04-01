@@ -17,6 +17,9 @@ namespace WebApi.Models
         public ICollection<SeatLock> SeatLocks { get; set; } = new List<SeatLock>();
         public ICollection<TicketOrderItem> Items { get; set; } = new List<TicketOrderItem>();
         public ICollection<OrderConcessionItem> ConcessionItems { get; set; } = new List<OrderConcessionItem>();
+
+        public int? PaymentId { get; set; }
+        public Payment? Payment { get; set; }
     }
 
     public class TicketOrderItem
