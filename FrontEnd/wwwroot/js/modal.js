@@ -268,4 +268,63 @@ function updateProgressBasedOnScroll() {
 window.showModal = showModal;
 window.hideModal = hideModal;
 window.initScrollTracking = initScrollTracking;
-window.setupScrollListener = setupScrollListener; 
+window.setupScrollListener = setupScrollListener;
+
+// Function to show an admin modal
+function showAdminModal(modalId) {
+    // Get all admin modals
+    var modals = document.querySelectorAll('.admin-modal');
+    var backdrops = document.querySelectorAll('.admin-modal-backdrop');
+    
+    // Hide any other open modals first
+    modals.forEach(function(modal) {
+        modal.style.display = 'none';
+    });
+    
+    backdrops.forEach(function(backdrop) {
+        backdrop.style.display = 'none';
+    });
+    
+    // Show the targeted modal
+    var targetModal = document.querySelector(`#${modalId}`);
+    if (!targetModal) {
+        // Try finding by class if id doesn't work
+        targetModal = document.querySelector(`.admin-modal.show`);
+    }
+    
+    if (targetModal) {
+        // Make sure the modal is visible
+        targetModal.style.display = 'flex';
+        
+        // Find the corresponding backdrop
+        var backdrop = document.querySelector('.admin-modal-backdrop');
+        if (backdrop) {
+            backdrop.style.display = 'block';
+        }
+        
+        // Lock body scrolling
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+// Function to hide all admin modals
+function hideAdminModals() {
+    // Hide all admin modals
+    var modals = document.querySelectorAll('.admin-modal');
+    modals.forEach(function(modal) {
+        modal.style.display = 'none';
+    });
+    
+    // Hide all admin backdrops
+    var backdrops = document.querySelectorAll('.admin-modal-backdrop');
+    backdrops.forEach(function(backdrop) {
+        backdrop.style.display = 'none';
+    });
+    
+    // Restore body scrolling
+    document.body.style.overflow = '';
+}
+
+// Expose functions to blazor
+window.showAdminModal = showAdminModal;
+window.hideAdminModals = hideAdminModals; 

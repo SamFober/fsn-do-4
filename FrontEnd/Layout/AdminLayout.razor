@@ -1,0 +1,571 @@
+@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject HttpClient Http
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>@PageTitle - Cinemagia Admin</PageTitle>
+
+<link href="css/admin-dark.css" rel="stylesheet" />
+
+<div class="admin-layout">
+    <!-- Sidebar Backdrop (mobile only) -->
+    @if (isMobileView && isMobileSidebarOpen)
+    {
+        <div class="sidebar-backdrop" @onclick="ToggleMobileMenu"></div>
+    }
+    
+    <!-- Sidebar -->
+    <div class="admin-sidebar @(isMobileView ? (isMobileSidebarOpen ? "mobile-open" : "mobile-closed") : (isSidebarCollapsed ? "collapsed" : ""))" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo-container">
+                <img src="/images/logo.png" alt="Cinemagia" class="logo" />
+            </div>
+            <button class="toggle-button" @onclick="ToggleSidebar">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+        </div>
+        
+        <div class="user-profile">
+            <img src="https://via.placeholder.com/40" class="avatar" alt="Admin" />
+            <div class="user-info">
+                <h4>Admin User</h4>
+                <span class="user-role">Super Admin</span>
+            </div>
+        </div>
+        
+        <div class="sidebar-menu">
+            <div class="nav-group">
+                <div class="nav-group-title">Dashboard</div>
+                <NavLink class="nav-item" href="/admin" Match="NavLinkMatch.All">
+                    <span class="nav-icon"><i class="fas fa-home"></i></span>
+                    <span class="nav-text">Dashboard</span>
+                </NavLink>
+            </div>
+            
+            <div class="nav-group">
+                <div class="nav-group-title">Content</div>
+                <NavLink class="nav-item" href="/admin/movies">
+                    <span class="nav-icon"><i class="fas fa-film"></i></span>
+                    <span class="nav-text">Movies</span>
+                    @if (MoviesCount > 0)
+                    {
+                        <span class="badge">@MoviesCount</span>
+                    }
+                </NavLink>
+                <NavLink class="nav-item" href="/admin/presentations">
+                    <span class="nav-icon"><i class="fas fa-calendar-alt"></i></span>
+                    <span class="nav-text">Presentations</span>
+                    @if (PresentationsCount > 0)
+                    {
+                        <span class="badge">@PresentationsCount</span>
+                    }
+                </NavLink>
+                <NavLink class="nav-item" href="/admin/halls">
+                    <span class="nav-icon"><i class="fas fa-building"></i></span>
+                    <span class="nav-text">Halls</span>
+                    @if (HallsCount > 0)
+                    {
+                        <span class="badge">@HallsCount</span>
+                    }
+                </NavLink>
+            </div>
+            
+            <div class="nav-group">
+                <div class="nav-group-title">Sales</div>
+                <NavLink class="nav-item" href="/admin/tickets">
+                    <span class="nav-icon"><i class="fas fa-ticket-alt"></i></span>
+                    <span class="nav-text">Tickets</span>
+                    @if (TicketsCount > 0)
+                    {
+                        <span class="badge">@TicketsCount</span>
+                    }
+                </NavLink>
+                <NavLink class="nav-item" href="/admin/orders">
+                    <span class="nav-icon"><i class="fas fa-shopping-cart"></i></span>
+                    <span class="nav-text">Orders</span>
+                    @if (NewOrdersCount > 0)
+                    {
+                        <span class="badge">@NewOrdersCount</span>
+                    }
+                </NavLink>
+            </div>
+        </div>
+        
+        <div class="sidebar-footer">
+            <NavLink class="nav-item" href="/" target="_blank">
+                <span class="nav-icon"><i class="fas fa-external-link-alt"></i></span>
+                <span class="nav-text">View Site</span>
+            </NavLink>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="admin-content">
+        <div class="admin-header">
+            <div class="header-title">
+                <span class="mobile-menu-toggle" @onclick="ToggleMobileMenu"><i class="fas fa-bars"></i></span>
+                <h1>@PageTitle</h1>
+                @if (!string.IsNullOrEmpty(BreadcrumbItems))
+                {
+                    <div class="breadcrumb">
+                        <div class="breadcrumb-item"><a href="/admin">Dashboard</a></div>
+                        @((MarkupString)BreadcrumbItems)
+                    </div>
+                }
+            </div>
+            <div class="header-actions">
+                <div class="user-menu">
+                    <img src="https://via.placeholder.com/32" class="avatar" alt="Admin" />
+                </div>
+            </div>
+        </div>
+        <div class="admin-body">
+            @Body
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string PageTitle { get; set; } = "Dashboard";
+    
+    [Parameter]
+    public string BreadcrumbItems { get; set; } = "";
+    
+    private bool isSidebarCollapsed = false;
+    private bool isMobileView = false;
+    
+    // Navigation item counts
+    private int MoviesCount { get; set; } = 7;
+    private int PresentationsCount { get; set; } = 300;
+    private int HallsCount { get; set; } = 6;
+    private int TicketsCount { get; set; } = 42;
+    private int NewOrdersCount { get; set; } = 5;
+    
+    // Add a new property for mobile menu state
+    private bool isMobileSidebarOpen = false;
+    
+    private DotNetObjectReference<AdminLayout> objRef;
+    
+    private void ToggleSidebar()
+    {
+        // Regular sidebar toggle for desktop
+        if (!isMobileView)
+        {
+            isSidebarCollapsed = !isSidebarCollapsed;
+        }
+    }
+    
+    private void ToggleMobileMenu()
+    {
+        // Only toggle mobile menu state
+        isMobileSidebarOpen = !isMobileSidebarOpen;
+    }
+    
+    protected override async Task OnInitializedAsync()
+    {
+        // Check for smaller screens to collapse sidebar by default
+        await CheckScreenSize();
+        
+        await LoadNavCounts();
+        
+        // Start the timer to periodically refresh counts
+        _ = StartCountRefreshTimer();
+        
+        // Register resize handler
+        objRef = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("addResizeListener", objRef);
+    }
+    
+    private async Task CheckScreenSize()
+    {
+        try
+        {
+            // Check if screen is mobile-sized
+            var width = await JS.InvokeAsync<int>("window.innerWidth");
+            var wasMobile = isMobileView;
+            isMobileView = width < 768;
+            
+            // Hide sidebar by default on mobile
+            if (isMobileView && !wasMobile)
+            {
+                isMobileSidebarOpen = false;
+            }
+            // Restore desktop behavior when switching back
+            else if (!isMobileView && wasMobile)
+            {
+                isSidebarCollapsed = false;
+            }
+        }
+        catch
+        {
+            // If JS interop fails, default to expanded sidebar on desktop
+            isMobileView = false;
+            isSidebarCollapsed = false;
+        }
+    }
+    
+    private async Task LoadNavCounts()
+    {
+        try
+        {
+            // Use our new dedicated API endpoint for navigation counts
+            var response = await Http.GetAsync("api/admin/nav-counts");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var counts = await response.Content.ReadFromJsonAsync<NavCounts>();
+                if (counts != null)
+                {
+                    MoviesCount = counts.Movies;
+                    PresentationsCount = counts.Presentations;
+                    HallsCount = counts.Halls;
+                    TicketsCount = counts.Tickets;
+                    NewOrdersCount = counts.NewOrders;
+                }
+            }
+            else
+            {
+                // Use default values which are already set
+                Console.WriteLine("Failed to load navigation counts, using defaults");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading navigation counts: {ex.Message}");
+            // Default values will be used, already set above
+        }
+    }
+    
+    // Update counts every 5 minutes
+    private async Task StartCountRefreshTimer()
+    {
+        while (true)
+        {
+            await Task.Delay(300000); // 5 minutes
+            await LoadNavCounts();
+            StateHasChanged();
+        }
+    }
+    
+    // Class to deserialize API response
+    private class NavCounts
+    {
+        public int Movies { get; set; }
+        public int Presentations { get; set; }
+        public int Halls { get; set; }
+        public int Tickets { get; set; }
+        public int NewOrders { get; set; }
+    }
+
+    private class DashboardStats
+    {
+        public int MoviesCount { get; set; }
+        public double MoviesGrowthPercent { get; set; }
+        public int TicketsCount { get; set; }
+        public double TicketsGrowthPercent { get; set; }
+        public decimal RevenueTotal { get; set; }
+        public double RevenueGrowthPercent { get; set; }
+        public int PresentationsCount { get; set; }
+        public double PresentationsGrowthPercent { get; set; }
+    }
+
+    [JSInvokable]
+    public async Task OnWindowResize()
+    {
+        await CheckScreenSize();
+        StateHasChanged();
+    }
+    
+    public void Dispose()
+    {
+        // Clean up the JavaScript resize listener when component is disposed
+        _ = JS.InvokeVoidAsync("removeResizeListener");
+        objRef?.Dispose();
+    }
+}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js" integrity="sha512-Tn2m0TIpgVyTzzvmxLNuqbSJH3JP8jm+Cy3hvHrW7ndTDcJ1w5mBiksqDBb8GpE2ksktFvDB/ykZ0mDpsZj20w==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<script>
+    // Handle window resize
+    window.addResizeListener = function(dotNetHelper) {
+        window.dotNetHelper = dotNetHelper;
+        window.onresize = function() {
+            if (window.dotNetHelper) {
+                window.dotNetHelper.invokeMethodAsync('OnWindowResize');
+            }
+        };
+    };
+    
+    window.removeResizeListener = function() {
+        window.onresize = null;
+        window.dotNetHelper = null;
+    };
+</script>
+
+<style>
+    /* Admin Layout Styles */
+    .admin-layout {
+        display: flex;
+        min-height: 100vh;
+        background-color: #f8f9fa;
+        color: #333;
+    }
+    
+    /* Sidebar Styles */
+    .admin-sidebar {
+        width: 260px;
+        background-color: #121a2b;
+        color: #fff;
+        display: flex;
+        flex-direction: column;
+        transition: width 0.3s ease;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        z-index: 100;
+    }
+    
+    .admin-sidebar.collapsed {
+        width: 70px;
+    }
+    
+    .admin-sidebar.collapsed .nav-text {
+        display: none;
+    }
+    
+    .sidebar-header {
+        padding: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .logo-container {
+        height: 40px;
+        overflow: hidden;
+    }
+    
+    .logo {
+        height: 100%;
+        max-width: 100%;
+        object-fit: contain;
+    }
+    
+    .admin-sidebar.collapsed .logo-container {
+        width: 40px;
+    }
+    
+    .toggle-button {
+        background: none;
+        border: none;
+        color: #f5c518;
+        cursor: pointer;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background-color: rgba(245, 197, 24, 0.1);
+    }
+    
+    .toggle-button:hover {
+        background-color: rgba(245, 197, 24, 0.2);
+    }
+    
+    .sidebar-menu {
+        flex: 1;
+        padding: 16px 0;
+        overflow-y: auto;
+    }
+    
+    .sidebar-footer {
+        padding: 16px;
+        border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .nav-item {
+        display: flex;
+        align-items: center;
+        padding: 12px 16px;
+        color: #fff;
+        text-decoration: none;
+        transition: background-color 0.2s ease;
+        border-radius: 4px;
+        margin: 4px 8px;
+    }
+    
+    .nav-item:hover {
+        background-color: rgba(255,255,255,0.1);
+    }
+    
+    .nav-item.active {
+        background-color: #f5c518;
+        color: #121a2b;
+    }
+    
+    .nav-icon {
+        font-size: 18px;
+        margin-right: 12px;
+        width: 24px;
+        text-align: center;
+    }
+    
+    .admin-sidebar.collapsed .nav-icon {
+        margin-right: 0;
+    }
+    
+    /* Content Styles */
+    .admin-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow-x: hidden;
+    }
+    
+    .admin-header {
+        background-color: #fff;
+        padding: 16px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .header-title h1 {
+        font-size: 1.5rem;
+        margin: 0;
+        font-weight: 600;
+    }
+    
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    
+    .search-bar {
+        position: relative;
+    }
+    
+    .search-bar input {
+        padding: 8px 12px 8px 36px;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        width: 200px;
+        background-color: #f5f5f5;
+    }
+    
+    .search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+    
+    .user-menu {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        padding: 8px 12px;
+        border-radius: 4px;
+    }
+    
+    .user-menu:hover {
+        background-color: #f5f5f5;
+    }
+    
+    /* Admin Body */
+    .admin-body {
+        padding: 24px;
+        flex: 1;
+        overflow-y: auto;
+    }
+    
+    /* Make sure the icons are visible */
+    .nav-icon i {
+        display: inline-block;
+        width: 1.25em;
+    }
+    
+    .toggle-button i {
+        display: inline-block;
+        width: 1em;
+    }
+    
+    /* Mobile menu toggle */
+    .mobile-menu-toggle {
+        display: none;
+        cursor: pointer;
+        margin-right: 15px;
+        font-size: 1.5rem;
+    }
+    
+    /* Mobile styles */
+    @@media (max-width: 768px) {
+        .mobile-menu-toggle {
+            display: inline-block;
+        }
+        
+        .admin-sidebar {
+            position: fixed;
+            height: 100vh;
+            left: 0;
+            top: 0;
+            width: 260px !important; /* Override the collapsed width */
+            z-index: 1000;
+            transition: transform 0.3s ease;
+        }
+        
+        .admin-sidebar.mobile-closed {
+            transform: translateX(-100%);
+        }
+        
+        .admin-sidebar.mobile-open {
+            transform: translateX(0);
+        }
+        
+        .admin-content {
+            width: 100%;
+        }
+        
+        .admin-header {
+            position: relative;
+        }
+        
+        /* Hide mobile text on small screens regardless of sidebar state */
+        .admin-sidebar .nav-text {
+            display: block; /* Override the collapsed state */
+        }
+        
+        /* Mobile sidebar should always show text */
+        .admin-sidebar.collapsed .nav-text {
+            display: block;
+        }
+        
+        /* Mobile sidebar should maintain icon margin */
+        .admin-sidebar.collapsed .nav-icon {
+            margin-right: 12px;
+        }
+    }
+    
+    /* Sidebar backdrop for mobile */
+    .sidebar-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        animation: fadeIn 0.3s ease;
+    }
+    
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+</style> 

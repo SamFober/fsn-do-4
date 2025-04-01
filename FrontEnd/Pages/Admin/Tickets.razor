@@ -1,0 +1,765 @@
+@page "/admin/tickets"
+@layout AdminLayout
+@using FrontEnd.Models
+@using System.ComponentModel.DataAnnotations
+@using FrontEnd.Components
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<PageTitle>Tickets Management - Cinemagia</PageTitle>
+
+<div class="admin-container">
+    <div class="page-header">
+        <h1 class="page-title">Tickets Management</h1>
+        <p class="page-description">View and manage ticket sales and reservations</p>
+    </div>
+    
+    @if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>Loading tickets data...</p>
+        </div>
+    }
+    else
+    {
+        <div class="filters-bar">
+            <div class="search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input 
+                    type="text" 
+                    class="form-control"
+                    placeholder="Search by order ID or customer..." 
+                    @bind="searchQuery" 
+                    @bind:event="oninput" 
+                    @onkeyup="HandleSearchKeyUp" />
+            </div>
+            
+            <div class="filters-section">
+                <select class="filter-select" @bind="selectedMovie">
+                    <option value="">All Movies</option>
+                    @foreach (var movie in movies)
+                    {
+                        <option value="@movie.Id">@movie.Title</option>
+                    }
+                </select>
+                
+                <select class="filter-select" @bind="selectedStatus">
+                    <option value="">All Status</option>
+                    <option value="Confirmed">Confirmed</option>
+                    <option value="Used">Used</option>
+                    <option value="Cancelled">Cancelled</option>
+                    <option value="Pending">Pending</option>
+                </select>
+                
+                <select class="filter-select" @bind="selectedDateRange">
+                    <option value="">All Dates</option>
+                    <option value="today">Today</option>
+                    <option value="tomorrow">Tomorrow</option>
+                    <option value="thisWeek">This Week</option>
+                    <option value="nextWeek">Next Week</option>
+                </select>
+                
+                <button class="filter-btn filter-btn-primary" @onclick="ApplyFilters">
+                    <i class="fas fa-filter"></i>
+                    <span>Apply Filters</span>
+                </button>
+                <button class="filter-btn" @onclick="ResetFilters">
+                    <i class="fas fa-undo"></i>
+                    <span>Reset</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h3>All Tickets</h3>
+                <div class="card-actions">
+                    <button class="btn-icon" title="Refresh" @onclick="RefreshTickets">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button class="btn-icon" title="Export" @onclick="ExportTickets">
+                        <i class="fas fa-download"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                @if (filteredTickets.Count == 0)
+                {
+                    <div class="table-empty">
+                        <i class="fas fa-ticket-alt fa-3x"></i>
+                        <p>No tickets found matching your filters</p>
+                        <button class="btn-secondary" @onclick="ResetFilters">Clear Filters</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-container">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th class="sortable" @onclick="@(() => SortBy("Id"))">
+                                        <span>ID</span>
+                                        <i class="fas @(sortColumn == "Id" ? (sortDirection == "asc" ? "fa-sort-up" : "fa-sort-down") : "fa-sort")"></i>
+                                    </th>
+                                    <th class="sortable" @onclick="@(() => SortBy("MovieTitle"))">
+                                        <span>Movie</span>
+                                        <i class="fas @(sortColumn == "MovieTitle" ? (sortDirection == "asc" ? "fa-sort-up" : "fa-sort-down") : "fa-sort")"></i>
+                                    </th>
+                                    <th class="sortable" @onclick="@(() => SortBy("ShowDateTime"))">
+                                        <span>Date</span>
+                                        <i class="fas @(sortColumn == "ShowDateTime" ? (sortDirection == "asc" ? "fa-sort-up" : "fa-sort-down") : "fa-sort")"></i>
+                                    </th>
+                                    <th class="sortable" @onclick="@(() => SortBy("HallName"))">
+                                        <span>Hall</span>
+                                        <i class="fas @(sortColumn == "HallName" ? (sortDirection == "asc" ? "fa-sort-up" : "fa-sort-down") : "fa-sort")"></i>
+                                    </th>
+                                    <th class="sortable" @onclick="@(() => SortBy("SeatNumber"))">
+                                        <span>Seat</span>
+                                        <i class="fas @(sortColumn == "SeatNumber" ? (sortDirection == "asc" ? "fa-sort-up" : "fa-sort-down") : "fa-sort")"></i>
+                                    </th>
+                                    <th class="sortable" @onclick="@(() => SortBy("CustomerName"))">
+                                        <span>Customer</span>
+                                        <i class="fas @(sortColumn == "CustomerName" ? (sortDirection == "asc" ? "fa-sort-up" : "fa-sort-down") : "fa-sort")"></i>
+                                    </th>
+                                    <th class="sortable" @onclick="@(() => SortBy("Price"))">
+                                        <span>Price</span>
+                                        <i class="fas @(sortColumn == "Price" ? (sortDirection == "asc" ? "fa-sort-up" : "fa-sort-down") : "fa-sort")"></i>
+                                    </th>
+                                    <th class="sortable" @onclick="@(() => SortBy("Status"))">
+                                        <span>Status</span>
+                                        <i class="fas @(sortColumn == "Status" ? (sortDirection == "asc" ? "fa-sort-up" : "fa-sort-down") : "fa-sort")"></i>
+                                    </th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var ticket in paginatedTickets)
+                                {
+                                    <tr>
+                                        <td>@ticket.Id</td>
+                                        <td>@ticket.MovieTitle</td>
+                                        <td>@ticket.ShowDateTime.ToString("g")</td>
+                                        <td>@ticket.HallName</td>
+                                        <td>@ticket.SeatNumber</td>
+                                        <td>@ticket.CustomerName</td>
+                                        <td>€@ticket.Price.ToString("0.00")</td>
+                                        <td>
+                                            <span class="status-badge @GetStatusClass(ticket.Status)">
+                                                @ticket.Status
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                <button class="btn-text" title="View" @onclick="() => ViewTicket(ticket)">
+                                                    View
+                                                </button>
+                                                @if (ticket.Status == "Confirmed" || ticket.Status == "Pending")
+                                                {
+                                                    <button class="btn-text" title="Cancel" @onclick="() => ShowCancelConfirmation(ticket)">
+                                                        Cancel
+                                                    </button>
+                                                }
+                                                <button class="btn-text" title="Email" @onclick="() => ResendEmail(ticket)">
+                                                    Resend Email
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    <Pagination 
+                        CurrentPage="@currentPage"
+                        PageSize="@pageSize"
+                        TotalItems="@filteredTickets.Count"
+                        OnPageChanged="@HandlePageChange"
+                        OnPageSizeChanged="@HandlePageSizeChange" />
+                }
+            </div>
+        </div>
+        
+        <!-- View Ticket Modal -->
+        @if (showViewModal && viewingTicket != null)
+        {
+            <div class="modal-overlay" @onclick="CloseViewModal">
+                <div class="modal-container" @onclick:stopPropagation="true">
+                    <div class="modal-header">
+                        <h2 class="modal-title">Ticket Details</h2>
+                        <button class="modal-close" @onclick="CloseViewModal">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="dashboard-grid">
+                            <div class="col-6">
+                                <div class="detail-section">
+                                    <h4>Ticket Information</h4>
+                                    <div class="detail-content">
+                                        <div class="detail-item">
+                                            <div class="detail-label">Ticket ID:</div>
+                                            <div class="detail-value">@viewingTicket.Id</div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <div class="detail-label">Order ID:</div>
+                                            <div class="detail-value">@viewingTicket.OrderId</div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <div class="detail-label">Movie:</div>
+                                            <div class="detail-value">@viewingTicket.MovieTitle</div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <div class="detail-label">Date & Time:</div>
+                                            <div class="detail-value">@viewingTicket.ShowDateTime.ToString("g")</div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <div class="detail-label">Hall:</div>
+                                            <div class="detail-value">@viewingTicket.HallName</div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <div class="detail-label">Seat:</div>
+                                            <div class="detail-value">@viewingTicket.SeatNumber</div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <div class="detail-label">Price:</div>
+                                            <div class="detail-value">€@viewingTicket.Price.ToString("0.00")</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="detail-section">
+                                    <h4>Customer & Status</h4>
+                                    <div class="detail-content">
+                                        <div class="detail-item">
+                                            <div class="detail-label">Customer:</div>
+                                            <div class="detail-value">@viewingTicket.CustomerName</div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <div class="detail-label">Email:</div>
+                                            <div class="detail-value">@viewingTicket.CustomerEmail</div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <div class="detail-label">Status:</div>
+                                            <div class="detail-value">
+                                                <span class="status-badge @GetStatusClass(viewingTicket.Status)">
+                                                    @viewingTicket.Status
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <div class="detail-label">Created:</div>
+                                            <div class="detail-value">@viewingTicket.CreatedAt.ToString("g")</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="detail-section">
+                                    <h4>Actions</h4>
+                                    <div class="detail-actions">
+                                        @if (viewingTicket.Status == "Confirmed" || viewingTicket.Status == "Pending")
+                                        {
+                                            <button class="btn-danger" @onclick="() => ShowCancelConfirmation(viewingTicket)">
+                                                <i class="fas fa-times"></i>
+                                                Cancel Ticket
+                                            </button>
+                                        }
+                                        <button class="btn-primary" @onclick="() => ResendEmail(viewingTicket)">
+                                            <i class="fas fa-envelope"></i>
+                                            Resend Email
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-secondary" @onclick="CloseViewModal">
+                            <i class="fas fa-times"></i>
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+        
+        <!-- Cancel Ticket Modal -->
+        @if (showCancelModal && cancellingTicket != null)
+        {
+            <div class="modal-overlay" @onclick="CloseCancelModal">
+                <div class="modal-container modal-sm" @onclick:stopPropagation="true">
+                    <div class="modal-header">
+                        <h2 class="modal-title">Cancel Ticket</h2>
+                        <button class="modal-close" @onclick="CloseCancelModal">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to cancel ticket #@cancellingTicket.Id for @cancellingTicket.MovieTitle?</p>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Cancellation Reason</label>
+                            <select class="form-select" @bind="cancelReason">
+                                <option value="Customer Request">Customer Request</option>
+                                <option value="Schedule Change">Schedule Change</option>
+                                <option value="Technical Issue">Technical Issue</option>
+                                <option value="Payment Problem">Payment Problem</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        
+                        @if (cancelReason == "Other")
+                        {
+                            <div class="form-group">
+                                <label class="form-label">Specify Reason</label>
+                                <input type="text" class="form-control" @bind="otherCancelReason" />
+                            </div>
+                        }
+                        
+                        <div class="form-group">
+                            <div class="form-check">
+                                <input type="checkbox" id="issueRefund" class="form-check-input" @bind="issueRefund" />
+                                <label for="issueRefund" class="form-check-label">Issue refund to customer</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-secondary" @onclick="CloseCancelModal">
+                            <i class="fas fa-times"></i>
+                            Cancel
+                        </button>
+                        <button class="btn-danger" @onclick="ConfirmCancel">
+                            <i class="fas fa-check"></i>
+                            Confirm Cancellation
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    
+    @if (successMessage != null)
+    {
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i>
+            <span>@successMessage</span>
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+    
+    @if (errorMessage != null)
+    {
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-circle"></i>
+            <span>@errorMessage</span>
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+</div>
+
+@code {
+    private bool isLoading = true;
+    private string? errorMessage = null;
+    private string? successMessage = null;
+    
+    // Ticket data
+    private List<TicketViewModel> tickets = new();
+    private List<TicketViewModel> filteredTickets = new();
+    private List<string> movieTitles = new();
+    private List<string> customerNames = new();
+    
+    // Supporting data
+    private List<Movie> movies = new();
+    
+    // Filters
+    private string searchQuery = "";
+    private string selectedMovie = "";
+    private string selectedStatus = "";
+    private string selectedDateRange = "";
+    
+    // Sorting
+    private string sortColumn = "Id";
+    private string sortDirection = "desc";
+    
+    // Pagination
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalPages => (int)Math.Ceiling(filteredTickets.Count / (double)pageSize);
+    private List<TicketViewModel> paginatedTickets => filteredTickets
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+    
+    // Modal states
+    private bool showViewModal = false;
+    private bool showCancelModal = false;
+    private TicketViewModel? viewingTicket = null;
+    private TicketViewModel? cancellingTicket = null;
+    
+    // Cancel options
+    private string cancelReason = "Customer Request";
+    private string otherCancelReason = "";
+    private bool issueRefund = true;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+            await LoadData();
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading tickets: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private async Task LoadData()
+    {
+        try {
+            // Load movies for filtering options
+            movies = await Http.GetFromJsonAsync<List<Movie>>("api/movies") ?? new List<Movie>();
+            
+            // Fetch real tickets from API
+            await LoadTicketsFromApi();
+        }
+        catch (Exception ex) {
+            throw new Exception($"Failed to load data: {ex.Message}");
+        }
+    }
+    
+    private async Task LoadTicketsFromApi()
+    {
+        try
+        {
+            // Call the actual API endpoint for admin tickets
+            var response = await Http.GetAsync("api/tickets/admin");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                tickets = await response.Content.ReadFromJsonAsync<List<TicketViewModel>>() ?? new List<TicketViewModel>();
+                
+                // Extract unique values for filters
+                movieTitles = tickets.Select(t => t.MovieTitle).Distinct().OrderBy(t => t).ToList();
+                customerNames = tickets.Select(t => t.CustomerName).Distinct().OrderBy(n => n).ToList();
+                
+                // Initialize filtered tickets with all tickets
+                filteredTickets = new List<TicketViewModel>(tickets);
+                SortTickets();
+            }
+            else
+            {
+                errorMessage = $"Failed to load tickets. Status: {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading tickets: {ex.Message}";
+        }
+    }
+    
+    private void ApplyFilters()
+    {
+        // Start with all tickets
+        var query = tickets.AsQueryable();
+        
+        // Apply search query
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            query = query.Where(t => 
+                t.Id.ToString().Contains(searchQuery) ||
+                t.OrderId.ToString().Contains(searchQuery) ||
+                t.CustomerName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                t.CustomerEmail.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                t.MovieTitle.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                t.SeatNumber.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+        }
+        
+        // Apply movie filter
+        if (!string.IsNullOrWhiteSpace(selectedMovie) && int.TryParse(selectedMovie, out int movieId) && movieId > 0)
+        {
+            query = query.Where(t => t.MovieId == movieId);
+        }
+        
+        // Apply status filter
+        if (!string.IsNullOrWhiteSpace(selectedStatus))
+        {
+            query = query.Where(t => t.Status == selectedStatus);
+        }
+        
+        // Apply date range filter
+        if (!string.IsNullOrWhiteSpace(selectedDateRange))
+        {
+            DateTime today = DateTime.Today;
+            query = selectedDateRange switch
+            {
+                "today" => query.Where(t => t.ShowDateTime.Date == today),
+                "tomorrow" => query.Where(t => t.ShowDateTime.Date == today.AddDays(1)),
+                "thisWeek" => query.Where(t => t.ShowDateTime.Date >= today && 
+                                               t.ShowDateTime.Date < today.AddDays(7 - (int)today.DayOfWeek)),
+                "nextWeek" => query.Where(t => t.ShowDateTime.Date >= today.AddDays(7 - (int)today.DayOfWeek) && 
+                                               t.ShowDateTime.Date < today.AddDays(14 - (int)today.DayOfWeek)),
+                _ => query
+            };
+        }
+        
+        // Set the filtered results
+        filteredTickets = query.ToList();
+        
+        // Apply sorting
+        SortTickets();
+        
+        // Reset to first page when filters change
+        currentPage = 1;
+    }
+    
+    private void SortTickets()
+    {
+        // Apply sorting
+        if (string.IsNullOrEmpty(sortColumn))
+            return;
+            
+        // Use reflection to sort by property name
+        IEnumerable<TicketViewModel> sortedTickets;
+        var prop = typeof(TicketViewModel).GetProperty(sortColumn);
+        
+        if (prop != null)
+        {
+            sortedTickets = sortDirection == "asc"
+                ? filteredTickets.OrderBy(t => prop.GetValue(t, null))
+                : filteredTickets.OrderByDescending(t => prop.GetValue(t, null));
+                
+            filteredTickets = sortedTickets.ToList();
+        }
+    }
+    
+    private void SortBy(string column)
+    {
+        if (sortColumn == column)
+        {
+            // Toggle direction
+            sortDirection = sortDirection == "asc" ? "desc" : "asc";
+        }
+        else
+        {
+            // New column, default to ascending
+            sortColumn = column;
+            sortDirection = "asc";
+        }
+        
+        SortTickets();
+    }
+    
+    private string GetSortIcon(string column)
+    {
+        if (sortColumn != column)
+            return "fas fa-sort";
+            
+        return sortDirection == "asc" ? "fas fa-sort-up" : "fas fa-sort-down";
+    }
+    
+    private void ResetFilters()
+    {
+        searchQuery = "";
+        selectedMovie = "";
+        selectedStatus = "";
+        selectedDateRange = "";
+        ApplyFilters();
+    }
+    
+    private string GetStatusClass(string status)
+    {
+        return status switch
+        {
+            "Confirmed" => "status-active",
+            "Used" => "status-inactive",
+            "Cancelled" => "status-error",
+            "Pending" => "status-pending",
+            _ => "status-inactive"
+        };
+    }
+    
+    private async Task HandleSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await Task.Delay(1); // Ensure the search query is updated
+            ApplyFilters();
+        }
+    }
+    
+    private void HandlePageChange(int page)
+    {
+        currentPage = page;
+        StateHasChanged();
+    }
+    
+    private void HandlePageSizeChange(int size)
+    {
+        pageSize = size;
+        currentPage = 1; // Reset to first page when changing page size
+        StateHasChanged();
+    }
+    
+    private void ViewTicket(TicketViewModel ticket)
+    {
+        viewingTicket = ticket;
+        showViewModal = true;
+    }
+    
+    private void CloseViewModal()
+    {
+        showViewModal = false;
+        viewingTicket = null;
+    }
+    
+    private void ShowCancelConfirmation(TicketViewModel ticket)
+    {
+        cancellingTicket = ticket;
+        cancelReason = "Customer Request";
+        otherCancelReason = "";
+        issueRefund = true;
+        showCancelModal = true;
+    }
+    
+    private void CloseCancelModal()
+    {
+        showCancelModal = false;
+        cancellingTicket = null;
+    }
+    
+    private async Task ConfirmCancel()
+    {
+        if (cancellingTicket == null)
+            return;
+            
+        try
+        {
+            var effectiveReason = cancelReason == "Other" ? otherCancelReason : cancelReason;
+            
+            // Call API to cancel ticket
+            var requestObj = new 
+            {
+                TicketId = cancellingTicket.Id,
+                Reason = effectiveReason,
+                IssueRefund = issueRefund
+            };
+            
+            var response = await Http.PostAsJsonAsync("api/tickets/cancel", requestObj);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                // Update local data
+                cancellingTicket.Status = "Cancelled";
+                successMessage = $"Ticket #{cancellingTicket.Id} has been cancelled successfully.";
+                
+                // Close modal
+                CloseCancelModal();
+                
+                // Refresh data
+                await LoadTicketsFromApi();
+                ApplyFilters();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Failed to cancel ticket: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error cancelling ticket: {ex.Message}";
+        }
+    }
+    
+    private async Task ResendEmail(TicketViewModel ticket)
+    {
+        try
+        {
+            // Call API to resend ticket email
+            var response = await Http.PostAsync($"api/tickets/{ticket.Id}/resend-email", null);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = $"Email for ticket #{ticket.Id} has been resent successfully.";
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Failed to resend email: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error resending email: {ex.Message}";
+        }
+    }
+    
+    private async Task RefreshTickets()
+    {
+        try
+        {
+            await LoadTicketsFromApi();
+            ApplyFilters();
+            successMessage = "Ticket data refreshed successfully";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error refreshing tickets: {ex.Message}";
+        }
+    }
+    
+    private async Task ExportTickets()
+    {
+        try
+        {
+            // In a real app, this would call an API endpoint
+            // For demo purposes, just create a simplified CSV
+            var csv = "Ticket ID,Order ID,Movie,Date & Time,Hall,Seat,Customer,Price,Status\n";
+            
+            foreach (var ticket in filteredTickets)
+            {
+                csv += $"{ticket.Id},{ticket.OrderId},\"{ticket.MovieTitle}\",{ticket.ShowDateTime:yyyy-MM-dd HH:mm},\"{ticket.HallName}\",{ticket.SeatNumber},\"{ticket.CustomerName}\",{ticket.Price:0.00},{ticket.Status}\n";
+            }
+            
+            var filename = $"tickets_export_{DateTime.Now:yyyy-MM-dd}.csv";
+            await JS.InvokeVoidAsync("downloadFile", filename, "text/csv", csv);
+            
+            successMessage = "Tickets exported successfully";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error exporting tickets: {ex.Message}";
+        }
+    }
+    
+    // Model classes
+    public class Movie
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = "";
+    }
+    
+    public class TicketViewModel
+    {
+        public int Id { get; set; }
+        public int OrderId { get; set; }
+        public int MovieId { get; set; }
+        public string MovieTitle { get; set; } = "";
+        public DateTime ShowDateTime { get; set; }
+        public string HallName { get; set; } = "";
+        public string SeatNumber { get; set; } = "";
+        public string Seat { get; set; } = "";
+        public string CustomerName { get; set; } = "";
+        public string CustomerEmail { get; set; } = "";
+        public decimal Price { get; set; }
+        public string Status { get; set; } = "";
+        public DateTime CreatedAt { get; set; }
+    }
+} 
