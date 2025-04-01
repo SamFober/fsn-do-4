@@ -4,13 +4,9 @@
 window.revenueChart = null;
 window.movieChart = null;
 
-// Force global scope for all functions
 window.initializeAdminCharts = function(revenueDataJson, movieDataJson) {
-    console.log("Admin charts initialization called with data");
-    
     // Make sure Chart.js is available
     if (typeof Chart === 'undefined') {
-        console.error("Chart.js is not loaded! Cannot initialize charts.");
         return false;
     }
     
@@ -19,38 +15,29 @@ window.initializeAdminCharts = function(revenueDataJson, movieDataJson) {
         const revenueData = JSON.parse(revenueDataJson);
         const movieData = JSON.parse(movieDataJson);
         
-        console.log("Successfully parsed chart data");
-        
         // Get the chart canvases
         const revenueCtx = document.getElementById('revenueChartCanvas');
         const movieCtx = document.getElementById('movieChartCanvas');
         
         // Check if canvas elements exist
         if (!revenueCtx) {
-            console.error("Revenue chart canvas not found in DOM");
             return false;
         }
         
         if (!movieCtx) {
-            console.error("Movie chart canvas not found in DOM");
             return false;
         }
-        
-        console.log("Chart canvases found in DOM");
         
         // Destroy existing charts if they exist
         if (window.revenueChart) {
             window.revenueChart.destroy();
-            console.log("Destroyed existing revenue chart");
         }
         
         if (window.movieChart) {
             window.movieChart.destroy();
-            console.log("Destroyed existing movie chart");
         }
         
         // Create the revenue chart
-        console.log("Creating revenue chart...");
         window.revenueChart = new Chart(revenueCtx, {
             type: 'line',
             data: revenueData,
@@ -87,7 +74,6 @@ window.initializeAdminCharts = function(revenueDataJson, movieDataJson) {
         });
         
         // Create the movie chart
-        console.log("Creating movie chart...");
         window.movieChart = new Chart(movieCtx, {
             type: 'bar',
             data: movieData,
@@ -116,11 +102,9 @@ window.initializeAdminCharts = function(revenueDataJson, movieDataJson) {
             }
         });
         
-        console.log("Charts created successfully!");
         return true;
     }
     catch (error) {
-        console.error("Error initializing charts:", error);
         return false;
     }
 };
@@ -128,62 +112,48 @@ window.initializeAdminCharts = function(revenueDataJson, movieDataJson) {
 // Update the revenue chart with new data from the API
 window.updateRevenueChart = function(newDataJson) {
     if (!window.revenueChart) {
-        console.error("Revenue chart not initialized");
         return;
     }
     
     try {
-        console.log("Updating revenue chart with new data from API");
         const newData = JSON.parse(newDataJson);
         
         // Update the chart data
         window.revenueChart.data.labels = newData.labels;
         window.revenueChart.data.datasets = newData.datasets;
         
-        // Update the chart
         window.revenueChart.update();
-        console.log("Revenue chart updated successfully");
     } 
     catch (error) {
-        console.error("Error updating revenue chart:", error);
+        // Silent error handling
     }
 };
 
 // Update the movie chart with new data from the API
 window.updateMovieChart = function(newDataJson) {
     if (!window.movieChart) {
-        console.error("Movie chart not initialized");
         return;
     }
     
     try {
-        console.log("Updating movie chart with new data from API");
         const newData = JSON.parse(newDataJson);
         
         // Update the chart data
         window.movieChart.data.labels = newData.labels;
         window.movieChart.data.datasets = newData.datasets;
         
-        // Update the chart
         window.movieChart.update();
-        console.log("Movie chart updated successfully");
     } 
     catch (error) {
-        console.error("Error updating movie chart:", error);
+        // Silent error handling
     }
 };
 
 // Update revenue chart when time range changes - fallback with hardcoded data
 window.updateRevenueChartRange = function(timeRange) {
     if (!window.revenueChart) {
-        console.error("Revenue chart not initialized");
         return;
     }
-    
-    console.log("Updating revenue chart range to:", timeRange);
-    
-    // In a real app, you would fetch new data from the API based on timeRange
-    // For demo, we'll just show different dummy data based on the range
     
     const days = parseInt(timeRange, 10);
     let labels = [];
@@ -225,14 +195,8 @@ window.updateRevenueChartRange = function(timeRange) {
 // Update movie chart when metric changes - fallback with hardcoded data
 window.updateMovieChartMetric = function(metric) {
     if (!window.movieChart) {
-        console.error("Movie chart not initialized");
         return;
     }
-    
-    console.log("Updating movie chart metric to:", metric);
-    
-    // In a real app, you would fetch new data from the API based on the metric
-    // For demo, we'll just show different dummy data based on the metric
     
     const movies = ['Inception', 'Dark Knight', 'Interstellar', 'Pulp Fiction', 'The Godfather'];
     let data = [];
@@ -250,7 +214,4 @@ window.updateMovieChartMetric = function(metric) {
     window.movieChart.data.datasets[0].label = label;
     window.movieChart.data.datasets[0].data = data;
     window.movieChart.update();
-};
-
-// Log that the script has loaded
-console.log("Admin charts script loaded and functions attached to window"); 
+}; 
