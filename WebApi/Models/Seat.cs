@@ -12,6 +12,7 @@ namespace WebApi.Models
         public int RowNumber { get; set; }
         public int SeatNumber { get; set; }
         public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
 
         public required Hall Hall { get; set; }
         public ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();

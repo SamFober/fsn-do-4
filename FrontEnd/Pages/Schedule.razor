@@ -41,7 +41,7 @@
             <div class="filters-section">
                 <div class="filter-item">
                     <label for="formatFilter">Format:</label>
-                    <select id="formatFilter" value="@selectedFormat" @onchange="@((e) => FormatChanged(e.Value.ToString()))">
+                    <select id="formatFilter" value="@selectedFormat" @onchange="@((e) => FormatChanged(e.Value?.ToString()))">
                         <option value="">All Formats</option>
                         @foreach (var format in availableFormats)
                         {
@@ -58,7 +58,7 @@
                 
                 <div class="filter-item">
                     <label for="sortBy">Sort by:</label>
-                    <select id="sortBy" value="@sortBy" @onchange="@((e) => SortChanged(e.Value.ToString()))">
+                    <select id="sortBy" value="@sortBy" @onchange="@((e) => SortChanged(e.Value?.ToString()))">
                         <option value="time">Time (Earliest First)</option>
                         <option value="time_desc">Time (Latest First)</option>
                         <option value="popularity">Popularity (Most Popular First)</option>
@@ -379,11 +379,13 @@
         return new List<string>();
     }
 
-    private async Task SortChanged(string newSort)
+    private async Task SortChanged(string? newSort)
     {
-        Console.WriteLine($"Sort changed to: {newSort}");
-        sortBy = newSort;
-        await LoadSchedule();
+        if (newSort != null)
+        {
+            sortBy = newSort;
+            await LoadSchedule();
+        }
     }
 
     private async Task ResetFilters()
@@ -398,11 +400,13 @@
         StateHasChanged();
     }
 
-    private async Task FormatChanged(string newFormat)
+    private async Task FormatChanged(string? newFormat)
     {
-        Console.WriteLine($"Format changed to: {newFormat}");
-        selectedFormat = newFormat;
-        await LoadSchedule();
+        if (newFormat != null)
+        {
+            selectedFormat = newFormat;
+            await LoadSchedule();
+        }
     }
 
     // Manually sort schedules based on our own sorting logic
