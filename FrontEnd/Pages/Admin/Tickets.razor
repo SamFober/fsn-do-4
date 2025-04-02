@@ -80,9 +80,6 @@
                     <button class="btn-icon" title="Refresh" @onclick="RefreshTickets">
                         <i class="fas fa-sync-alt"></i>
                     </button>
-                    <button class="btn-icon" title="Export" @onclick="ExportTickets">
-                        <i class="fas fa-download"></i>
-                    </button>
                 </div>
             </div>
             <div class="card-body p-0">
@@ -683,7 +680,7 @@
         try
         {
             // Call API to resend ticket email
-            var response = await Http.PostAsync($"api/tickets/{ticket.Id}/resend-email", null);
+            var response = await Http.PostAsync($"api/orders/{ticket.OrderId}/resend-email", null);
             
             if (response.IsSuccessStatusCode)
             {
@@ -712,30 +709,6 @@
         catch (Exception ex)
         {
             errorMessage = $"Error refreshing tickets: {ex.Message}";
-        }
-    }
-    
-    private async Task ExportTickets()
-    {
-        try
-        {
-            // In a real app, this would call an API endpoint
-            // For demo purposes, just create a simplified CSV
-            var csv = "Ticket ID,Order ID,Movie,Date & Time,Hall,Seat,Customer,Price,Status\n";
-            
-            foreach (var ticket in filteredTickets)
-            {
-                csv += $"{ticket.Id},{ticket.OrderId},\"{ticket.MovieTitle}\",{ticket.ShowDateTime:yyyy-MM-dd HH:mm},\"{ticket.HallName}\",{ticket.SeatNumber},\"{ticket.CustomerName}\",{ticket.Price:0.00},{ticket.Status}\n";
-            }
-            
-            var filename = $"tickets_export_{DateTime.Now:yyyy-MM-dd}.csv";
-            await JS.InvokeVoidAsync("downloadFile", filename, "text/csv", csv);
-            
-            successMessage = "Tickets exported successfully";
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error exporting tickets: {ex.Message}";
         }
     }
     

@@ -73,6 +73,10 @@ body.admin-theme-dark {
     color: var(--text-color);
 }
 
+.admin-container .page-header .page-title {
+    color: #333;
+}
+
 /* Sidebar Styles */
 .admin-sidebar {
     width: 280px;

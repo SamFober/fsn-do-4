@@ -3,10 +3,12 @@ using Microsoft.EntityFrameworkCore;
 using WebApi.Data;
 using WebApi.Interfaces.Services;
 using WebApi.Models;
+using WebApi.Models.Responses;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.IO;
 
 namespace WebApi.Controllers
 {
@@ -18,15 +20,21 @@ namespace WebApi.Controllers
         private readonly ApplicationDbContext _context;
         private readonly ILogger<OrdersController> _logger;
         private readonly IMailService _mailService;
+        private readonly ITicketPdfService _ticketPdfService;
+        private readonly ITicketService _ticketService;
 
         public OrdersController(
             ApplicationDbContext context, 
             ILogger<OrdersController> logger,
-            IMailService mailService)
+            IMailService mailService,
+            ITicketPdfService ticketPdfService,
+            ITicketService ticketService)
         {
             _context = context;
             _logger = logger;
             _mailService = mailService;
+            _ticketPdfService = ticketPdfService;
+            _ticketService = ticketService;
         }
 
         // GET: api/orders
@@ -48,32 +56,8 @@ namespace WebApi.Controllers
                     .OrderByDescending(o => o.CreatedAt)
                     .ToListAsync();
 
-                var result = orders.Select(o => new
-                {
-                    Id = o.Id,
-                    OrderToken = o.OrderToken,
-                    CreatedAt = o.CreatedAt,
-                    CustomerName = GetCustomerNameFromTickets(o.Tickets),
-                    CustomerEmail = GetCustomerEmailFromTickets(o.Tickets),
-                    CustomerPhone = "",  // No phone field in model but added for UI
-                    TicketCount = o.Tickets.Count,
-                    Status = o.Status.ToString(),
-                    PaymentMethod = "Credit Card",  // Default as we don't store this
-                    PaymentId = o.Id.ToString(),  // Use order ID as payment ID
-                    SubtotalAmount = o.Tickets.Sum(t => t.Presentation?.Price ?? 0),
-                    DiscountAmount = 0,  // No discount field in model
-                    TotalAmount = o.Tickets.Sum(t => t.Presentation?.Price ?? 0),
-                    Tickets = o.Tickets.Select(t => new
-                    {
-                        Id = t.Id,
-                        MovieTitle = t.Presentation?.Movie?.Title ?? "Unknown Movie",
-                        ShowDateTime = t.Presentation?.StartTime ?? DateTime.MinValue,
-                        HallName = t.Presentation?.Hall?.Name ?? "Unknown Hall",
-                        SeatNumber = $"{t.Seat?.RowNumber}{t.Seat?.SeatNumber}" ?? "Unknown Seat",
-                        Price = t.Presentation?.Price ?? 0,
-                        Status = t.Status.ToString()
-                    }).ToList()
-                }).ToList();
+                // Map entities to response models using the constructor
+                var result = orders.Select(o => new AdminOrderResponse(o)).ToList();
 
                 return Ok(result);
             }
@@ -94,19 +78,25 @@ namespace WebApi.Controllers
                     .Include(o => o.Tickets)
                         .ThenInclude(t => t.Presentation)
                             .ThenInclude(p => p.Movie)
+                    .Include(o => o.Tickets)
+                        .ThenInclude(t => t.Presentation)
+                    .Include(o => o.Items)
                     .OrderByDescending(o => o.CreatedAt)
                     .Take(5)  // Only get 5 most recent orders
                     .ToListAsync();
 
-                var result = recentOrders.Select(o => new
-                {
-                    Id = o.Id.ToString(),
-                    Customer = GetCustomerNameFromTickets(o.Tickets),
-                    Movie = o.Tickets.FirstOrDefault()?.Presentation?.Movie?.Title ?? "Multiple Movies",
-                    Date = o.CreatedAt,
-                    Amount = o.Tickets.Sum(t => t.Presentation?.Price ?? 0),
-                    Status = o.Status.ToString()
-                }).ToList();
+                // Use AdminOrderResponse for consistency, then select only the needed properties
+                var result = recentOrders
+                    .Select(o => new AdminOrderResponse(o))
+                    .Select(r => new {
+                        Id = r.Id.ToString(),
+                        Customer = r.CustomerName,
+                        Movie = r.Tickets.FirstOrDefault()?.MovieTitle ?? "Multiple Movies",
+                        Date = r.CreatedAt,
+                        Amount = r.TotalAmount,
+                        Status = r.Status
+                    })
+                    .ToList();
 
                 return Ok(result);
             }
@@ -140,32 +130,8 @@ namespace WebApi.Controllers
                     return NotFound($"Order with ID {id} not found");
                 }
 
-                var result = new
-                {
-                    Id = order.Id,
-                    OrderToken = order.OrderToken,
-                    CreatedAt = order.CreatedAt,
-                    CustomerName = GetCustomerNameFromTickets(order.Tickets),
-                    CustomerEmail = GetCustomerEmailFromTickets(order.Tickets),
-                    CustomerPhone = "",  // No phone field in model but added for UI
-                    TicketCount = order.Tickets.Count,
-                    Status = order.Status.ToString(),
-                    PaymentMethod = "Credit Card",  // Default as we don't store this
-                    PaymentId = order.Id.ToString(),  // Use order ID as payment ID
-                    SubtotalAmount = order.Tickets.Sum(t => t.Presentation?.Price ?? 0),
-                    DiscountAmount = 0,  // No discount field in model
-                    TotalAmount = order.Tickets.Sum(t => t.Presentation?.Price ?? 0),
-                    Tickets = order.Tickets.Select(t => new
-                    {
-                        Id = t.Id,
-                        MovieTitle = t.Presentation?.Movie?.Title ?? "Unknown Movie",
-                        ShowDateTime = t.Presentation?.StartTime ?? DateTime.MinValue,
-                        HallName = t.Presentation?.Hall?.Name ?? "Unknown Hall",
-                        SeatNumber = $"{t.Seat?.RowNumber}{t.Seat?.SeatNumber}" ?? "Unknown Seat",
-                        Price = t.Presentation?.Price ?? 0,
-                        Status = t.Status.ToString()
-                    }).ToList()
-                };
+                // Use the constructor to map the entity to a response model
+                var result = new AdminOrderResponse(order);
 
                 return Ok(result);
             }
@@ -183,14 +149,6 @@ namespace WebApi.Controllers
             try
             {
                 var order = await _context.TicketOrders
-                    .Include(o => o.Tickets)
-                        .ThenInclude(t => t.Presentation)
-                            .ThenInclude(p => p.Movie)
-                    .Include(o => o.Tickets)
-                        .ThenInclude(t => t.Presentation)
-                            .ThenInclude(p => p.Hall)
-                    .Include(o => o.Tickets)
-                        .ThenInclude(t => t.Seat)
                     .FirstOrDefaultAsync(o => o.Id == id);
 
                 if (order == null)
@@ -198,120 +156,17 @@ namespace WebApi.Controllers
                     return NotFound($"Order with ID {id} not found");
                 }
 
-                if (string.IsNullOrEmpty(GetCustomerEmailFromTickets(order.Tickets)))
-                {
-                    return BadRequest("Order does not have a customer email address");
-                }
+                // Use the existing FinalizeOrder method which already handles 
+                // getting tickets, creating PDFs, and sending emails
+                await _ticketService.FinalizeOrder(order.OrderToken);
 
-                // Get email template - this would typically be loaded from a file
-                // For demo, we'll use a simple HTML template
-                string emailTemplate = GetOrderConfirmationEmailTemplate(order);
-
-                // Send email
-                bool emailSent = _mailService.SendEmail(
-                    GetCustomerNameFromTickets(order.Tickets) ?? "Customer",
-                    GetCustomerEmailFromTickets(order.Tickets),
-                    $"Your Cinema Tickets - Order #{order.Id}",
-                    emailTemplate,
-                    null  // No attachments
-                );
-
-                if (emailSent)
-                {
-                    return Ok(new { message = $"Confirmation email resent to {GetCustomerEmailFromTickets(order.Tickets)}" });
-                }
-                else
-                {
-                    return StatusCode(500, "Failed to send email");
-                }
+                return Ok(new { message = $"Confirmation email with tickets resent successfully" });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error resending email for order {OrderId}", id);
-                return StatusCode(500, $"An error occurred while resending email for order {id}");
+                return StatusCode(500, $"An error occurred while resending email for order {id}: {ex.Message}");
             }
-        }
-
-        // Helper method to get customer name from the tickets
-        private string GetCustomerNameFromTickets(ICollection<Ticket> tickets)
-        {
-            return tickets.FirstOrDefault()?.CustomerName ?? "Guest";
-        }
-
-        // Helper method to get customer email from the tickets
-        private string GetCustomerEmailFromTickets(ICollection<Ticket> tickets)
-        {
-            return tickets.FirstOrDefault()?.CustomerEmail ?? "";
-        }
-
-        // Helper method to generate a simple email template
-        private string GetOrderConfirmationEmailTemplate(TicketOrder order)
-        {
-            string ticketRows = string.Join("", order.Tickets.Select(t => $@"
-                <tr>
-                    <td style='padding: 8px; border: 1px solid #ddd;'>{t.Presentation?.Movie?.Title ?? "Unknown Movie"}</td>
-                    <td style='padding: 8px; border: 1px solid #ddd;'>{t.Presentation?.StartTime.ToString("g") ?? "Unknown Time"}</td>
-                    <td style='padding: 8px; border: 1px solid #ddd;'>{t.Presentation?.Hall?.Name ?? "Unknown Hall"}</td>
-                    <td style='padding: 8px; border: 1px solid #ddd;'>{t.Seat?.RowNumber}{t.Seat?.SeatNumber.ToString() ?? "Unknown Seat"}</td>
-                    <td style='padding: 8px; border: 1px solid #ddd;'>€{(t.Presentation?.Price != null ? t.Presentation.Price.ToString("0.00") : "0.00")}</td>
-                </tr>"));
-
-            decimal totalAmount = order.Tickets.Sum(t => t.Presentation?.Price ?? 0);
-
-            string customerName = GetCustomerNameFromTickets(order.Tickets);
-
-            return $@"
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset='utf-8'>
-                    <title>Your Cinema Tickets</title>
-                </head>
-                <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto;'>
-                    <div style='background-color: #f8f9fa; padding: 20px; text-align: center;'>
-                        <h1 style='color: #121a2b;'>Your Cinema Tickets</h1>
-                        <p>Order #{order.Id}</p>
-                    </div>
-                    
-                    <div style='padding: 20px;'>
-                        <p>Dear {customerName ?? "Customer"},</p>
-                        
-                        <p>Thank you for your order! Below are your ticket details:</p>
-                        
-                        <table style='width: 100%; border-collapse: collapse; margin-bottom: 20px;'>
-                            <thead>
-                                <tr style='background-color: #f2f2f2;'>
-                                    <th style='padding: 8px; border: 1px solid #ddd; text-align: left;'>Movie</th>
-                                    <th style='padding: 8px; border: 1px solid #ddd; text-align: left;'>Date & Time</th>
-                                    <th style='padding: 8px; border: 1px solid #ddd; text-align: left;'>Hall</th>
-                                    <th style='padding: 8px; border: 1px solid #ddd; text-align: left;'>Seat</th>
-                                    <th style='padding: 8px; border: 1px solid #ddd; text-align: left;'>Price</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {ticketRows}
-                            </tbody>
-                            <tfoot>
-                                <tr>
-                                    <td colspan='4' style='padding: 8px; border: 1px solid #ddd; text-align: right;'><strong>Total</strong></td>
-                                    <td style='padding: 8px; border: 1px solid #ddd;'>€{totalAmount.ToString("0.00")}</td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                        
-                        <p>Please arrive at least 15 minutes before the show time. Your tickets will be available at the cinema box office.</p>
-                        
-                        <p>Enjoy your movie!</p>
-                        
-                        <p>Best regards,<br>Cinemagia Team</p>
-                    </div>
-                    
-                    <div style='background-color: #121a2b; color: white; padding: 20px; text-align: center;'>
-                        <p>&copy; 2023 Cinemagia. All rights reserved.</p>
-                    </div>
-                </body>
-                </html>
-            ";
         }
     }
 } 
