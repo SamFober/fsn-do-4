@@ -16,15 +16,18 @@ namespace WebApi.Controllers
         private readonly ITicketService _ticketService;
         private readonly ILogger<TicketsController> _logger;
         private readonly ApplicationDbContext _context; // Keep for test setup only
+        private readonly IMailService _mailService;
 
         public TicketsController(
             ITicketService ticketService,
             ApplicationDbContext context,
-            ILogger<TicketsController> logger)
+            ILogger<TicketsController> logger,
+            IMailService mailService)
         {
             _ticketService = ticketService;
             _context = context;
             _logger = logger;
+            _mailService = mailService;
         }
 
         [HttpPost("test/setup-split-scenario")]
@@ -452,10 +455,10 @@ namespace WebApi.Controllers
         /// <response code="400">If the seats are no longer available</response>
         /// <response code="404">If the order is not found or expired</response>
         [HttpPost("orders/{orderToken}/confirm")]
-        [ProducesResponseType(typeof(List<TicketResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(List<WebApi.Models.Responses.TicketResponse>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult<List<TicketResponse>>> ConfirmOrder(
+        public async Task<ActionResult<List<WebApi.Models.Responses.TicketResponse>>> ConfirmOrder(
             Guid orderToken,
             [FromBody] ConfirmOrderRequest request)
         {
@@ -674,6 +677,203 @@ namespace WebApi.Controllers
             {
                 _logger.LogError(ex, "An error occurred while creating the tickets");
                 return StatusCode(500, "An error occurred while creating the tickets");
+            }
+        }
+
+        [HttpGet]
+        [ProducesResponseType(typeof(List<WebApi.Models.Responses.TicketResponse>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetAllTickets()
+        {
+            try
+            {
+                // Fetch all tickets with related data
+                var tickets = await _context.Tickets
+                    .Include(t => t.Presentation)
+                        .ThenInclude(p => p.Movie)
+                    .Include(t => t.Presentation)
+                        .ThenInclude(p => p.Hall)
+                    .Include(t => t.Seat)
+                    .Include(t => t.TicketOrder)
+                    .OrderByDescending(t => t.CreatedAt)
+                    .ToListAsync();
+
+                // Map to response objects using the proper TicketResponse record
+                var response = tickets.Select(ticket => new WebApi.Models.Responses.TicketResponse(
+                    TicketId: ticket.Id,
+                    MovieTitle: ticket.Presentation?.Movie?.Title ?? "Unknown Movie",
+                    HallName: ticket.Presentation?.Hall?.Name ?? "Unknown Hall",
+                    StartTime: ticket.Presentation?.StartTime ?? DateTime.MinValue,
+                    EndTime: ticket.Presentation?.EndTime ?? DateTime.MinValue,
+                    Row: ticket.Seat?.RowNumber ?? 0,
+                    SeatNumber: ticket.Seat?.SeatNumber ?? 0,
+                    CustomerName: ticket.CustomerName ?? "Unknown",
+                    CustomerEmail: ticket.CustomerEmail ?? "",
+                    Status: ticket.Status,
+                    PurchaseDate: ticket.PurchaseDate
+                )).ToList();
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving all tickets");
+                return StatusCode(500, "An error occurred while retrieving tickets");
+            }
+        }
+
+        [HttpGet("admin")]
+        [ProducesResponseType(typeof(List<AdminTicketResponse>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetAdminTickets()
+        {
+            try
+            {
+                // Fetch all tickets with related data
+                var tickets = await _context.Tickets
+                    .Include(t => t.Presentation)
+                        .ThenInclude(p => p.Movie)
+                    .Include(t => t.Presentation)
+                        .ThenInclude(p => p.Hall)
+                    .Include(t => t.Seat)
+                    .Include(t => t.TicketOrder)
+                    .OrderByDescending(t => t.CreatedAt)
+                    .ToListAsync();
+
+                // Map to response objects using the AdminTicketResponse class for admin dashboard
+                var response = tickets.Select(ticket => new AdminTicketResponse
+                {
+                    Id = ticket.Id,
+                    OrderId = ticket.TicketOrder?.Id ?? 0,
+                    MovieId = ticket.Presentation?.MovieId ?? 0,
+                    MovieTitle = ticket.Presentation?.Movie?.Title ?? "Unknown Movie",
+                    ShowDateTime = ticket.Presentation?.StartTime ?? DateTime.MinValue,
+                    HallName = ticket.Presentation?.Hall?.Name ?? "Unknown Hall",
+                    SeatNumber = $"{ticket.Seat?.RowNumber}{ticket.Seat?.SeatNumber}",
+                    Format = ticket.Presentation?.Format ?? "",
+                    Price = ticket.Presentation?.Price ?? 0,
+                    CustomerName = ticket.CustomerName ?? "",
+                    CustomerEmail = ticket.CustomerEmail ?? "",
+                    CustomerPhone = "", // This field doesn't exist in the model
+                    Status = ticket.Status.ToString(),
+                    CreatedAt = ticket.CreatedAt,
+                    UpdatedAt = ticket.UpdatedAt
+                }).ToList();
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving admin tickets");
+                return StatusCode(500, "An error occurred while retrieving tickets");
+            }
+        }
+
+        // New endpoint for individual ticket cancellation (used by admin)
+        [HttpPost("{ticketId}/cancel")]
+        [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> CancelTicket(int ticketId, [FromBody] CancelTicketRequest request)
+        {
+            try
+            {
+                var ticket = await _context.Tickets
+                    .Include(t => t.Presentation)
+                    .Include(t => t.Seat)
+                    .Include(t => t.TicketOrder)
+                    .FirstOrDefaultAsync(t => t.Id == ticketId);
+
+                if (ticket == null)
+                {
+                    return NotFound($"Ticket with ID {ticketId} not found");
+                }
+
+                // Check if the ticket is already cancelled
+                if (ticket.Status == TicketStatus.Cancelled)
+                {
+                    return BadRequest("Ticket is already cancelled");
+                }
+
+                // Update ticket status
+                ticket.Status = TicketStatus.Cancelled;
+                ticket.UpdatedAt = DateTime.UtcNow;
+
+                // Make the seat available again for this presentation
+                var seatPresentation = await _context.SeatPresentations
+                    .FirstOrDefaultAsync(sp => sp.PresentationId == ticket.PresentationId && sp.SeatId == ticket.SeatId);
+
+                if (seatPresentation != null)
+                {
+                    seatPresentation.IsAvailable = true;
+                    seatPresentation.UpdatedAt = DateTime.UtcNow;
+                }
+
+                // Update presentation available seats count
+                var presentation = ticket.Presentation;
+                if (presentation != null)
+                {
+                    presentation.AvailableSeats = Math.Min(
+                        presentation.AvailableSeats + 1,
+                        presentation.Hall?.Rows * presentation.Hall?.SeatsPerRow ?? presentation.AvailableSeats + 1
+                    );
+                }
+
+                await _context.SaveChangesAsync();
+
+                // Record cancellation reason and other details
+                _logger.LogInformation(
+                    "Ticket {TicketId} cancelled. Reason: {Reason}, Refund issued: {Refund}",
+                    ticketId,
+                    request.Reason,
+                    request.IssueRefund
+                );
+
+                // If refund is requested, log it (in a real system, we would process the refund)
+                if (request.IssueRefund)
+                {
+                    _logger.LogInformation(
+                        "Refund issued for ticket {TicketId}, amount: {Amount}",
+                        ticketId,
+                        presentation?.Price ?? 0
+                    );
+                }
+
+                // Notify customer if we have their email (optional)
+                if (!string.IsNullOrEmpty(ticket.CustomerEmail))
+                {
+                    try
+                    {
+                        // Simple email notification
+                        string emailBody = $@"
+                            <h1>Ticket Cancellation</h1>
+                            <p>Dear {ticket.CustomerName},</p>
+                            <p>Your ticket for {ticket.Presentation?.Movie?.Title} on {ticket.Presentation?.StartTime:g} has been cancelled.</p>
+                            <p>Reason: {request.Reason}</p>
+                            " + (request.IssueRefund ? $"<p>A refund of €{ticket.Presentation?.Price:0.00} has been issued.</p>" : "");
+
+                        _mailService.SendEmail(
+                            ticket.CustomerName,
+                            ticket.CustomerEmail,
+                            "Your Cinema Ticket has been Cancelled",
+                            emailBody,
+                            null
+                        );
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log but don't fail if email sending fails
+                        _logger.LogWarning(ex, "Failed to send cancellation email to {Email}", ticket.CustomerEmail);
+                    }
+                }
+
+                return Ok(new { 
+                    message = "Ticket cancelled successfully",
+                    refundIssued = request.IssueRefund,
+                    refundAmount = request.IssueRefund ? ticket.Presentation?.Price : 0
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error cancelling ticket {TicketId}", ticketId);
+                return StatusCode(500, "An error occurred while cancelling the ticket");
             }
         }
 

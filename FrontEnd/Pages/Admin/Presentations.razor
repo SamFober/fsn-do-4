@@ -1,0 +1,1148 @@
+@page "/admin/presentations"
+@layout AdminLayout
+@using FrontEnd.Models
+@using System.ComponentModel.DataAnnotations
+@using FrontEnd.Components
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<PageTitle>Presentations Management - Cinemagia</PageTitle>
+
+<div class="admin-container">
+    <div class="page-header">
+        <h1 class="page-title">Presentations Management</h1>
+        <p class="page-description">Manage movie showtimes and theater allocations</p>
+    </div>
+    
+    @if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>Loading presentations data...</p>
+        </div>
+    }
+    else
+    {
+        <div class="filters-bar">
+            <div class="search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input 
+                    type="text" 
+                    class="form-control" 
+                    placeholder="Search presentations..." 
+                    @bind="searchQuery" 
+                    @bind:event="oninput" 
+                    @onkeyup="HandleSearchKeyUp" />
+            </div>
+            
+            <div class="filters-section">
+                <select class="filter-select" @bind="selectedStatus">
+                    <option value="">All Status</option>
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                </select>
+                
+                <button class="filter-btn filter-btn-primary" @onclick="ApplyFilters">
+                    <i class="fas fa-filter"></i>
+                    <span>Apply Filters</span>
+                </button>
+                <button class="filter-btn" @onclick="ResetFilters">
+                    <i class="fas fa-undo"></i>
+                    <span>Reset</span>
+                </button>
+                
+                <button class="filter-btn filter-btn-primary" @onclick="AddPresentation">
+                    <i class="fas fa-plus"></i>
+                    <span>Add New Presentation</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h3>All Presentations</h3>
+                <div class="card-actions">
+                    <button class="btn-icon" title="Refresh" @onclick="ApplyFilters">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                @if (presentations.Count == 0)
+                {
+                    <div class="table-empty">
+                        <i class="fas fa-calendar-alt fa-3x"></i>
+                        <p>No presentations found matching your filters</p>
+                        <button class="btn-secondary" @onclick="ResetFilters">Clear Filters</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-container">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Movie</th>
+                                    <th>Hall</th>
+                                    <th>Date</th>
+                                    <th>Time</th>
+                                    <th>Format</th>
+                                    <th>Price</th>
+                                    <th>Capacity</th>
+                                    <th>Tickets Sold</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var presentation in paginatedPresentations)
+                                {
+                                    <tr>
+                                        <td>@presentation.Id</td>
+                                        <td>@GetMovieTitle(presentation.MovieId)</td>
+                                        <td>@GetHallName(presentation.HallId)</td>
+                                        <td>@presentation.StartTime.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                                        <td>@presentation.StartTime.ToLocalTime().ToString("HH:mm")</td>
+                                        <td>@presentation.Format</td>
+                                        <td>€@presentation.BasePrice.ToString("0.00")</td>
+                                        <td>@presentation.Capacity</td>
+                                        <td>@presentation.TicketsSold</td>
+                                        <td>
+                                            <span class="status-badge @(presentation.IsActive ? "status-active" : "status-inactive")">
+                                                @(presentation.IsActive ? "Active" : "Inactive")
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                <button class="btn-icon" title="View" @onclick="() => ViewPresentation(presentation)">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button class="btn-icon" title="Edit" @onclick="() => EditPresentation(presentation)">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn-icon" title="Delete" @onclick="() => DeletePresentation(presentation)">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        
+                        <Pagination 
+                            CurrentPage="@currentPage"
+                            PageSize="@pageSize"
+                            TotalItems="@filteredPresentations.Count"
+                            OnPageChanged="@HandlePageChange"
+                            OnPageSizeChanged="@HandlePageSizeChange" />
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    
+    @* Add/Edit Presentation Modal *@
+    @if (showAddEditModal)
+    {
+        <div class="modal-overlay" @onclick="CloseModal"></div>
+        <div class="modal-container modal-md" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h2 class="modal-title">@(editingPresentation == null ? "Add New Presentation" : "Edit Presentation")</h2>
+                <button class="modal-close" @onclick="CloseModal">×</button>
+            </div>
+            <div class="modal-body">
+                <EditForm Model="@currentPresentation" OnValidSubmit="SavePresentation">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger mb-3" />
+                    
+                    <div class="form-group mb-3">
+                        <label for="movieId">Movie*</label>
+                        <InputSelect id="movieId" class="form-select" @bind-Value="currentPresentation.MovieId">
+                            <option value="0">-- Select Movie --</option>
+                            @foreach (var movie in movies)
+                            {
+                                <option value="@movie.Id">@movie.Title</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="@(() => currentPresentation.MovieId)" />
+                    </div>
+                    
+                    <div class="form-group mb-3">
+                        <label for="hallId">Hall*</label>
+                        <InputSelect id="hallId" class="form-select" @bind-Value="currentPresentation.HallId">
+                            <option value="0">-- Select Hall --</option>
+                            @foreach (var hall in halls)
+                            {
+                                <option value="@hall.Id">@hall.Name</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="@(() => currentPresentation.HallId)" />
+                    </div>
+                    
+                    <div class="form-group mb-3">
+                        <label for="startTime">Start Time*</label>
+                        <InputText id="startTime" class="form-control" @bind-Value="startTimeString" placeholder="YYYY-MM-DD HH:MM" />
+                        @if (!string.IsNullOrEmpty(startTimeError))
+                        {
+                            <div class="text-danger">@startTimeError</div>
+                        }
+                    </div>
+                    
+                    <div class="form-group mb-3">
+                        <label for="basePrice">Base Price (€)*</label>
+                        <InputNumber id="basePrice" class="form-control" @bind-Value="currentPresentation.BasePrice" />
+                        <ValidationMessage For="@(() => currentPresentation.BasePrice)" />
+                    </div>
+                    
+                    <div class="form-group mb-3">
+                        <div class="form-check">
+                            <InputCheckbox id="isActive" class="form-check-input" @bind-Value="currentPresentation.IsActive" />
+                            <label class="form-check-label" for="isActive">Active Presentation</label>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" @onclick="CloseModal">
+                    <i class="fas fa-times"></i>
+                    Cancel
+                </button>
+                <button type="submit" class="btn-primary" @onclick="SavePresentation">
+                    <i class="fas fa-save"></i>
+                    Save
+                </button>
+            </div>
+        </div>
+    }
+    
+    @* Delete Confirmation Modal *@
+    @if (showDeleteModal && deletingPresentation != null)
+    {
+        <div class="modal-overlay" @onclick="CloseModal"></div>
+        <div class="modal-container modal-sm" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h2 class="modal-title">Confirm Delete</h2>
+                <button class="modal-close" @onclick="CloseModal">×</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this presentation?</p>
+                <p><strong>Movie:</strong> @GetMovieTitle(deletingPresentation.MovieId)</p>
+                <p><strong>Hall:</strong> @GetHallName(deletingPresentation.HallId)</p>
+                <p><strong>Time:</strong> @deletingPresentation.StartTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</p>
+                <p class="text-danger">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" @onclick="CloseModal">
+                    <i class="fas fa-times"></i>
+                    Cancel
+                </button>
+                <button type="button" class="btn-danger" @onclick="ConfirmDelete">
+                    <i class="fas fa-trash"></i>
+                    Delete
+                </button>
+            </div>
+        </div>
+    }
+    
+    @* View Presentation Modal *@
+    @if (showViewModal && viewingPresentation != null)
+    {
+        <div class="modal-overlay" @onclick="CloseModal"></div>
+        <div class="modal-container modal-lg" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h2 class="modal-title">Presentation Details</h2>
+                <button class="modal-close" @onclick="CloseModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-section">
+                    <h4>Presentation Information</h4>
+                    <dl class="detail-list">
+                        <dt>ID:</dt>
+                        <dd>@viewingPresentation.Id</dd>
+                        
+                        <dt>Movie:</dt>
+                        <dd>@GetMovieTitle(viewingPresentation.MovieId)</dd>
+                        
+                        <dt>Hall:</dt>
+                        <dd>@GetHallName(viewingPresentation.HallId)</dd>
+                        
+                        <dt>Start Time:</dt>
+                        <dd>@viewingPresentation.StartTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</dd>
+                        
+                        <dt>Base Price:</dt>
+                        <dd>€@viewingPresentation.BasePrice.ToString("0.00")</dd>
+                        
+                        <dt>Status:</dt>
+                        <dd>
+                            <span class="status-badge @(viewingPresentation.IsActive ? "status-active" : "status-inactive")">
+                                @(viewingPresentation.IsActive ? "Active" : "Inactive")
+                            </span>
+                        </dd>
+                    </dl>
+                </div>
+                
+                <div class="detail-section">
+                    <h4>Ticket Information</h4>
+                    <dl class="detail-list">
+                        <dt>Available Seats:</dt>
+                        <dd>@viewingPresentation.AvailableSeats</dd>
+                        
+                        <dt>Tickets Sold:</dt>
+                        <dd>@viewingPresentation.TicketsSold</dd>
+                        
+                        <dt>Revenue:</dt>
+                        <dd>€@((viewingPresentation.TicketsSold * viewingPresentation.BasePrice).ToString("0.00"))</dd>
+                    </dl>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" @onclick="CloseModal">
+                    <i class="fas fa-times"></i>
+                    Close
+                </button>
+                <button type="button" class="btn-primary" @onclick="() => EditPresentation(viewingPresentation)">
+                    <i class="fas fa-edit"></i>
+                    Edit
+                </button>
+            </div>
+        </div>
+    }
+    
+    @if (successMessage != null)
+    {
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i>
+            <span>@successMessage</span>
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+    
+    @if (errorMessage != null)
+    {
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-circle"></i>
+            <span>@errorMessage</span>
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+</div>
+
+@code {
+    private bool isLoading = true;
+    private string? errorMessage = null;
+    private string? successMessage = null;
+    
+    // Presentation data
+    private List<PresentationViewModel> presentations = new();
+    private List<PresentationViewModel> filteredPresentations => GetFilteredPresentations();
+    
+    // Supporting data
+    private List<MovieViewModel> movies = new();
+    private List<HallViewModel> halls = new();
+    
+    // Filters
+    private string searchQuery = "";
+    private int selectedMovieId = 0;
+    private int selectedHallId = 0;
+    private string selectedStatus = "";
+    private string selectedDateRange = "";
+    private DateTime? startDate;
+    private DateTime? endDate;
+    private string startTimeString = "";
+    private string? startTimeError = null;
+    
+    // Sorting
+    private string sortColumn = "StartTime";
+    private string sortDirection = "asc";
+    
+    // Pagination
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalPages => (int)Math.Ceiling(filteredPresentations.Count / (double)pageSize);
+    private List<PresentationViewModel> paginatedPresentations => filteredPresentations
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+    
+    // Modal states
+    private bool showAddEditModal = false;
+    private bool showDeleteModal = false;
+    private bool showViewModal = false;
+    private PresentationViewModel? viewingPresentation;
+    private PresentationViewModel? editingPresentation;
+    private PresentationViewModel? deletingPresentation;
+    private PresentationFormModel currentPresentation = new();
+    
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+            
+            // Load movies and halls first
+            await Task.WhenAll(
+                LoadMoviesFromApi(),
+                LoadHallsFromApi()
+            );
+            
+            // Then load presentations and enrich them
+            await LoadPresentationsFromApi();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error initializing data: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private async Task LoadMoviesFromApi()
+    {
+        try
+        {
+            // First check if the API is accessible
+            var response = await Http.GetAsync("api/movies");
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = $"Failed to load movies. Status: {response.StatusCode}";
+                movies = new List<MovieViewModel>();
+                return;
+            }
+            
+            var apiMovies = await Http.GetFromJsonAsync<List<MovieViewModel>>("api/movies") ?? new List<MovieViewModel>();
+            movies = apiMovies;
+            Console.WriteLine($"Loaded {movies.Count} movies");
+            
+            // Debugging: Print first few movies
+            foreach (var movie in movies.Take(3))
+            {
+                Console.WriteLine($"Movie: ID={movie.Id}, Title={movie.Title}");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading movies: {ex.Message}";
+            movies = new List<MovieViewModel>();
+        }
+    }
+    
+    private async Task LoadHallsFromApi()
+    {
+        try
+        {
+            var apiHalls = await Http.GetFromJsonAsync<List<HallViewModel>>("api/halls") ?? new List<HallViewModel>();
+            halls = apiHalls;
+            Console.WriteLine($"Loaded {halls.Count} halls");
+            
+            // Debugging: Print first few halls
+            foreach (var hall in halls.Take(3))
+            {
+                Console.WriteLine($"Hall: ID={hall.Id}, Name={hall.Name}");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading halls: {ex.Message}";
+            halls = new List<HallViewModel>();
+        }
+    }
+    
+    private async Task LoadPresentationsFromApi()
+    {
+        try
+        {
+            Console.WriteLine("Fetching presentations from API...");
+            var apiPresentations = await Http.GetFromJsonAsync<List<PresentationViewModel>>("api/presentations") ?? new List<PresentationViewModel>();
+            presentations = apiPresentations;
+            
+            Console.WriteLine($"Loaded {presentations.Count} presentations from API");
+            
+            // The API returns presentation objects with different field names in list vs single item
+            // In the list endpoint: "title" is the movie title
+            // In the single item endpoint: "movieTitle" is the movie title
+            
+            // Check if we need to map fields due to API response format
+            foreach (var presentation in presentations)
+            {
+                // If MovieTitle is empty but Title might be populated in the dynamic response
+                if (string.IsNullOrEmpty(presentation.MovieTitle) && !string.IsNullOrEmpty(presentation.Title))
+                {
+                    Console.WriteLine($"Moving Title to MovieTitle for presentation {presentation.Id}: '{presentation.Title}'");
+                    presentation.MovieTitle = presentation.Title;
+                }
+                
+                // If MovieId is 0 but we have a movie title, try to find matching movie ID
+                if (presentation.MovieId == 0 && !string.IsNullOrEmpty(presentation.MovieTitle))
+                {
+                    var matchingMovie = movies.FirstOrDefault(m => 
+                        string.Equals(m.Title, presentation.MovieTitle, StringComparison.OrdinalIgnoreCase));
+                    
+                    if (matchingMovie != null)
+                    {
+                        Console.WriteLine($"Setting MovieId for presentation {presentation.Id} with title '{presentation.MovieTitle}' to {matchingMovie.Id}");
+                        presentation.MovieId = matchingMovie.Id;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"WARNING: Could not find movie matching title '{presentation.MovieTitle}' for presentation {presentation.Id}");
+                    }
+                }
+                
+                // If HallId is 0 but a hall name exists, try to find matching hall ID
+                if (presentation.HallId == 0 && !string.IsNullOrEmpty(presentation.HallName))
+                {
+                    var matchingHall = halls.FirstOrDefault(h => 
+                        string.Equals(h.Name, presentation.HallName, StringComparison.OrdinalIgnoreCase));
+                    
+                    if (matchingHall != null)
+                    {
+                        Console.WriteLine($"Setting HallId for presentation {presentation.Id} with name '{presentation.HallName}' to {matchingHall.Id}");
+                        presentation.HallId = matchingHall.Id;
+                        
+                        // Also set capacity from the hall if available
+                        presentation.Capacity = matchingHall.Capacity;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"WARNING: Could not find hall matching name '{presentation.HallName}' for presentation {presentation.Id}");
+                    }
+                }
+                
+                // Make sure Price is correctly set
+                if (presentation.Price > 0 && presentation.BasePrice == 0)
+                {
+                    presentation.BasePrice = presentation.Price;
+                    Console.WriteLine($"Setting BasePrice from Price for presentation {presentation.Id}: {presentation.Price}");
+                }
+                else if (presentation.BasePrice > 0 && presentation.Price == 0)
+                {
+                    presentation.Price = presentation.BasePrice;
+                    Console.WriteLine($"Setting Price from BasePrice for presentation {presentation.Id}: {presentation.BasePrice}");
+                }
+                
+                // Set IsActive based on dates - assume active if end time is in the future
+                presentation.IsActive = presentation.EndTime > DateTime.Now;
+                
+                // Set default format if empty
+                if (string.IsNullOrEmpty(presentation.Format))
+                {
+                    presentation.Format = "Standard";
+                }
+                
+                // If TicketsSold isn't set but AvailableSeats and Capacity are, calculate it
+                if (presentation.TicketsSold == 0 && presentation.AvailableSeats > 0 && presentation.Capacity > 0)
+                {
+                    presentation.TicketsSold = presentation.Capacity - presentation.AvailableSeats;
+                }
+                else if (presentation.AvailableSeats == 0 && presentation.Capacity > 0)
+                {
+                    // If AvailableSeats isn't set but we have Capacity, assume all seats are available
+                    // We can't set AvailableSeats directly since it's a computed property
+                    // Instead, set TicketsSold to 0 which will make AvailableSeats equal to Capacity
+                    presentation.TicketsSold = 0;
+                }
+                
+                // Log the final presentation state
+                Console.WriteLine($"Final Presentation {presentation.Id}: Movie = {presentation.MovieId} ({presentation.MovieTitle}), " +
+                                  $"Hall = {presentation.HallId} ({presentation.HallName}), " +
+                                  $"Price = {presentation.Price}, IsActive = {presentation.IsActive}, " +
+                                  $"Capacity = {presentation.Capacity}, Available = {presentation.AvailableSeats}");
+            }
+            
+            // Apply filters after processing
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading presentations: {ex.Message}";
+            presentations = new List<PresentationViewModel>();
+        }
+    }
+    
+    private string GetMovieTitle(int movieId)
+    {
+        // First check if the movieId is valid
+        if (movieId > 0)
+        {
+            var movie = movies.FirstOrDefault(m => m.Id == movieId);
+            if (movie != null)
+            {
+                return movie.Title;
+            }
+            Console.WriteLine($"UI Render: Movie with ID {movieId} not found in movies collection!");
+        }
+        
+        // If we get here, either the movieId was invalid or the movie wasn't found
+        // Return the movie title directly from the presentation object if available
+        var presentation = presentations.FirstOrDefault(p => p.MovieId == movieId);
+        if (presentation != null && !string.IsNullOrEmpty(presentation.MovieTitle))
+        {
+            return presentation.MovieTitle;
+        }
+        
+        return "Unknown Movie";
+    }
+    
+    private string GetHallName(int hallId)
+    {
+        // First check if the hallId is valid
+        if (hallId > 0)
+        {
+            var hall = halls.FirstOrDefault(h => h.Id == hallId);
+            if (hall != null)
+            {
+                return hall.Name;
+            }
+            Console.WriteLine($"UI Render: Hall with ID {hallId} not found in halls collection!");
+        }
+        
+        // If we get here, either the hallId was invalid or the hall wasn't found
+        // Return the hall name directly from the presentation object if available
+        var presentation = presentations.FirstOrDefault(p => p.HallId == hallId);
+        if (presentation != null && !string.IsNullOrEmpty(presentation.HallName))
+        {
+            return presentation.HallName;
+        }
+        
+        return "Unknown Hall";
+    }
+    
+    private async Task HandleSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await Task.Delay(1); // Ensure the search query is updated
+            ApplyFilters();
+        }
+    }
+    
+    private void ApplyFilters()
+    {
+        currentPage = 1;
+        // The filteredPresentations property automatically applies the filters
+        StateHasChanged();
+    }
+    
+    private void ResetFilters()
+    {
+        searchQuery = "";
+        selectedMovieId = 0;
+        selectedHallId = 0;
+        selectedStatus = "";
+        selectedDateRange = "";
+        startDate = null;
+        endDate = null;
+        sortColumn = "StartTime";
+        sortDirection = "asc";
+        currentPage = 1;
+        StateHasChanged();
+    }
+    
+    private void HandleDateRangeChange(string range)
+    {
+        selectedDateRange = range;
+        var today = DateTime.Today;
+        
+        switch (range)
+        {
+            case "today":
+                startDate = today;
+                endDate = today.AddDays(1).AddSeconds(-1);
+                break;
+            case "tomorrow":
+                startDate = today.AddDays(1);
+                endDate = today.AddDays(2).AddSeconds(-1);
+                break;
+            case "week":
+                startDate = today;
+                endDate = today.AddDays(7).AddSeconds(-1);
+                break;
+            case "month":
+                startDate = today;
+                endDate = today.AddMonths(1).AddSeconds(-1);
+                break;
+            default:
+                startDate = null;
+                endDate = null;
+                break;
+        }
+        
+        ApplyFilters();
+    }
+    
+    private List<PresentationViewModel> GetFilteredPresentations()
+    {
+        var query = presentations.AsQueryable();
+        
+        // Apply search filter
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            query = query.Where(p => 
+                p.MovieTitle.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                p.HallName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                p.Format.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+        }
+        
+        // Apply movie filter
+        if (selectedMovieId > 0)
+        {
+            query = query.Where(p => p.MovieId == selectedMovieId);
+        }
+        
+        // Apply hall filter
+        if (selectedHallId > 0)
+        {
+            query = query.Where(p => p.HallId == selectedHallId);
+        }
+
+        // Apply status filter
+        if (!string.IsNullOrEmpty(selectedStatus))
+        {
+            bool isActive = selectedStatus == "true";
+            query = query.Where(p => p.IsActive == isActive);
+        }
+        
+        // Apply date range filter
+        if (startDate.HasValue && endDate.HasValue)
+        {
+            query = query.Where(p => p.StartTime >= startDate && p.StartTime <= endDate);
+        }
+        
+        // Apply sorting
+        if (sortColumn == "StartTime")
+        {
+            query = sortDirection == "asc" 
+                ? query.OrderBy(p => p.StartTime) 
+                : query.OrderByDescending(p => p.StartTime);
+        }
+        else if (sortColumn == "MovieTitle")
+        {
+            query = sortDirection == "asc" 
+                ? query.OrderBy(p => p.MovieTitle) 
+                : query.OrderByDescending(p => p.MovieTitle);
+        }
+        else if (sortColumn == "HallName")
+        {
+            query = sortDirection == "asc" 
+                ? query.OrderBy(p => p.HallName) 
+                : query.OrderByDescending(p => p.HallName);
+        }
+        else if (sortColumn == "Price")
+        {
+            query = sortDirection == "asc" 
+                ? query.OrderBy(p => p.BasePrice) 
+                : query.OrderByDescending(p => p.BasePrice);
+        }
+        
+        return query.ToList();
+    }
+    
+    private void SortPresentations(string column)
+    {
+        if (sortColumn == column)
+        {
+            sortDirection = sortDirection == "asc" ? "desc" : "asc";
+        }
+        else
+        {
+            sortColumn = column;
+            sortDirection = "asc";
+        }
+        
+        StateHasChanged();
+    }
+    
+    private void AddPresentation()
+    {
+        editingPresentation = null;
+        currentPresentation = new PresentationFormModel
+        {
+            StartTime = DateTime.Now.Date.AddHours(12),
+            IsActive = true,
+            BasePrice = 10.00m,
+            Format = "Standard"
+        };
+        showAddEditModal = true;
+    }
+    
+    private void ViewPresentation(PresentationViewModel presentation)
+    {
+        viewingPresentation = presentation;
+        showViewModal = true;
+    }
+    
+    private void EditPresentation(PresentationViewModel presentation)
+    {
+        editingPresentation = presentation;
+        currentPresentation = new PresentationFormModel
+        {
+            Id = presentation.Id,
+            MovieId = presentation.MovieId,
+            HallId = presentation.HallId,
+            StartTime = presentation.StartTime,
+            BasePrice = presentation.BasePrice,
+            Format = presentation.Format,
+            IsActive = presentation.IsActive
+        };
+        startTimeString = presentation.StartTime.ToString("yyyy-MM-dd HH:mm");
+        showAddEditModal = true;
+    }
+    
+    private void DeletePresentation(PresentationViewModel presentation)
+    {
+        deletingPresentation = presentation;
+        showDeleteModal = true;
+    }
+    
+    private async Task ConfirmDelete()
+    {
+        if (deletingPresentation == null) return;
+        
+        try
+        {
+            var response = await Http.DeleteAsync($"api/presentations/{deletingPresentation.Id}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "Presentation deleted successfully!";
+                
+                // Refresh the data
+                await LoadPresentationsFromApi();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Failed to delete presentation: {error}";
+            }
+            
+            CloseModal();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting presentation: {ex.Message}";
+        }
+    }
+    
+    private void CloseModal()
+    {
+        showAddEditModal = false;
+        showDeleteModal = false;
+        showViewModal = false;
+        editingPresentation = null;
+        deletingPresentation = null;
+        viewingPresentation = null;
+        currentPresentation = new PresentationFormModel();
+        startTimeError = null;
+    }
+    
+    private async Task SavePresentation()
+    {
+        try
+        {
+            // Validate start time
+            if (string.IsNullOrWhiteSpace(startTimeString))
+            {
+                startTimeError = "Start time is required";
+                return;
+            }
+            
+            if (!DateTime.TryParse(startTimeString, out DateTime parsedStartTime))
+            {
+                startTimeError = "Invalid date/time format. Use YYYY-MM-DD HH:MM";
+                return;
+            }
+            
+            currentPresentation.StartTime = parsedStartTime;
+            
+            // Get the selected movie duration for end time calculation
+            var selectedMovie = movies.FirstOrDefault(m => m.Id == currentPresentation.MovieId);
+            if (selectedMovie == null)
+            {
+                throw new Exception("Selected movie not found");
+            }
+            
+            // Calculate end time based on movie duration
+            var endTime = currentPresentation.StartTime.AddMinutes(selectedMovie.DurationMinutes);
+            
+            if (editingPresentation == null)
+            {
+                // Create new presentation
+                var createRequest = new
+                {
+                    MovieId = currentPresentation.MovieId,
+                    HallId = currentPresentation.HallId,
+                    StartTime = currentPresentation.StartTime,
+                    EndTime = endTime,
+                    BasePrice = currentPresentation.BasePrice,
+                    Format = currentPresentation.Format,
+                    IsActive = currentPresentation.IsActive
+                };
+                
+                var response = await Http.PostAsJsonAsync("api/presentations", createRequest);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<PresentationViewModel>();
+                    successMessage = "Presentation created successfully!";
+                    
+                    // Refresh the data
+                    await LoadPresentationsFromApi();
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    errorMessage = $"Failed to create presentation: {error}";
+                }
+            }
+            else
+            {
+                // Update existing presentation
+                var updateRequest = new
+                {
+                    MovieId = currentPresentation.MovieId,
+                    HallId = currentPresentation.HallId,
+                    StartTime = currentPresentation.StartTime,
+                    EndTime = endTime,
+                    BasePrice = currentPresentation.BasePrice,
+                    Format = currentPresentation.Format,
+                    IsActive = currentPresentation.IsActive
+                };
+                
+                var response = await Http.PutAsJsonAsync($"api/presentations/{editingPresentation.Id}", updateRequest);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    successMessage = "Presentation updated successfully!";
+                    
+                    // Refresh the data
+                    await LoadPresentationsFromApi();
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    errorMessage = $"Failed to update presentation: {error}";
+                }
+            }
+            
+            CloseModal();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving presentation: {ex.Message}";
+        }
+    }
+    
+    private string FormatTimeSpan(DateTime startTime, DateTime endTime)
+    {
+        return $"{startTime:HH:mm} - {endTime:HH:mm}";
+    }
+    
+    private void HandlePageChange(int page)
+    {
+        currentPage = page;
+        StateHasChanged();
+    }
+    
+    private void HandlePageSizeChange(int size)
+    {
+        pageSize = size;
+        currentPage = 1; // Reset to first page when changing page size
+        StateHasChanged();
+    }
+    
+    // View Models
+    private class PresentationViewModel
+    {
+        public int Id { get; set; }
+        public int MovieId { get; set; }
+        public string MovieTitle { get; set; } = "";
+        public string Title { get; set; } = "";
+        public int HallId { get; set; }
+        public string HallName { get; set; } = "";
+        public DateTime StartTime { get; set; }
+        public DateTime EndTime { get; set; }
+        public decimal BasePrice { get; set; }
+        public decimal Price { get; set; }
+        public string Format { get; set; } = "";
+        public bool IsActive { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+        public string Status => IsActive ? "Active" : "Inactive";
+        public int Capacity { get; set; }
+        public int TicketsSold { get; set; }
+        public int AvailableSeats => Capacity - TicketsSold;
+    }
+    
+    private class MovieViewModel
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = "";
+        public int DurationMinutes { get; set; }
+    }
+    
+    private class HallViewModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public int Capacity { get; set; }
+    }
+    
+    private class PresentationFormModel
+    {
+        [Required(ErrorMessage = "Please select a movie")]
+        public int MovieId { get; set; }
+        
+        [Required(ErrorMessage = "Please select a hall")]
+        public int HallId { get; set; }
+        
+        [Required(ErrorMessage = "Start time is required")]
+        public DateTime StartTime { get; set; } = DateTime.Now;
+        
+        [Required(ErrorMessage = "Price is required")]
+        [Range(0.01, 100.00, ErrorMessage = "Price must be between 0.01 and 100.00")]
+        public decimal BasePrice { get; set; }
+        
+        [Required(ErrorMessage = "Format is required")]
+        public string Format { get; set; } = "Standard";
+        
+        public bool IsActive { get; set; } = true;
+        
+        public int Id { get; set; }
+    }
+}
+
+<style>
+    /* Modal styles using the consistent admin modal template from Halls.razor */
+    .admin-modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1040;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .admin-modal {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 90%;
+        max-width: 600px;
+        z-index: 1050;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .admin-modal-lg {
+        max-width: 900px;
+    }
+    
+    .admin-modal-content {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        max-height: 90vh;
+    }
+    
+    .admin-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.5rem;
+        background-color: #0d6efd;
+        color: white;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+    }
+    
+    .admin-modal-header h3 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 500;
+    }
+    
+    .admin-modal-close {
+        background: transparent;
+        border: none;
+        color: white;
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 0;
+        line-height: 1;
+    }
+    
+    .admin-modal-body {
+        padding: 1.5rem;
+        overflow-y: auto;
+        flex: 1;
+    }
+    
+    .admin-modal-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid #dee2e6;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+    
+    /* Detail section styles */
+    .detail-section {
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin-bottom: 1.25rem;
+    }
+    
+    .detail-section h4 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        font-size: 1.1rem;
+    }
+    
+    .detail-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+    }
+    
+    .detail-item {
+        display: flex;
+    }
+    
+    .detail-label {
+        font-weight: 600;
+        width: 140px;
+        color: #555;
+    }
+    
+    .detail-value {
+        flex: 1;
+    }
+    
+    /* Table actions */
+    .table-actions {
+        display: flex;
+        gap: 5px;
+    }
+    
+    /* Empty state */
+    .empty-state {
+        text-align: center;
+        padding: 2rem;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        margin-top: 2rem;
+    }
+</style> 

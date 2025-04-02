@@ -13,7 +13,7 @@ namespace FrontEnd.Models
         public string? Description { get; set; }
         public string PosterUrl { get; set; }
         public string Genre { get; set; }
-        public string AgeRating { get; set; }
+        public string AgeRating { get; set; } = string.Empty;
         public int DurationMinutes { get; set; }
         public DateTime? ReleaseDate { get; set; }
         public bool IsActive { get; set; }

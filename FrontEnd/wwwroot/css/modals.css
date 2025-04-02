@@ -544,4 +544,145 @@ input[type="radio"] {
 
 .overlay-modal-buttons .cinema-btn-primary {
     min-width: 200px;
+}
+
+/* Modal information sections */
+.information-section {
+    margin-bottom: 20px;
+}
+
+.information-section h4 {
+    color: #00bcd4;
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 8px;
+}
+
+/* Key-value pairs in info sections */
+.information-row {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.information-label {
+    color: #8d9cb0;
+    font-weight: 400;
+    width: 150px;
+    flex-shrink: 0;
+}
+
+.information-value {
+    color: #ffffff;
+    flex-grow: 1;
+}
+
+/* Status indicators */
+.status-indicator {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.status-active {
+    background-color: rgba(76, 175, 80, 0.15);
+    color: #4caf50;
+}
+
+.status-inactive {
+    background-color: rgba(244, 67, 54, 0.15);
+    color: #f44336;
+}
+
+.status-pending {
+    background-color: rgba(255, 152, 0, 0.15);
+    color: #ff9800;
+}
+
+/* Movie information display */
+.movie-information, 
+.presentation-information,
+.ticket-information,
+.customer-information,
+.general-information {
+    margin-bottom: 20px;
+}
+
+.information-title {
+    color: #00bcd4;
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 8px;
+}
+
+/* Labels in detail views */
+.detail-label {
+    color: #8d9cb0;
+    font-weight: 400;
+}
+
+/* Hall details styling */
+.hall-details .info-row {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.hall-details .info-label {
+    color: #8d9cb0;
+    width: 140px;
+}
+
+.hall-details .info-value {
+    color: #ffffff;
+}
+
+/* Fix for specific elements */
+.hall-detail-info dt,
+.movie-detail-info dt,
+.presentation-detail-info dt,
+.ticket-detail-info dt {
+    color: #8d9cb0 !important;
+}
+
+.modal-section-title {
+    color: #00bcd4;
+    font-size: 1.1rem;
+    margin-top: 20px;
+    margin-bottom: 15px;
+}
+
+/* Seating layout styles */
+.hall-seat-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.hall-seat {
+    width: 25px;
+    height: 25px;
+    background-color: #00bcd4;
+    margin: 2px;
+    border-radius: 3px;
+}
+
+.hall-seat-mini {
+    width: 15px;
+    height: 15px;
+    background-color: #00bcd4;
+    margin: 2px;
+    border-radius: 2px;
+}
+
+.hall-screen {
+    background-color: #111;
+    color: white;
+    padding: 8px;
+    text-align: center;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    width: 100%;
 } 

@@ -1,0 +1,380 @@
+/* Admin Dashboard Components */
+
+/* Dashboard Cards */
+.dashboard-card {
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    padding: 20px;
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.stat-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.stat-title {
+    font-size: 1rem;
+    color: #666;
+    font-weight: 500;
+    margin: 0;
+}
+
+.stat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin: 0;
+    margin-bottom: 8px;
+}
+
+.stat-description {
+    font-size: 0.875rem;
+    color: #888;
+    margin: 0;
+}
+
+.trend-indicator {
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.trend-up {
+    color: #28a745;
+}
+
+.trend-down {
+    color: #dc3545;
+}
+
+.trend-neutral {
+    color: #6c757d;
+}
+
+/* Color Variations */
+.card-primary .stat-icon {
+    background-color: rgba(13, 110, 253, 0.1);
+    color: #0d6efd;
+}
+
+.card-success .stat-icon {
+    background-color: rgba(25, 135, 84, 0.1);
+    color: #198754;
+}
+
+.card-info .stat-icon {
+    background-color: rgba(13, 202, 240, 0.1);
+    color: #0dcaf0;
+}
+
+.card-warning .stat-icon {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+}
+
+.card-danger .stat-icon {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+.card-cinema .stat-icon {
+    background-color: rgba(245, 197, 24, 0.1);
+    color: #f5c518;
+}
+
+/* Chart Card */
+.chart-card {
+    padding: 20px;
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.chart-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.chart-container {
+    height: 300px;
+    width: 100%;
+}
+
+/* Table Card */
+.table-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.table-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.table-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.table-action {
+    color: #0d6efd;
+    font-size: 0.875rem;
+    text-decoration: none;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+    padding: 12px 20px;
+    text-align: left;
+}
+
+.admin-table thead {
+    background-color: #f9f9f9;
+}
+
+.admin-table th {
+    font-weight: 500;
+    color: #666;
+    border-bottom: 1px solid #eee;
+}
+
+.admin-table tbody tr {
+    border-bottom: 1px solid #eee;
+}
+
+.admin-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.admin-table tbody tr:hover {
+    background-color: #f5f5f5;
+}
+
+/* Status Badge */
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.status-active {
+    background-color: rgba(25, 135, 84, 0.1);
+    color: #198754;
+}
+
+.status-pending {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+}
+
+.status-inactive {
+    background-color: rgba(108, 117, 125, 0.1);
+    color: #6c757d;
+}
+
+.status-error {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+/* Dashboard Layout */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 20px;
+    margin-bottom: 4rem;
+}
+
+.col-12 {
+    grid-column: span 12;
+}
+
+.col-8 {
+    grid-column: span 8;
+}
+
+.col-6 {
+    grid-column: span 6;
+}
+
+.col-4 {
+    grid-column: span 4;
+}
+
+.col-3 {
+    grid-column: span 3;
+}
+
+@media (max-width: 1200px) {
+    .col-4 {
+        grid-column: span 6;
+    }
+    
+    .col-3 {
+        grid-column: span 6;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .col-8, .col-6, .col-4, .col-3 {
+        grid-column: span 1;
+    }
+}
+
+/* Button Styles */
+.admin-btn {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: none;
+}
+
+.btn-primary {
+    background-color: #0d6efd;
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background-color: #0b5ed7;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: #fff;
+}
+
+.btn-danger:hover {
+    background-color: #bb2d3b;
+}
+
+.btn-success {
+    background-color: #198754;
+    color: #fff;
+}
+
+.btn-success:hover {
+    background-color: #157347;
+}
+
+.btn-warning {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.btn-warning:hover {
+    background-color: #ffca2c;
+}
+
+.btn-cinema {
+    background-color: #f5c518;
+    color: #121a2b;
+}
+
+.btn-cinema:hover {
+    background-color: #e0b315;
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 0.875rem;
+}
+
+.btn-lg {
+    padding: 12px 24px;
+    font-size: 1.1rem;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.action-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.edit-btn {
+    background-color: rgba(13, 110, 253, 0.1);
+    color: #0d6efd;
+}
+
+.edit-btn:hover {
+    background-color: rgba(13, 110, 253, 0.2);
+}
+
+.delete-btn {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+.delete-btn:hover {
+    background-color: rgba(220, 53, 69, 0.2);
+}
+
+.view-btn {
+    background-color: rgba(13, 202, 240, 0.1);
+    color: #0dcaf0;
+}
+
+.view-btn:hover {
+    background-color: rgba(13, 202, 240, 0.2);
+} 
