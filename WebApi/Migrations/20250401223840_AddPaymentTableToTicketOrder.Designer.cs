@@ -10,15 +10,15 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace WebApi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250401141357_AddDeleteConstraintToPaymentTable")]
-    partial class AddDeleteConstraintToPaymentTable
+    [Migration("20250401223840_AddPaymentTableToTicketOrder")]
+    partial class AddPaymentTableToTicketOrder
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.3")
+                .HasAnnotation("ProductVersion", "8.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
             modelBuilder.Entity("WebApi.Models.ConcessionItem", b =>
@@ -194,7 +194,7 @@ namespace WebApi.Migrations
                     b.Property<int>("PaymentStatus")
                         .HasColumnType("int");
 
-                    b.Property<int>("TicketOrderId")
+                    b.Property<int?>("TicketOrderId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
@@ -414,11 +414,11 @@ namespace WebApi.Migrations
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<bool>("IsOnlineOrder")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<Guid>("OrderToken")
                         .HasColumnType("char(36)");
-
-                    b.Property<int?>("PaymentId")
-                        .HasColumnType("int");
 
                     b.Property<int>("PresentationId")
                         .HasColumnType("int");
@@ -494,9 +494,7 @@ namespace WebApi.Migrations
                 {
                     b.HasOne("WebApi.Models.TicketOrder", "TicketOrder")
                         .WithOne("Payment")
-                        .HasForeignKey("WebApi.Models.Payment", "TicketOrderId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .HasForeignKey("WebApi.Models.Payment", "TicketOrderId");
 
                     b.Navigation("TicketOrder");
                 });

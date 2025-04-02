@@ -285,6 +285,7 @@ namespace WebApi.Repositories
         {
             var order = await _context.TicketOrders
                 .Include(o => o.Items)
+                .Include(o =>o.Payment)
                 .FirstOrDefaultAsync(o => o.OrderToken == orderToken);
 
             if (order != null && includeItems)
@@ -305,6 +306,20 @@ namespace WebApi.Repositories
                         .LoadAsync();
                 }
             }
+
+            return order;
+        }
+
+        public async Task<TicketOrder?> GetOrderByMolliePaymentid(string molliePaymentId)
+        {
+            var order = await _context.TicketOrders
+                .Include(o => o.Items)
+                .Include(o => o.Payment)
+                .Include(o => o.Tickets)
+                .Include(o => o.Customer)
+                .Where(o => o.IsOnlineOrder == true)
+                .Where(o => o.Payment.MolliePaymentId == molliePaymentId)
+                .FirstOrDefaultAsync();
 
             return order;
         }
@@ -634,7 +649,7 @@ namespace WebApi.Repositories
                 .Include(t => t.Seat)
                 .ToListAsync();
         }
-        public async Task<List<OrderConcessionItem>?> FindConcessionItemsByOrderToken(Guid orderToken)
+        public async Task<List<OrderConcessionItem>> FindConcessionItemsByOrderToken(Guid orderToken)
         {
             return await _context.OrderConcessionItems
                 .Where(oci => oci.Order.OrderToken == orderToken)

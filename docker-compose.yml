@@ -103,6 +103,34 @@ services:
     networks:
       - cinemagia-network
 
+  serveo:
+    image: taichunmin/serveo:latest
+    container_name: cinemagia-serveo-tunneling-backend
+    tty: true
+    stdin_open: true
+    command: >
+      autossh -M 0
+      -o ServerAliveInterval=60
+      -o ServerAliveCountMax=3
+      -o ExitOnForwardFailure=yes
+      -o StrictHostKeyChecking=no
+      -R 80:host.docker.internal:5001
+      serveo.net
+
+  serveo-frontend:
+    image: taichunmin/serveo:latest
+    container_name: cinemagia-serveo-tunneling-frontend
+    tty: true
+    stdin_open: true
+    command: >
+      autossh -M 0
+      -o ServerAliveInterval=60
+      -o ServerAliveCountMax=3
+      -o ExitOnForwardFailure=yes
+      -o StrictHostKeyChecking=no
+      -R 80:host.docker.internal:5002
+      serveo.net
+
 networks:
   cinemagia-network:
     driver: bridge

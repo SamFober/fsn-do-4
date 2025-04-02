@@ -36,6 +36,35 @@ namespace WebApi.Migrations
                     b.ToTable("ConcessionItems");
                 });
 
+            modelBuilder.Entity("WebApi.Models.Customer", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<string>("EmailAddress")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int?>("TicketOrderId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TicketOrderId")
+                        .IsUnique();
+
+                    b.ToTable("Customers");
+                });
+
             modelBuilder.Entity("WebApi.Models.Hall", b =>
                 {
                     b.Property<int>("Id")
@@ -191,7 +220,7 @@ namespace WebApi.Migrations
                     b.Property<int>("PaymentStatus")
                         .HasColumnType("int");
 
-                    b.Property<int>("TicketOrderId")
+                    b.Property<int?>("TicketOrderId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
@@ -411,11 +440,11 @@ namespace WebApi.Migrations
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<bool>("IsOnlineOrder")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<Guid>("OrderToken")
                         .HasColumnType("char(36)");
-
-                    b.Property<int?>("PaymentId")
-                        .HasColumnType("int");
 
                     b.Property<int>("PresentationId")
                         .HasColumnType("int");
@@ -457,6 +486,15 @@ namespace WebApi.Migrations
                     b.ToTable("TicketOrderItems");
                 });
 
+            modelBuilder.Entity("WebApi.Models.Customer", b =>
+                {
+                    b.HasOne("WebApi.Models.TicketOrder", "TicketOrder")
+                        .WithOne("Customer")
+                        .HasForeignKey("WebApi.Models.Customer", "TicketOrderId");
+
+                    b.Navigation("TicketOrder");
+                });
+
             modelBuilder.Entity("WebApi.Models.MovieFormat", b =>
                 {
                     b.HasOne("WebApi.Models.Movie", "Movie")
@@ -491,9 +529,7 @@ namespace WebApi.Migrations
                 {
                     b.HasOne("WebApi.Models.TicketOrder", "TicketOrder")
                         .WithOne("Payment")
-                        .HasForeignKey("WebApi.Models.Payment", "TicketOrderId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .HasForeignKey("WebApi.Models.Payment", "TicketOrderId");
 
                     b.Navigation("TicketOrder");
                 });
@@ -648,6 +684,8 @@ namespace WebApi.Migrations
             modelBuilder.Entity("WebApi.Models.TicketOrder", b =>
                 {
                     b.Navigation("ConcessionItems");
+
+                    b.Navigation("Customer");
 
                     b.Navigation("Items");
 

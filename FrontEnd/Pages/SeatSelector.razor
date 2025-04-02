@@ -98,8 +98,8 @@
                                         @foreach (var seat in row.Seats.OrderBy(s => s.SeatNumber))
                                         {
                                             var isSelected = selectedSeats.Any(s => s.Id == seat.Id);
-                                            string seatClass = isSelected ? "seat-selected" : 
-                                                               !seat.IsAvailable ? "seat-unavailable" : "seat-available";
+                                            string seatClass = isSelected ? "seat-selected" :
+                                            !seat.IsAvailable ? "seat-unavailable" : "seat-available";
 
                                             <div class="seat @seatClass" @onclick="() => SelectSeat(seat)" title="Row @row.RowNumber, Seat @seat.SeatNumber">
                                                 <span class="seat-number">@seat.SeatNumber</span>
@@ -146,7 +146,7 @@
                                     <div class="ticket-type-row">
                                         <div class="ticket-seat-info">Row @seat.RowNumber, Seat @seat.SeatNumber</div>
                                         <div class="ticket-type-selector">
-                                            <select class="form-select" value="@(ticketTypes.ContainsKey(seat.Id) ? ticketTypes[seat.Id] : "adult")" 
+                                            <select class="form-select" value="@(ticketTypes.ContainsKey(seat.Id) ? ticketTypes[seat.Id] : "adult")"
                                             @onchange="@(e => SelectTicketType(seat.Id, e.Value.ToString()))">
                                                 <option value="adult">Adult - €@GetTicketTypePrice("adult")</option>
                                                 <option value="child">Child - €@GetTicketTypePrice("child")</option>
@@ -253,8 +253,8 @@
                     @foreach (var option in availableOptions)
                     {
                         <label class="cinema-radio-option mb-3 @(selectedOption == option.Key ? "selected" : "")">
-                            <input class="cinema-radio-input" type="radio" name="seatingOption" 
-                            value="@option.Key" @onchange="@(e => selectedOption = option.Key)" 
+                            <input class="cinema-radio-input" type="radio" name="seatingOption"
+                            value="@option.Key" @onchange="@(e => selectedOption = option.Key)"
                             checked="@(selectedOption == option.Key)" />
                             <div class="cinema-radio-content">
                                 <span class="cinema-radio-title">@option.Value.Description</span>
@@ -329,7 +329,7 @@
                 }
                 else
                 {
-                    <button type="button" class="cinema-btn cinema-btn-primary" @onclick="GetTickets">Get tickets</button>    
+                    <button type="button" class="cinema-btn cinema-btn-primary" @onclick="GetTickets">Get tickets</button>
                 }
             </div>
         </div>
@@ -397,6 +397,8 @@
     [Parameter]
     public int PresentationId { get; set; }
 
+    private bool isOnlineOrder = true;
+
     private Presentation? presentation;
     private string? message;
     private int numberOfSeats = 1;
@@ -438,13 +440,13 @@
         validationTimer.Elapsed += ValidateOrderWithBackend;
         messageTimer.AutoReset = false;
         messageTimer.Elapsed += StartMessageFadeOut;
-        fadeTimer.AutoReset = false; 
+        fadeTimer.AutoReset = false;
         fadeTimer.Elapsed += CompleteMessageFadeOut;
     }
 
     private void StartMessageFadeOut(object? sender, ElapsedEventArgs e)
     {
-        InvokeAsync(() => 
+        InvokeAsync(() =>
         {
             isMessageFading = true;
             StateHasChanged();
@@ -454,7 +456,7 @@
 
     private void CompleteMessageFadeOut(object? sender, ElapsedEventArgs e)
     {
-        InvokeAsync(() => 
+        InvokeAsync(() =>
         {
             message = null;
             isMessageFading = false;
@@ -487,7 +489,7 @@
                 validationTimer.Stop();
 
                 // Order has expired, reset the state
-                InvokeAsync(async () => 
+                InvokeAsync(async () =>
                 {
                     // Call the backend to ensure the order is marked as expired there too
                     await ExpireOrder();
@@ -533,7 +535,7 @@
             if (!response.IsSuccessStatusCode)
             {
                 // Order is no longer valid, reset the state
-                await InvokeAsync(async () => 
+                await InvokeAsync(async () =>
                 {
                     expirationTimer.Stop();
                     validationTimer.Stop();
@@ -557,7 +559,7 @@
 
                 if (result != null && result.ExpiresAt.HasValue)
                 {
-                    await InvokeAsync(() => 
+                    await InvokeAsync(() =>
                     {
                         // Update our local expiration time to match the server
                         orderExpirationTime = result.ExpiresAt.Value;
@@ -696,7 +698,7 @@
             // Hide the modal during the API call
             showSeatSelectionModal = false;
 
-            var response = await Http.PostAsJsonAsync("api/tickets/orders/start", new { presentationId = PresentationId });
+            var response = await Http.PostAsJsonAsync("api/tickets/orders/start", new { presentationId = PresentationId, isOnlineOrder = isOnlineOrder });
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<OrderResponse>();
@@ -738,7 +740,7 @@
                         SetMessage("Order started. Please select your seats.");
                     }
                 }
-                else 
+                else
                 {
                     SetMessage("Order started. Please select your seats.");
                 }
@@ -807,7 +809,7 @@
             }
 
             // Call the API to start a group order with the specified number of seats
-            var response = await Http.PostAsJsonAsync("api/tickets/orders/start-group", new { presentationId = PresentationId, numberOfSeats });
+            var response = await Http.PostAsJsonAsync("api/tickets/orders/start-group", new { presentationId = PresentationId, numberOfSeats, isOnlineOrder = isOnlineOrder });
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<GroupOrderResponse>();
@@ -837,7 +839,7 @@
                         if (option.Key != "consecutive")
                         {
                             // Show confirmation modal for split or smaller consecutive
-                            singleOptionMessage = option.Key == "split" 
+                            singleOptionMessage = option.Key == "split"
                                 ? "The only available option is to split your group. Would you like to proceed with split seating?"
                                 : $"We can offer {numberOfSeats - 1} consecutive seats. Would you like to proceed with fewer seats?";
 
@@ -999,7 +1001,8 @@
 
     private async Task ConfirmTickets()
     {
-        try {
+        try
+        {
             // Stop both timers when tickets are confirmed
             expirationTimer.Stop();
             validationTimer.Stop();
@@ -1010,50 +1013,59 @@
                 var concessionsResponse = await Http.PostAsJsonAsync($"api/concessions/{orderToken}", new { ConcessionItemId = popcornType.Key, quantity = popcornType.Count() });
             }
 
-            var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { customerName = "John Doe", customerEmail = "j.doe@example.com" });
+            var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { customerFirstName = "John", customerLastName = "Doe", customerEmail = "j.doe@example.com" });
 
             if (confirmationResponse.IsSuccessStatusCode)
-                /*{
-                SetMessage("Tickets confirmed successfully!");
-            }*/
             {
-            await JSRuntime.InvokeVoidAsync("showModal", "numpadModal");
-        }
-    else
+                if (isOnlineOrder)
+                {
+                    var response = await confirmationResponse.Content.ReadFromJsonAsync<ConfirmOrderResponse>();
+                    NavigationManager.NavigateTo(response.checkoutUrl);
+                }
+                else
+                {
+                    await JSRuntime.InvokeVoidAsync("showModal", "numpadModal");
+                }            
+            }
+
+            /*{
+            SetMessage("Tickets confirmed successfully!");
+            }*/
+            else
         {
             var errorMessage = await confirmationResponse.Content.ReadAsStringAsync();
             SetMessage($"Failed to confirm tickets: {errorMessage}");
         }
     }
-    catch (Exception ex)
-    {
-    SetMessage($"Error confirming tickets: {ex.Message}");
-    Console.WriteLine($"Error confirming tickets: {ex}");
-    }
-    }
-
-    private async Task ConfirmSeatingOption()
-    {
-        if (selectedOption != null)
+        catch (Exception ex)
         {
+            SetMessage($"Error confirming tickets: {ex.Message}");
+    Console.WriteLine($"Error confirming tickets: {ex}");
+        }
+        }
+
+        private async Task ConfirmSeatingOption()
+        {
+            if (selectedOption != null)
+            {
     await JSRuntime.InvokeVoidAsync("hideModal", "seatingOptionsModal");
     await SelectSeatingOption(selectedOption);
+            }
         }
-    }
 
-    private async Task ConfirmSingleOption()
-    {
-        if (selectedOption != null)
+        private async Task ConfirmSingleOption()
         {
+            if (selectedOption != null)
+            {
     await JSRuntime.InvokeVoidAsync("hideModal", "singleOptionConfirmModal");
     await SelectSeatingOption(selectedOption);
+            }
         }
-    }
 
-    private async Task SelectSeatingOption(string option)
-    {
-        try
+        private async Task SelectSeatingOption(string option)
         {
+            try
+            {
     if (pendingGroupOrder?.OrderToken == null)
     {
         SetMessage("No pending group order found.");
@@ -1101,18 +1113,18 @@
         var errorMessage = await response.Content.ReadAsStringAsync();
         SetMessage($"Failed to select seating option: {errorMessage}");
     }
-        }
-        catch (Exception ex)
-        {
+            }
+            catch (Exception ex)
+            {
     SetMessage($"Error selecting seating option: {ex.Message}");
     Console.WriteLine($"Error selecting seating option: {ex.Message}");
+            }
         }
-    }
 
-    private async Task CancelOrder()
-    {
-        try
+        private async Task CancelOrder()
         {
+            try
+            {
     string? tokenToCancel = orderToken ?? pendingGroupOrder?.OrderToken;
     if (tokenToCancel != null)
     {
@@ -1156,40 +1168,40 @@
         // If there's no active order yet, just navigate back to the previous page
         await JSRuntime.InvokeVoidAsync("navigateBack");
     }
-        }
-        catch (Exception ex)
-        {
+            }
+            catch (Exception ex)
+            {
     SetMessage($"Error cancelling order: {ex.Message}");
     Console.WriteLine($"Error cancelling order: {ex}");
+            }
         }
-    }
 
-    private void SelectTicketType(int seatId, string ticketType)
-    {
-        if (ticketTypes.ContainsKey(seatId))
+        private void SelectTicketType(int seatId, string ticketType)
         {
+            if (ticketTypes.ContainsKey(seatId))
+            {
     ticketTypes[seatId] = ticketType;
-        }
-        else
-        {
+            }
+            else
+            {
     ticketTypes.Add(seatId, ticketType);
+            }
+
+            StateHasChanged();
         }
 
-        StateHasChanged();
-    }
-
-    private void SelectPopcornType(int seatId, string popcornType = null)
-    {
-        if (string.IsNullOrEmpty(popcornType)) 
+        private void SelectPopcornType(int seatId, string popcornType = null)
         {
+            if (string.IsNullOrEmpty(popcornType))
+            {
     if (popcornTypes.ContainsKey(seatId))
     {
         popcornTypes.Remove(seatId);
-        StateHasChanged(); 
+        StateHasChanged();
     }
-        }
-        else
-        {
+            }
+            else
+            {
     if (popcornTypes.ContainsKey(seatId))
     {
         popcornTypes[seatId] = popcornType;
@@ -1199,57 +1211,57 @@
         popcornTypes.Add(seatId, popcornType);
     }
     StateHasChanged();
+            }
         }
-    }
 
-    private string GetTicketTypeName(string type)
-    {
-        return type switch
+        private string GetTicketTypeName(string type)
         {
+            return type switch
+            {
     "adult" => "Adult",
     "child" => "Child",
     "senior" => "Senior",
     "student" => "Student",
     _ => "Regular"
-        };
-    }
-
-    private decimal GetTicketTypePrice(string type)
-    {
-        decimal price = type switch
-        {
-            "adult" => 12.50m,
-            "child" => 8.50m,
-            "senior" => 10.50m,
-            "student" => 9.50m,
-            _ => 12.50m
-        };
-
-        if (presentation.IsSecretMovie)
-        {
-            price -= 2.50m;
+            };
         }
 
-        return price;
-    }
+        private decimal GetTicketTypePrice(string type)
+        {
+            decimal price = type switch
+            {
+    "adult" => 12.50m,
+    "child" => 8.50m,
+    "senior" => 10.50m,
+    "student" => 9.50m,
+    _ => 12.50m
+            };
+
+            if (presentation.IsSecretMovie)
+            {
+    price -= 2.50m;
+            }
+
+            return price;
+        }
 
         private string GetConcessionTypeName(int id)
-    {
-        return concessions.FirstOrDefault(c => c.Id == id)?.Name ?? "Unknown";
-    }
-
-    private decimal GetConcessionTypePrice(int id)
-    {
-        return concessions.FirstOrDefault(c => c.Id == id)?.Price ?? 0;
-    }
-
-    private decimal CalculateTotalPrice()
-    {
-        decimal total = 0;
-
-        // Ensure we have ticket types for all selected seats
-        foreach (var seat in selectedSeats)
         {
+            return concessions.FirstOrDefault(c => c.Id == id)?.Name ?? "Unknown";
+        }
+
+        private decimal GetConcessionTypePrice(int id)
+        {
+            return concessions.FirstOrDefault(c => c.Id == id)?.Price ?? 0;
+        }
+
+        private decimal CalculateTotalPrice()
+        {
+            decimal total = 0;
+
+            // Ensure we have ticket types for all selected seats
+            foreach (var seat in selectedSeats)
+            {
     string ticketType = ticketTypes.ContainsKey(seat.Id) ? ticketTypes[seat.Id] : "adult";
 
     if (!ticketTypes.ContainsKey(seat.Id))
@@ -1258,27 +1270,27 @@
     }
 
     total += GetTicketTypePrice(ticketType);
+            }
+
+            foreach (var type in popcornTypes)
+            {
+    total += GetConcessionTypePrice(int.Parse(type.Value));
+            }
+
+            return total;
         }
 
-        foreach (var type in popcornTypes)
+        // When seats change, ensure we have ticket types for each seat
+        protected override void OnParametersSet()
         {
-            total += GetConcessionTypePrice(int.Parse(type.Value));
+            InitializeTicketTypes();
         }
 
-        return total;
-    }
-
-    // When seats change, ensure we have ticket types for each seat
-    protected override void OnParametersSet()
-    {
-        InitializeTicketTypes();
-    }
-
-    private void InitializeTicketTypes()
-    {
-        // Initialize default ticket types for all selected seats
-        foreach (var seat in selectedSeats)
+        private void InitializeTicketTypes()
         {
+            // Initialize default ticket types for all selected seats
+            foreach (var seat in selectedSeats)
+            {
     if (!ticketTypes.ContainsKey(seat.Id))
     {
         ticketTypes.Add(seat.Id, "adult");
@@ -1288,84 +1300,85 @@
     {
         popcornTypes.Add(seat.Id, "");
     }
-        }
+            }
 
-        // Remove ticket types for seats that are no longer selected
-        var seatIds = selectedSeats.Select(s => s.Id).ToList();
-        var keysToRemove = ticketTypes.Keys.Where(k => !seatIds.Contains(k)).ToList();
+            // Remove ticket types for seats that are no longer selected
+            var seatIds = selectedSeats.Select(s => s.Id).ToList();
+            var keysToRemove = ticketTypes.Keys.Where(k => !seatIds.Contains(k)).ToList();
 
-        foreach (var key in keysToRemove)
-        {
+            foreach (var key in keysToRemove)
+            {
     ticketTypes.Remove(key);
-        }
+            }
 
-        keysToRemove = popcornTypes.Keys.Where(k => !seatIds.Contains(k)).ToList();
-        foreach (var key in keysToRemove)
-        {
+            keysToRemove = popcornTypes.Keys.Where(k => !seatIds.Contains(k)).ToList();
+            foreach (var key in keysToRemove)
+            {
     popcornTypes.Remove(key);
+            }
         }
-    }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
+        protected override async Task OnAfterRenderAsync(bool firstRender)
         {
+            if (firstRender)
+            {
     await JSRuntime.InvokeVoidAsync("initScrollTracking");
+            }
         }
-    }
 
-    // Numpad functions
-    private string numpadInputValue = "";
-    private bool numpadPinConfirmed = false;
+        // Numpad functions
+        private string numpadInputValue = "";
+        private bool numpadPinConfirmed = false;
 
-    private void NumpadAddNumber(string number)
-    {
-        if (numpadInputValue == "Invalid PIN") NumpadClearInput();
-        if (numpadInputValue.Length < 4)
+        private void NumpadAddNumber(string number)
+        {
+            if (numpadInputValue == "Invalid PIN") NumpadClearInput();
+            if (numpadInputValue.Length < 4)
     numpadInputValue += number;
-    }
+        }
 
-    private void NumpadRemoveNumber()
-    {
-        if (!string.IsNullOrEmpty(numpadInputValue) && numpadInputValue != "Error" && numpadInputValue != "Confirmed")
+        private void NumpadRemoveNumber()
         {
+            if (!string.IsNullOrEmpty(numpadInputValue) && numpadInputValue != "Error" && numpadInputValue != "Confirmed")
+            {
     numpadInputValue = numpadInputValue[..^1];
+            }
         }
-    }
 
-    private void NumpadClearInput() => numpadInputValue = "";
+        private void NumpadClearInput() => numpadInputValue = "";
 
-    public async Task NumpadConfirmInput()
-    {
-        var validCodes = new List<string> { "1234", "5678", "9876" };
-        
-        if (validCodes.Contains(numpadInputValue))
+        public async Task NumpadConfirmInput()
         {
-            numpadInputValue = "Processing..";
-            await Task.Delay(2000);
-            numpadInputValue = "Confirmed";
-            numpadPinConfirmed = true;
-        } else
-        {
-            numpadInputValue = "Invalid PIN";
+            var validCodes = new List<string> { "1234", "5678", "9876" };
+
+            if (validCodes.Contains(numpadInputValue))
+            {
+    numpadInputValue = "Processing..";
+    await Task.Delay(2000);
+    numpadInputValue = "Confirmed";
+    numpadPinConfirmed = true;
+            }
+            else
+            {
+    numpadInputValue = "Invalid PIN";
+            }
         }
-    }
 
-    private void GetTickets()
-    {
-        // Use a relative path instead of hardcoded URL
-        string url = $"/{orderToken}/finish";
-        Navigation.NavigateTo(url, true);
-    }
-
-    [JSInvokable]
-    public static Task UpdateProgressStep(int step)
-    {
-        if (_instance != null && _instance.activeStep != step)
+        private void GetTickets()
         {
-            _instance.activeStep = step;
-            _instance.StateHasChanged();
+            // Use a relative path instead of hardcoded URL
+            string url = $"/{orderToken}/finish";
+            Navigation.NavigateTo(url, true);
         }
-        return Task.CompletedTask;
-    }
+
+        [JSInvokable]
+        public static Task UpdateProgressStep(int step)
+        {
+            if (_instance != null && _instance.activeStep != step)
+            {
+    _instance.activeStep = step;
+    _instance.StateHasChanged();
+            }
+            return Task.CompletedTask;
+        }
 } 

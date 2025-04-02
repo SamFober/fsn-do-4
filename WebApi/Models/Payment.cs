@@ -11,8 +11,8 @@ namespace WebApi.Models
         public required PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Pending;
         public required string CheckoutUrl { get; set; }
 
-        public int TicketOrderId { get; set; }
-        public TicketOrder TicketOrder { get; set; }
+        public int? TicketOrderId { get; set; }
+        public TicketOrder? TicketOrder { get; set; }
     }
 
     public enum PaymentStatus

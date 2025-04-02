@@ -6,16 +6,17 @@ using MySql.EntityFrameworkCore.Metadata;
 namespace WebApi.Migrations
 {
     /// <inheritdoc />
-    public partial class AddPaymentToOrder : Migration
+    public partial class AddPaymentTableToTicketOrder : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
-                name: "PaymentId",
+            migrationBuilder.AddColumn<bool>(
+                name: "IsOnlineOrder",
                 table: "TicketOrders",
-                type: "int",
-                nullable: true);
+                type: "tinyint(1)",
+                nullable: false,
+                defaultValue: false);
 
             migrationBuilder.CreateTable(
                 name: "Payments",
@@ -28,7 +29,7 @@ namespace WebApi.Migrations
                     Description = table.Column<string>(type: "longtext", nullable: false),
                     PaymentStatus = table.Column<int>(type: "int", nullable: false),
                     CheckoutUrl = table.Column<string>(type: "longtext", nullable: false),
-                    TicketOrderId = table.Column<int>(type: "int", nullable: false)
+                    TicketOrderId = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -37,8 +38,7 @@ namespace WebApi.Migrations
                         name: "FK_Payments_TicketOrders_TicketOrderId",
                         column: x => x.TicketOrderId,
                         principalTable: "TicketOrders",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        principalColumn: "Id");
                 })
                 .Annotation("MySQL:Charset", "utf8mb4");
 
@@ -56,7 +56,7 @@ namespace WebApi.Migrations
                 name: "Payments");
 
             migrationBuilder.DropColumn(
-                name: "PaymentId",
+                name: "IsOnlineOrder",
                 table: "TicketOrders");
         }
     }
