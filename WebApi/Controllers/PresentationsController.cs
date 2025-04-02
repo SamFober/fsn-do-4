@@ -90,6 +90,7 @@ namespace WebApi.Controllers
                 presentation.StartTime,
                 presentation.EndTime,
                 presentation.Price,
+                presentation.IsSecretMovie,
                 HallName = presentation.Hall.Name,
                 Rows = seatAvailability
             };
@@ -489,6 +490,28 @@ namespace WebApi.Controllers
                 _logger.LogError(ex, "Error retrieving movie schedule for movie ID {MovieId}", movieId);
                 return StatusCode(500, "An error occurred while retrieving the movie schedule");
             }
+        }
+
+        [HttpGet("secret")]
+
+        public async Task<ActionResult<object>> GetSecretMovies()
+        {
+            var secretMovies = await _context.Presentations
+                .Include(p => p.Movie)
+                .Where(p => p.IsSecretMovie)
+                .Select(p => new
+                {
+                    p.Id,
+                    p.HallName,
+                    p.Movie.Genre,
+                    p.Movie.AgeRating,
+                    p.IsSecretMovie,
+                    p.StartTime,
+                    p.EndTime,
+                    p.Price
+                })
+                .ToListAsync();
+            return Ok(secretMovies);
         }
     }
 }

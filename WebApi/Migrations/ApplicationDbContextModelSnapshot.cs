@@ -18,6 +18,24 @@ namespace WebApi.Migrations
                 .HasAnnotation("ProductVersion", "8.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
+            modelBuilder.Entity("WebApi.Models.ConcessionItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ConcessionItems");
+                });
+
             modelBuilder.Entity("WebApi.Models.Hall", b =>
                 {
                     b.Property<int>("Id")
@@ -126,6 +144,30 @@ namespace WebApi.Migrations
                     b.ToTable("MovieFormats");
                 });
 
+            modelBuilder.Entity("WebApi.Models.OrderConcessionItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<int>("ConcessionItemId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConcessionItemId");
+
+                    b.HasIndex("OrderId");
+
+                    b.ToTable("OrderConcessionItems");
+                });
+
             modelBuilder.Entity("WebApi.Models.Presentation", b =>
                 {
                     b.Property<int>("Id")
@@ -153,6 +195,9 @@ namespace WebApi.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
+
+                    b.Property<bool>("IsSecretMovie")
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<int>("MovieId")
                         .HasColumnType("int");
@@ -420,6 +465,25 @@ namespace WebApi.Migrations
                     b.Navigation("Movie");
                 });
 
+            modelBuilder.Entity("WebApi.Models.OrderConcessionItem", b =>
+                {
+                    b.HasOne("WebApi.Models.ConcessionItem", "ConcessionItem")
+                        .WithMany()
+                        .HasForeignKey("ConcessionItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WebApi.Models.TicketOrder", "Order")
+                        .WithMany("ConcessionItems")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ConcessionItem");
+
+                    b.Navigation("Order");
+                });
+
             modelBuilder.Entity("WebApi.Models.Presentation", b =>
                 {
                     b.HasOne("WebApi.Models.Hall", "Hall")
@@ -582,6 +646,8 @@ namespace WebApi.Migrations
 
             modelBuilder.Entity("WebApi.Models.TicketOrder", b =>
                 {
+                    b.Navigation("ConcessionItems");
+
                     b.Navigation("Items");
 
                     b.Navigation("SeatLocks");

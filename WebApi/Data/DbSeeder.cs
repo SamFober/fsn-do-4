@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System;
 using WebApi.Models;
 
 namespace WebApi.Data
@@ -198,6 +199,42 @@ namespace WebApi.Data
                     await context.SaveChangesAsync();
                 }
 
+                // Add concessions
+                if (!await context.ConcessionItems.AnyAsync())
+                {
+                    var concessionItems = new[]
+                    {
+                        new ConcessionItem
+                        {
+                            Name = "Regular Popcorn",
+                            Price = 5.00m
+                        },
+                        new ConcessionItem
+                        {
+                            Name = "Large Popcorn",
+                            Price = 7.50m
+                        },
+                        new ConcessionItem
+                        {
+                            Name = "Cheese Popcorn",
+                            Price = 6.00m
+                        },
+                        new ConcessionItem
+                        {
+                            Name = "Caramel Popcorn",
+                            Price = 6.50m
+                        },
+                        new ConcessionItem
+                        {
+                            Name = "Popcorn Combo (Regular + Drink)",
+                            Price = 9.00m
+                        }
+                    };
+
+                    context.ConcessionItems.AddRange(concessionItems);
+                    await context.SaveChangesAsync();
+                }
+
                 //Add reviews for movies
                 if (!await context.Reviews.AnyAsync())
                 {
@@ -333,6 +370,7 @@ namespace WebApi.Data
                 if (!await context.Presentations.AnyAsync())
                 {
                     var existingMovies = await context.Movies.ToListAsync();
+
                     var halls = await context.Halls.ToListAsync();
 
                     if (existingMovies.Any() && halls.Any())
@@ -378,6 +416,9 @@ namespace WebApi.Data
 
                                     // Calculate available seats as total hall capacity
                                     int totalSeats = hall.Rows * hall.SeatsPerRow;
+                                    
+                                    // Randomly decide if this presentation is secret (~0.5% chance)
+                                    bool isSecret = random.NextDouble() < 0.005;
 
                                     // Create the presentation
                                     presentations.Add(new Presentation
@@ -393,7 +434,8 @@ namespace WebApi.Data
                                             ? movie.Formats.ElementAt(random.Next(movie.Formats.Count)).Name ?? "Standard"
                                             : "Standard",
                                         // Set available seats to the total capacity of the hall
-                                        AvailableSeats = totalSeats
+                                        AvailableSeats = totalSeats,
+                                        IsSecretMovie = isSecret
                                     });
                                 }
                             }
@@ -408,7 +450,7 @@ namespace WebApi.Data
             // Initialize SeatPresentation records for all presentations
             await InitializeSeatPresentations(context);
         }
-
+        
         private static async Task UpdatePresentationsAvailableSeats(ApplicationDbContext context)
         {
             // Get presentations with AvailableSeats = 0

@@ -634,6 +634,13 @@ namespace WebApi.Repositories
                 .Include(t => t.Seat)
                 .ToListAsync();
         }
+        public async Task<List<OrderConcessionItem>?> FindConcessionItemsByOrderToken(Guid orderToken)
+        {
+            return await _context.OrderConcessionItems
+                .Where(oci => oci.Order.OrderToken == orderToken)
+                .Include(oci => oci.ConcessionItem)
+                .ToListAsync();
+        }
 
         public async Task<Seat?> GetSeatById(int seatId)
         {
@@ -646,6 +653,34 @@ namespace WebApi.Repositories
             {
                 _logger.LogError(ex, "Error getting seat by ID {SeatId}", seatId);
                 return null;
+            }
+        }
+
+        public async Task<ConcessionItem?> GetConcessionById(int concessionItemId)
+        {
+            try
+            {
+                return await _context.ConcessionItems
+                .FirstOrDefaultAsync(c => c.Id == concessionItemId);
+            } catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting concession item by ID {ConcessionItemId}", concessionItemId);
+                return null;
+            }
+        }
+        public async Task<bool> AddConcessionToOrder(OrderConcessionItem orderConcessionItem)
+        {
+            try
+            {
+                await _context.OrderConcessionItems.AddAsync(orderConcessionItem);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding concession item to order. Order ID: {OrderId}, ConcessionItem ID: {ConcessionItemId}",
+                    orderConcessionItem.OrderId, orderConcessionItem.ConcessionItemId);
+                return false;
             }
         }
     }

@@ -19,13 +19,13 @@ namespace WebApi.Services
 
             this.qRCodeGenerator = new QRCodeGenerator();
         }
-        public byte[] CreatePdfTicketsAsByteArray(List<Ticket> tickets, Guid orderToken)
+        public byte[] CreatePdfTicketsAsByteArray(List<Ticket> tickets, List<OrderConcessionItem>? concessionItems, Guid orderToken)
         {
-            var document = CreateTicketDocument(tickets, orderToken);
+            var document = CreateTicketDocument(tickets, concessionItems, orderToken);
             return document.GeneratePdf();
         }
 
-        private IDocument CreateTicketDocument(List<Ticket> tickets, Guid orderToken)
+        private IDocument CreateTicketDocument(List<Ticket> tickets, List<OrderConcessionItem> concessionItems, Guid orderToken)
         {
             var qrCodeData = qRCodeGenerator.CreateQrCode(orderToken.ToString(), QRCodeGenerator.ECCLevel.Q);
             var qrCode = new PngByteQRCode(qrCodeData);
@@ -124,6 +124,47 @@ namespace WebApi.Services
                         });
                     });
                 }
+
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(50);
+
+                    page.Header().Row(row =>
+                    {
+                        row.RelativeItem().Column(column =>
+                        {
+                            column.Item()
+                            .PaddingBottom(5)
+                            .Text("Concession Items")
+                            .FontSize(20).SemiBold();
+                        });
+                    });
+
+                    page.Content().Column(column =>
+                    {
+                        column.Spacing(10);
+
+                        foreach (var concessionItem in concessionItems)
+                        {
+                            column.Item().Text(text =>
+                            {
+                                text.Span(concessionItem.Quantity.ToString()).FontSize(14);
+                                text.Span(" x ").FontSize(14);
+                                text.Span(concessionItem.ConcessionItem.Name).FontSize(14);
+                                text.Span(" - €" + concessionItem.ConcessionItem.Price.ToString("0.00")).FontSize(14);
+                            });
+                        }
+                    });
+
+                    page.Footer().AlignCenter().Text(x =>
+                    {
+                        x.CurrentPageNumber();
+                        x.Span(" / ");
+                        x.TotalPages();
+                    });
+                });
+
             });
         }
     }

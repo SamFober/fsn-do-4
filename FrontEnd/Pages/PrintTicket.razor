@@ -960,7 +960,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var response = await httpClient.GetAsync($"http://localhost:5213/api/Tickets/{orderToken}/download");
+        var response = await httpClient.GetAsync($"api/Tickets/{orderToken}/finalize");
 
             if (response.IsSuccessStatusCode)
             {
@@ -968,7 +968,7 @@
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                message = "Error: No tickets found.";
+                message = "Error: Order not found";
                 //alertColor = "color: red;";
             }
             else
@@ -980,6 +980,31 @@
 
     private async Task PrintTickets()
     {
-        await JSRuntime.InvokeVoidAsync("openPrintDialog", $"http://localhost:5213/api/Tickets/{orderToken}/download");
+        try {
+            // Show a message to the user
+            message = "Processing your tickets...";
+            StateHasChanged();
+            
+            // Use the full URL to ensure correct API endpoint
+            var baseUrl = httpClient.BaseAddress?.ToString() ?? "http://localhost:5001/";
+            if (!baseUrl.EndsWith("/")) baseUrl += "/";
+            
+            var pdfUrl = $"{baseUrl}api/Tickets/{orderToken}/download";
+            Console.WriteLine($"Opening PDF URL: {pdfUrl}");
+            
+            // Call JavaScript to open the PDF
+            await JSRuntime.InvokeVoidAsync("openPrintDialog", pdfUrl);
+            
+            // Clear the message after a delay
+            await Task.Delay(2000);
+            message = null;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            message = $"Error preparing tickets: {ex.Message}";
+            Console.Error.WriteLine($"Error in PrintTickets: {ex}");
+            StateHasChanged();
+        }
     }
 }
