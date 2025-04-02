@@ -56,6 +56,8 @@ builder.Services.AddScoped<IMovieService, MovieService>();
 builder.Services.AddScoped<ITicketRepository, TicketRepository>();
 builder.Services.AddScoped<ITicketService, TicketService>();
 builder.Services.AddScoped<IConcessionRepository, ConcessionRepository>();
+builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+
 
 // Add CORS
 builder.Services.AddCors(options =>
