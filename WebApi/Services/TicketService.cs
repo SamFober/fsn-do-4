@@ -995,7 +995,7 @@ namespace WebApi.Services
 
         public async Task FinalizeOrder(Guid orderToken)
         {
-            var order = await _repository.FindTicketOrderByOrderToken(orderToken);
+            var order = await _repository.GetOrderByToken(orderToken, includeItems: true);
 
             if (order != null)
             {

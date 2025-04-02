@@ -310,6 +310,19 @@ namespace WebApi.Repositories
             return order;
         }
 
+        public async Task<TicketOrder?> GetOnlineOrderByToken(Guid orderToken)
+        {
+            var order = await _context.TicketOrders
+                .Include(o => o.Items)
+                .Include(o => o.Payment)
+                .Include(o => o.Customer)
+                .Include(o => o.ConcessionItems)
+                .Where(o => o.IsOnlineOrder == true)
+                .FirstOrDefaultAsync(o => o.OrderToken == orderToken);
+
+            return order;
+        }
+
         public async Task<TicketOrder?> GetOrderByMolliePaymentid(string molliePaymentId)
         {
             var order = await _context.TicketOrders
@@ -317,9 +330,9 @@ namespace WebApi.Repositories
                 .Include(o => o.Payment)
                 .Include(o => o.Tickets)
                 .Include(o => o.Customer)
+                .Include(o => o.ConcessionItems)
                 .Where(o => o.IsOnlineOrder == true)
-                .Where(o => o.Payment.MolliePaymentId == molliePaymentId)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(o => o.Payment.MolliePaymentId == molliePaymentId);
 
             return order;
         }

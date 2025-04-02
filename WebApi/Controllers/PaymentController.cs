@@ -1,8 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using WebApi.Exceptions;
 using WebApi.Interfaces.Services;
-using WebApi.Models;
-using WebApi.Models.Requests.Payment;
 
 namespace WebApi.Controllers
 {

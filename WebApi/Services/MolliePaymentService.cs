@@ -37,7 +37,7 @@ namespace WebApi.Services
         {
             _logger.LogInformation($"Creating payment for order {orderToken}");
             decimal totalPaymentAmount = 0.00m;
-            var ticketOrder = await _ticketRepository.GetOrderByToken(orderToken, includeItems: true)
+            var ticketOrder = await _ticketRepository.GetOnlineOrderByToken(orderToken)
                 ?? throw new OrderNotFoundException("Order not found.");
 
             if (ticketOrder.Payment != null) throw new PaymentAlreadyExistsException();
@@ -58,8 +58,9 @@ namespace WebApi.Services
             {
                 Description = $"Cinemagia order {orderToken}",
                 Amount = new Mollie.Api.Models.Amount("EUR", totalPaymentAmount),
-                RedirectUrl = $"https://21753e8f9d26e4c7cbb6f5f29e89c1b1.serveo.net/{orderToken}/finish",
-                WebhookUrl = "https://400b0cc0a3560f8d0744d7651dc290bd.serveo.net/api/payment"
+                RedirectUrl = $"https://2807819c7745145cff0d98bc04bc6562.serveo.net/{orderToken}/finish",
+                WebhookUrl = "https://f3b32189d85fe2349c473366cfe0cb18.serveo.net/api/payment",
+                CancelUrl = "https://2807819c7745145cff0d98bc04bc6562.serveo.net"
             };
 
             try

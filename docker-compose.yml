@@ -116,6 +116,8 @@ services:
       -o StrictHostKeyChecking=no
       -R 80:host.docker.internal:5001
       serveo.net
+    networks:
+      - cinemagia-network
 
   serveo-frontend:
     image: taichunmin/serveo:latest
@@ -130,6 +132,8 @@ services:
       -o StrictHostKeyChecking=no
       -R 80:host.docker.internal:5002
       serveo.net
+    networks:
+      - cinemagia-network
 
 networks:
   cinemagia-network:
