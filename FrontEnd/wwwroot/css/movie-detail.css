@@ -13,12 +13,32 @@
 .nav-buttons {
     padding: 30px 40px 0 0;
     display: flex;
+    justify-content: space-between;
     align-items: center;
+    padding: 10px 20px
+}
+
+.share-icon button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    box-shadow: none;
+    padding: 8px;
+    background-color: rgba(15, 23, 48, 0.7);
+    padding: 8px 15px;
+    border-radius: 20px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(245, 197, 24, 0.5);
 }
 
 .back-home-btn {
     display: flex;
     align-items: center;
+    justify-content:space-around;
     gap: 8px;
     color: white;
     background-color: rgba(15, 23, 48, 0.7);
