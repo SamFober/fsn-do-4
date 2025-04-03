@@ -1,5 +1,3 @@
-using System;
-
 namespace WebApi.Models.Exceptions
 {
     public class TicketNotFoundException : Exception

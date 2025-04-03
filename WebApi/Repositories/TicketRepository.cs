@@ -81,7 +81,7 @@ namespace WebApi.Repositories
             // Initialize SeatPresentations if they don't exist yet
             bool hasExistingRecords = await _context.SeatPresentations
                 .AnyAsync(sp => sp.PresentationId == presentationId);
-                
+
             if (!hasExistingRecords)
             {
                 await InitializeSeatPresentations(presentationId);
@@ -123,16 +123,16 @@ namespace WebApi.Repositories
                 // Initialize SeatPresentations if they don't exist yet
                 bool hasExistingRecords = await _context.SeatPresentations
                     .AnyAsync(sp => sp.PresentationId == presentationId);
-                    
+
                 if (!hasExistingRecords)
                 {
                     _logger.LogWarning("No SeatPresentation records found for presentation {PresentationId}. Initializing...", presentationId);
                     await InitializeSeatPresentations(presentationId);
-                    
+
                     // Double-check initialization was successful
                     hasExistingRecords = await _context.SeatPresentations
                         .AnyAsync(sp => sp.PresentationId == presentationId);
-                        
+
                     if (!hasExistingRecords)
                     {
                         _logger.LogError("Failed to initialize SeatPresentation records for presentation {PresentationId}", presentationId);
@@ -142,10 +142,10 @@ namespace WebApi.Repositories
 
                 // Get all requested seats to check their availability
                 var requestedSeatPresentations = await _context.SeatPresentations
-                    .Where(sp => sp.PresentationId == presentationId && 
+                    .Where(sp => sp.PresentationId == presentationId &&
                            seatIds.Contains(sp.SeatId))
                     .ToListAsync();
-                    
+
                 if (requestedSeatPresentations.Count < seatIds.Count)
                 {
                     var missingSeatIds = seatIds.Except(requestedSeatPresentations.Select(sp => sp.SeatId)).ToList();
@@ -161,12 +161,12 @@ namespace WebApi.Repositories
                 if (orderToken.HasValue)
                 {
                     currentOrderSeats = await _context.SeatLocks
-                        .Where(l => l.OrderToken == orderToken.Value && 
-                                   l.PresentationId == presentationId && 
+                        .Where(l => l.OrderToken == orderToken.Value &&
+                                   l.PresentationId == presentationId &&
                                    l.ExpiresAt > DateTime.UtcNow)
                         .Select(l => l.SeatId)
                         .ToListAsync();
-                    
+
                     _logger.LogInformation(
                         "Order {OrderToken} already has {LockCount} seats locked: {LockedSeats}",
                         orderToken.Value,
@@ -176,7 +176,7 @@ namespace WebApi.Repositories
 
                 // Get unavailable seats from SeatPresentations, excluding seats already locked by this order
                 var unavailableSeats = requestedSeatPresentations
-                    .Where(sp => !sp.IsAvailable && 
+                    .Where(sp => !sp.IsAvailable &&
                                 (orderToken == null || !currentOrderSeats.Contains(sp.SeatId)))
                     .Select(sp => sp.SeatId)
                     .ToList();
@@ -231,7 +231,7 @@ namespace WebApi.Repositories
                     "All seats {SeatIds} are available for presentation {PresentationId}",
                     string.Join(", ", seatIds),
                     presentationId);
-                    
+
                 return true;
             }
             catch (Exception ex)
@@ -433,7 +433,7 @@ namespace WebApi.Repositories
                 {
                     return await GetLocksByOrder(orderGuid);
                 }
-                
+
                 _logger.LogWarning("Failed to parse order token: {OrderToken}", orderToken);
                 return new List<SeatLock>();
             }
@@ -471,7 +471,7 @@ namespace WebApi.Repositories
                 var presentation = await _context.Presentations
                     .Include(p => p.Hall)
                     .FirstOrDefaultAsync(p => p.Id == presentationId);
-                
+
                 if (presentation == null || presentation.Hall == null)
                 {
                     _logger.LogWarning("Presentation {PresentationId} or its Hall not found", presentationId);
@@ -482,7 +482,7 @@ namespace WebApi.Repositories
                 var seats = await _context.Seats
                     .Where(s => seatIds.Contains(s.Id) && s.HallId == presentation.HallId)
                     .ToListAsync();
-                    
+
                 if (seats.Count != seatIds.Count)
                 {
                     var existingSeatIds = seats.Select(s => s.Id).ToList();
@@ -491,7 +491,7 @@ namespace WebApi.Repositories
                         "Some seats {MissingSeatIds} don't exist or don't belong to hall {HallId}",
                         string.Join(", ", missingSeatIds),
                         presentation.HallId);
-                    
+
                     // Continue with the valid seats
                     seatIds = existingSeatIds;
                 }
@@ -507,7 +507,7 @@ namespace WebApi.Repositories
                         // Find or create the SeatPresentation record
                         var seatPresentation = await _context.SeatPresentations
                             .FirstOrDefaultAsync(sp => sp.SeatId == seatId && sp.PresentationId == presentationId);
-                        
+
                         if (seatPresentation != null)
                         {
                             // Only update if the availability status is actually changing
@@ -517,10 +517,10 @@ namespace WebApi.Repositories
                                 bool oldStatus = seatPresentation.IsAvailable;
                                 seatPresentation.IsAvailable = isAvailable;
                                 seatPresentation.UpdatedAt = DateTime.UtcNow;
-                                
+
                                 _logger.LogDebug("Updated SeatPresentation for seat {SeatId}, presentation {PresentationId} from {OldStatus} to {NewStatus}",
                                     seatId, presentationId, oldStatus, isAvailable);
-                                
+
                                 // Increment the change counter
                                 availabilityChangesCount++;
                             }
@@ -541,10 +541,10 @@ namespace WebApi.Repositories
                                 CreatedAt = DateTime.UtcNow,
                                 UpdatedAt = DateTime.UtcNow
                             });
-                            
+
                             _logger.LogDebug("Created new SeatPresentation for seat {SeatId}, presentation {PresentationId} with {IsAvailable}",
                                 seatId, presentationId, isAvailable);
-                            
+
                             // If we're creating a new record and marking it as unavailable, count it as a change
                             if (!isAvailable)
                             {
@@ -559,24 +559,24 @@ namespace WebApi.Repositories
                         // Continue with the rest of the seats
                     }
                 }
-                
+
                 // Apply changes first before recounting
                 await _context.SaveChangesAsync();
-                
+
                 // Calculate total seats in the hall
                 int totalSeats = presentation.Hall.Rows * presentation.Hall.SeatsPerRow;
-                
+
                 // Count unavailable seats for this presentation
                 int unavailableSeats = await _context.SeatPresentations
                     .CountAsync(sp => sp.PresentationId == presentationId && !sp.IsAvailable);
-                
+
                 // Update available seats count on the presentation
                 int oldAvailableSeats = presentation.AvailableSeats;
                 presentation.AvailableSeats = totalSeats - unavailableSeats;
-                
-                _logger.LogInformation("Updating presentation {PresentationId} available seats from {OldAvailableSeats} to {NewAvailableSeats} (total: {TotalSeats}, unavailable: {UnavailableSeats}, changes: {ChangesCount})", 
+
+                _logger.LogInformation("Updating presentation {PresentationId} available seats from {OldAvailableSeats} to {NewAvailableSeats} (total: {TotalSeats}, unavailable: {UnavailableSeats}, changes: {ChangesCount})",
                     presentationId, oldAvailableSeats, presentation.AvailableSeats, totalSeats, unavailableSeats, availabilityChangesCount);
-                
+
                 // Save the updated presentation
                 await _context.SaveChangesAsync();
             }
@@ -586,35 +586,35 @@ namespace WebApi.Repositories
                     presentationId, string.Join(", ", seatIds));
             }
         }
-        
+
         public async Task InitializeSeatPresentations(int presentationId)
         {
             // Get the presentation with its hall
             var presentation = await _context.Presentations
                 .Include(p => p.Hall)
                 .FirstOrDefaultAsync(p => p.Id == presentationId);
-                
+
             if (presentation == null || presentation.Hall == null)
             {
                 _logger.LogWarning("Cannot initialize seat presentations: Presentation {PresentationId} or its Hall not found", presentationId);
                 return;
             }
-            
+
             // Get all seats for this hall
             var seats = await _context.Seats
                 .Where(s => s.HallId == presentation.HallId)
                 .ToListAsync();
-                
+
             // Check if any SeatPresentation records already exist for this presentation
             bool hasExistingRecords = await _context.SeatPresentations
                 .AnyAsync(sp => sp.PresentationId == presentationId);
-                
+
             if (hasExistingRecords)
             {
                 _logger.LogInformation("SeatPresentation records already exist for presentation {PresentationId}", presentationId);
                 return;
             }
-            
+
             // Create SeatPresentation records for each seat
             var seatPresentations = seats.Select(seat => new SeatPresentation
             {
@@ -624,15 +624,15 @@ namespace WebApi.Repositories
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             }).ToList();
-            
+
             await _context.SeatPresentations.AddRangeAsync(seatPresentations);
-            
+
             // Set the initial AvailableSeats count on the presentation
             presentation.AvailableSeats = seats.Count;
-            
-            _logger.LogInformation("Initialized {Count} seats for presentation {PresentationId}", 
+
+            _logger.LogInformation("Initialized {Count} seats for presentation {PresentationId}",
                 seats.Count, presentationId);
-                
+
             await _context.SaveChangesAsync();
         }
 

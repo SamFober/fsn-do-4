@@ -21,4 +21,4 @@ namespace WebApi.Migrations
                 table: "TicketOrders");
         }
     }
-} 
+}
