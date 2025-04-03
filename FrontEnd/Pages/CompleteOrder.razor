@@ -1,0 +1,145 @@
+﻿@page "/order/{orderToken}/complete"
+@using FrontEnd.Models.Responses
+
+@inject HttpClient httpClient;
+@inject NavigationManager NavigationManager;
+@inject IJSRuntime JSRuntime;
+
+<link href="css/home_style.css" rel="stylesheet" />
+<link href="css/home_navbar.css" rel="stylesheet" />
+<link href="css/seating.css" rel="stylesheet" />
+<link href="css/modals.css" rel="stylesheet" />
+
+<div class="cinema-container is-page-home">
+    <div class="gradient-background-wrapper"></div>
+
+    <nav class="homepage-navbar">
+        <div class="nav-left-group">
+            <div class="logo-container">
+                <img src="Cinemagia_logo.jpg" alt="Logo" class="navbar-logo">
+            </div>
+
+            <ul class="nav-links @(isMobileMenuOpen ? "active" : "")">
+                <li><a href="#film-posters">Movies</a></li>
+                <li><a href="/schedule">Schedule</a></li>
+                <li><a href="/secret-movies">Secret Movies</a></li>
+            </ul>
+        </div>
+
+        <!-- Mobile menu icon -->
+        <div class="menu-icon" @onclick="ToggleMobileMenu">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+
+        <div class="nav-secondary">
+            <div class="search-icon">🔍</div>
+            <div class="account-icon">👤</div>
+            <div class="language-selector">EN</div>
+        </div>
+    </nav>
+
+    <div class="content-with-header-space">
+        <section class="split-hero">
+            <div class="split-hero-content">
+                <!-- Movie Logo/Title styled like Pathé -->
+                <div class="movie-logo">
+                    <h1 class="hero-title">Thank you, @customerFirstName!</h1>
+                </div>
+                <p class="hero-description">Enjoy the film!</p>
+                <div class="hero-cta">
+                    <button @onclick="PrintTickets" class="hero-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ticket-icon"><path d="M3 7v2a3 3 0 1 1 0 6v2h18v-2a3 3 0 1 1 0-6V7zm0 5h18"></path></svg>
+                        Print your tickets
+                    </button>
+                </div>
+            </div>
+            <div class="split-angle-divider"></div>
+
+            <div class="split-hero-image">
+                <div class="split-hero-backdrop" style="background-image: url('@moviePosterUrl')"></div>
+            </div>
+        </section>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string orderToken { get; set; } = "";
+
+    public string customerFirstName { get; set; } = "";
+    public string moviePosterUrl { get; set; } = "";
+
+    private static DotNetObjectReference<CompleteOrder>? objRef;
+    private bool isMobileMenuOpen = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var completedOrderResponse = await httpClient.GetAsync($"api/orders/completed/{orderToken}");
+
+        if (completedOrderResponse.IsSuccessStatusCode)
+        {
+            var order = await completedOrderResponse.Content.ReadFromJsonAsync<CompletedOrderResponse>();
+
+            if (order.paymentStatus != PaymentStatus.Paid) NavigationManager.NavigateTo("/");
+
+            customerFirstName = order.customerFirstName;
+            moviePosterUrl = order.moviePosterUrl;
+        }
+        else
+        {
+           NavigationManager.NavigateTo("/");
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("eval", "window.DotNet = DotNet");
+            await JSRuntime.InvokeVoidAsync("import", "./js/home.js");
+
+            // Add body class for home page
+            await JSRuntime.InvokeVoidAsync("document.body.classList.add", "is-page-home");
+        }
+    }
+
+    private async Task PrintTickets()
+    {
+        // Use the full URL to ensure correct API endpoint
+        var baseUrl = httpClient.BaseAddress?.ToString() ?? "http://localhost:5001/";
+        if (!baseUrl.EndsWith("/")) baseUrl += "/";
+
+        var pdfUrl = $"{baseUrl}api/Tickets/{orderToken}/download";
+        Console.WriteLine($"Opening PDF URL: {pdfUrl}");
+
+        // Call JavaScript to open the PDF
+        await JSRuntime.InvokeVoidAsync("openPrintDialog", pdfUrl);
+    }
+
+    private void ToggleMobileMenu()
+    {
+        isMobileMenuOpen = !isMobileMenuOpen;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public static Task CloseMobileMenu()
+    {
+        if (objRef?.Value != null)
+        {
+            objRef.Value.isMobileMenuOpen = false;
+            objRef.Value.StateHasChanged();
+        }
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        objRef?.Dispose();
+        // Remove body class when navigating away
+        JSRuntime.InvokeVoidAsync("document.body.classList.remove", "is-page-home");
+    }
+}

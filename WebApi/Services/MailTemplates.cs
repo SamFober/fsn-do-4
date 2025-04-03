@@ -17,6 +17,11 @@ namespace WebApi.Services
             return emailTemplate;
         }
 
+        public static string OrderCompleteMailTemplate(TicketOrder onlineOrder)
+        {
+            return OrderCompleteMailTemplate(onlineOrder.Customer.FirstName, onlineOrder.Presentation, onlineOrder.Items.Count());
+        }
+
         /// <summary>
         /// Loads an email HTML template file
         /// </summary>

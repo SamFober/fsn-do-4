@@ -285,6 +285,7 @@ namespace WebApi.Repositories
         {
             var order = await _context.TicketOrders
                 .Include(o => o.Items)
+                .Include(o => o.Customer)
                 .Include(o =>o.Payment)
                 .FirstOrDefaultAsync(o => o.OrderToken == orderToken);
 
@@ -310,29 +311,68 @@ namespace WebApi.Repositories
             return order;
         }
 
-        public async Task<TicketOrder?> GetOnlineOrderByToken(Guid orderToken)
+        public async Task<TicketOrder?> GetOnlineOrderByToken(Guid orderToken, bool includeItems = false)
         {
             var order = await _context.TicketOrders
                 .Include(o => o.Items)
                 .Include(o => o.Payment)
                 .Include(o => o.Customer)
-                .Include(o => o.ConcessionItems)
                 .Where(o => o.IsOnlineOrder == true)
                 .FirstOrDefaultAsync(o => o.OrderToken == orderToken);
+
+            if (order != null && includeItems)
+            {
+                // Explicitly load the presentation and its related entities
+                await _context.Entry(order)
+                    .Reference(o => o.Presentation)
+                    .LoadAsync();
+
+                if (order.Presentation != null)
+                {
+                    await _context.Entry(order.Presentation)
+                        .Reference(p => p.Movie)
+                        .LoadAsync();
+
+                    await _context.Entry(order.Presentation)
+                        .Reference(p => p.Hall)
+                        .LoadAsync();
+                }
+            }
 
             return order;
         }
 
-        public async Task<TicketOrder?> GetOrderByMolliePaymentid(string molliePaymentId)
+        public async Task<TicketOrder?> GetOnlineOrderByMolliePaymentid(string molliePaymentId, bool includeItems = false)
         {
             var order = await _context.TicketOrders
                 .Include(o => o.Items)
                 .Include(o => o.Payment)
-                .Include(o => o.Tickets)
                 .Include(o => o.Customer)
-                .Include(o => o.ConcessionItems)
                 .Where(o => o.IsOnlineOrder == true)
                 .FirstOrDefaultAsync(o => o.Payment.MolliePaymentId == molliePaymentId);
+
+            if (order != null && includeItems)
+            {
+                // Explicitly load the presentation and its related entities
+                await _context.Entry(order)
+                    .Reference(o => o.Presentation)
+                    .LoadAsync();
+
+                if (order.Presentation != null)
+                {
+                    await _context.Entry(order.Presentation)
+                        .Reference(p => p.Movie)
+                        .LoadAsync();
+
+                    await _context.Entry(order.Presentation)
+                        .Reference(p => p.Hall)
+                        .LoadAsync();
+                }
+
+                await _context.Entry(order)
+                    .Collection(o => o.Tickets)
+                    .LoadAsync();
+            }
 
             return order;
         }

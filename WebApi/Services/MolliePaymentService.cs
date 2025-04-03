@@ -1,6 +1,7 @@
 ﻿using Mollie.Api.Client;
 using Mollie.Api.Client.Abstract;
 using Mollie.Api.Models.Payment.Request;
+using System.Text;
 using WebApi.Exceptions;
 using WebApi.Interfaces.Repositories;
 using WebApi.Interfaces.Services;
@@ -11,6 +12,9 @@ namespace WebApi.Services
 {
     public class MolliePaymentService : IPaymentService
     {
+        private const string FrontEndWebhookUrl = "https://5459b786a55d423f90e800e42cf57c25.serveo.net";
+        private const string BackendWebHookUrl = "https://7a2f968c17d477f303cf41c2df1b7b72.serveo.net";
+
         private readonly ITicketRepository _ticketRepository;
         private readonly IMailService _mailService;
         private readonly IPaymentMethodClient _paymentMethodClient;
@@ -58,9 +62,9 @@ namespace WebApi.Services
             {
                 Description = $"Cinemagia order {orderToken}",
                 Amount = new Mollie.Api.Models.Amount("EUR", totalPaymentAmount),
-                RedirectUrl = $"https://2807819c7745145cff0d98bc04bc6562.serveo.net/{orderToken}/finish",
-                WebhookUrl = "https://f3b32189d85fe2349c473366cfe0cb18.serveo.net/api/payment",
-                CancelUrl = "https://2807819c7745145cff0d98bc04bc6562.serveo.net"
+                RedirectUrl = $"{FrontEndWebhookUrl}/order/{orderToken}/complete",
+                WebhookUrl = $"{BackendWebHookUrl}/api/payment",
+                CancelUrl = $"{FrontEndWebhookUrl}"
             };
 
             try
@@ -89,7 +93,7 @@ namespace WebApi.Services
             }
         }
 
-        public async Task<bool> ProcessMolliePaymentUpdate(string paymentId)
+        public async Task<TicketOrder> ProcessMolliePaymentUpdate(string paymentId)
         {
             try
             {
@@ -98,21 +102,25 @@ namespace WebApi.Services
                 if (molliePaymentResponse == null)
                 {
                     _logger.LogError("Mollie payment not found.");
-                    return false;
+                    throw new PaymentNotFoundException();
                 }
 
-                var ticketOrder = await _ticketRepository.GetOrderByMolliePaymentid(paymentId)
+                var ticketOrder = await _ticketRepository.GetOnlineOrderByMolliePaymentid(paymentId, includeItems: true)
                     ?? throw new OrderNotFoundException("No order found with the given Mollie payment ID.");
 
                 if (molliePaymentResponse.Status == "paid")
                 {
                     ticketOrder.Payment.PaymentStatus = PaymentStatus.Paid;
+                    ticketOrder.OrderCode = GenerateOrderCode();
+
                     foreach (var ticket in ticketOrder.Tickets)
                     {
                         ticket.Status = TicketStatus.Paid;
                     }
 
-                    return await _ticketRepository.SaveOrder(ticketOrder);
+                    await _ticketRepository.SaveOrder(ticketOrder);
+
+                    return ticketOrder;
                 }
                 else
                 {
@@ -136,13 +144,16 @@ namespace WebApi.Services
                             }
                             break;
                     }
-                    return await _ticketRepository.SaveOrder(ticketOrder);
+
+                    await _ticketRepository.SaveOrder(ticketOrder);
+
+                    return ticketOrder;
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error while updating payment: ");
-                return false;
+                throw;
             }
         }
 
@@ -179,6 +190,20 @@ namespace WebApi.Services
         public Task GetPayments()
         {
             throw new NotImplementedException();
+        }
+
+        private string GenerateOrderCode()
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            StringBuilder result = new StringBuilder(7);
+            Random random = new Random();
+
+            for (int i = 0; i < 7; i++)
+            {
+                result.Append(chars[random.Next(chars.Length)]);
+            }
+
+            return result.ToString();
         }
     }
 }

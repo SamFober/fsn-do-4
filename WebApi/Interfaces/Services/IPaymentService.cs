@@ -7,7 +7,7 @@ namespace WebApi.Interfaces.Services
     {
         Task GetPayments();
         Task<Payment> CreatePayment(Guid orderToken, Customer customer);
-        Task<bool> ProcessMolliePaymentUpdate(string molliePaymentId);
+        Task<TicketOrder> ProcessMolliePaymentUpdate(string molliePaymentId);
         Task<List<PaymentMethodResponse>> GetAvailablePaymentMethods();
     }
 }
