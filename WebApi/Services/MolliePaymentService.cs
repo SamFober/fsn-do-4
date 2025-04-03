@@ -12,7 +12,7 @@ namespace WebApi.Services
 {
     public class MolliePaymentService : IPaymentService
     {
-        private const string FrontEndWebhookUrl = "https://5459b786a55d423f90e800e42cf57c25.serveo.net";
+        private const string FrontEndWebhookUrl = "https://52968e0118a6280819c64d84e6995213.serveo.net";
         private const string BackendWebHookUrl = "https://7a2f968c17d477f303cf41c2df1b7b72.serveo.net";
 
         private readonly ITicketRepository _ticketRepository;

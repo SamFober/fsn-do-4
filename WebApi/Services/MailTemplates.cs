@@ -4,7 +4,7 @@ namespace WebApi.Services
 {
     public class MailTemplates
     {
-        public static string OrderCompleteMailTemplate(string customerName, Presentation presentation, int ticketCount)
+        public static string OrderCompleteMailTemplate(string customerName, Presentation presentation, int ticketCount, string orderCode = "----")
         {
 
             string emailTemplate = LoadTemplate("confirm_order_email_template.html", "Hi {firstName}, here are your tickets!");
@@ -13,13 +13,14 @@ namespace WebApi.Services
             emailTemplate = emailTemplate.Replace("{movieName}", presentation.Movie.Title);
             emailTemplate = emailTemplate.Replace("{presentationDate}", presentation.StartTime.ToString());
             emailTemplate = emailTemplate.Replace("{ticketCount}", ticketCount.ToString());
+            emailTemplate = emailTemplate.Replace("{orderCode}", orderCode);
 
             return emailTemplate;
         }
 
         public static string OrderCompleteMailTemplate(TicketOrder onlineOrder)
         {
-            return OrderCompleteMailTemplate(onlineOrder.Customer.FirstName, onlineOrder.Presentation, onlineOrder.Items.Count());
+            return OrderCompleteMailTemplate(onlineOrder.Customer.FirstName, onlineOrder.Presentation, onlineOrder.Items.Count(), onlineOrder.OrderCode);
         }
 
         /// <summary>

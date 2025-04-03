@@ -174,6 +174,7 @@ namespace WebApi.Controllers
 
                 var response = new CompletedOrderResponse()
                 {
+                    orderToken = order.OrderToken,
                     customerFirstName = order.Customer.FirstName,
                     customerLastName = order.Customer.LastName,
                     moviePosterUrl = order.Presentation.Movie.PosterUrl,
@@ -186,6 +187,52 @@ namespace WebApi.Controllers
             {
                 _logger.LogError(ex, "Error fetching order {OrderId}", orderToken);
                 return StatusCode(500, $"An error occurred while fetching order {orderToken}");
+            }
+        }
+
+        // GET: api/orders/{orderToken}
+        [HttpGet("completed/code/{code}")]
+        public async Task<IActionResult> GetCompletedOrderWithCode(string code)
+        {
+            try
+            {
+                var order = await _context.TicketOrders
+                    .Include(o => o.Presentation)
+                        .ThenInclude(p => p.Movie)
+                    .Include(o => o.Customer)
+                    .Include(o => o.Payment)
+                    .Include(o => o.Items)
+                    .Include(o => o.Tickets)
+                        .ThenInclude(t => t.Presentation)
+                            .ThenInclude(p => p.Movie)
+                    .Include(o => o.Tickets)
+                        .ThenInclude(t => t.Presentation)
+                            .ThenInclude(p => p.Hall)
+                    .Include(o => o.Tickets)
+                        .ThenInclude(t => t.Seat)
+                    .Where(o => o.IsOnlineOrder == true)
+                    .FirstOrDefaultAsync(o => o.OrderCode == code);
+
+                if (order == null)
+                {
+                    return NotFound($"Order with code {code} not found");
+                }
+
+                var response = new CompletedOrderResponse()
+                {
+                    orderToken = order.OrderToken,
+                    customerFirstName = order.Customer.FirstName,
+                    customerLastName = order.Customer.LastName,
+                    moviePosterUrl = order.Presentation.Movie.PosterUrl,
+                    paymentStatus = order.Payment.PaymentStatus
+                };
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching order with code {OrderId}", code);
+                return StatusCode(500, $"An error occurred while fetching order with code  {code}");
             }
         }
 
