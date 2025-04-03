@@ -44,16 +44,18 @@ namespace WebApi.Controllers
 
                 var ticketBytes = _ticketPdfService.CreatePdfTicketsAsByteArray(tickets, concessionItems, ticketOrder.OrderToken);
 
-                var ticketAttachments = new List<object>();
+
+
+                var ticketAttachments = new List<object>()
+            {
+                new MimePart("application", "pdf")
                 {
-                    new MimePart("application", "pdf")
-                    {
-                        Content = new MimeContent(new MemoryStream(ticketBytes)),
-                        ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
-                        ContentTransferEncoding = ContentEncoding.Base64,
-                        FileName = $"{ticketOrder.OrderToken}.pdf"
-                    };
-                };
+                    Content = new MimeContent(new MemoryStream(ticketBytes)),
+                    ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+                    ContentTransferEncoding = ContentEncoding.Base64,
+                    FileName = $"{ticketOrder.OrderToken}.pdf"
+                }
+            };
 
                 _mailService.SendEmail(
                     $"{ticketOrder.Customer.FirstName} {ticketOrder.Customer.LastName}",
