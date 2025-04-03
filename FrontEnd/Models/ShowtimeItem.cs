@@ -14,4 +14,4 @@ namespace FrontEnd.Models
         public bool IsAlmostFull { get; set; }
         public bool IsSoldOut { get; set; }
     }
-} 
+}

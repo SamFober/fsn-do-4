@@ -17,10 +17,10 @@ namespace WebApi.Models
         public decimal Price { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
-        
+
         [StringLength(50)]
         public string Format { get; set; } = "Standard";
-        
+
         [StringLength(100)]
         public string HallName { get; set; } = "";
         public int AvailableSeats { get; set; }

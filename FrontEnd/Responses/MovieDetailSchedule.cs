@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using FrontEnd.Models;
 
 namespace FrontEnd.Responses
@@ -16,4 +15,4 @@ namespace FrontEnd.Responses
         public List<FormatInfo> Formats { get; set; } = new List<FormatInfo>();
         public List<DailyMovieSchedule> Schedule { get; set; } = new List<DailyMovieSchedule>();
     }
-} 
+}

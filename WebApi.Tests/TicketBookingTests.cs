@@ -1,21 +1,18 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;  // Add this for InMemoryEventId
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using WebApi.Controllers;
-using WebApi.Data;
+using WebApi.Interfaces.Repositories; // Add this for ITicketRepository
+using WebApi.Interfaces.Services;    // Add this for ITicketService
 using WebApi.Models;
 using WebApi.Models.Requests;
 using WebApi.Models.Responses;
-using Xunit;
-using static WebApi.Controllers.TicketsController;  // Add this at the top to access nested types
-using Microsoft.Extensions.DependencyInjection;
 using WebApi.Services;  // Add this for OrderCleanupService
-using WebApi.Interfaces.Services;    // Add this for ITicketService
-using WebApi.Interfaces.Repositories; // Add this for ITicketRepository
-using WebApi.Models.Responses;
 using WebApi.Tests.Mocks.Services;  // Add this to use TicketResponse
+using Xunit;
 
 namespace WebApi.Tests;
 
@@ -47,7 +44,7 @@ public class TicketBookingTests : IDisposable
 
         // Setup repository mock
         _repositoryMock.Setup(r => r.GetAvailableSeats(It.IsAny<int>(), It.IsAny<bool>()))
-            .ReturnsAsync((int presentationId, bool findBest) => 
+            .ReturnsAsync((int presentationId, bool findBest) =>
                 _context.Seats.Where(s => s.Hall.Presentations.Any(p => p.Id == presentationId))
                     .ToList());
 
@@ -91,12 +88,12 @@ public class TicketBookingTests : IDisposable
         try
         {
             // Create and save hall
-            var hall = new Hall 
-            { 
-                Id = 1, 
-                Name = "Test Hall", 
-                Rows = 10, 
-                SeatsPerRow = 10 
+            var hall = new Hall
+            {
+                Id = 1,
+                Name = "Test Hall",
+                Rows = 10,
+                SeatsPerRow = 10
             };
             _context.Halls.Add(hall);
             _context.SaveChanges();
@@ -118,10 +115,10 @@ public class TicketBookingTests : IDisposable
             _context.SaveChanges();
 
             // Create and save movie
-            var movie = new Movie 
-            { 
-                Id = 1, 
-                Title = "Test Movie", 
+            var movie = new Movie
+            {
+                Id = 1,
+                Title = "Test Movie",
                 DurationMinutes = 120
             };
             _context.Movies.Add(movie);
@@ -209,8 +206,8 @@ public class TicketBookingTests : IDisposable
         foreach (var rowGroup in seatsByRow)
         {
             // In each row, book seats 1-4 and 6-10, leaving only 1 seat available (5)
-            var seatsToBook = rowGroup.Where(s => 
-                s.SeatNumber <= 4 || 
+            var seatsToBook = rowGroup.Where(s =>
+                s.SeatNumber <= 4 ||
                 s.SeatNumber >= 6
             ).ToList();
 
@@ -232,9 +229,9 @@ public class TicketBookingTests : IDisposable
 
         // Verify our setup - should have no more than 3 consecutive seats available in any row
         var availableSeats = await _context.Seats
-            .Where(s => !_context.Tickets.Any(t => 
-                t.SeatId == s.Id && 
-                t.PresentationId == 1 && 
+            .Where(s => !_context.Tickets.Any(t =>
+                t.SeatId == s.Id &&
+                t.PresentationId == 1 &&
                 t.Status != TicketStatus.Cancelled))
             .OrderBy(s => s.RowNumber)
             .ThenBy(s => s.SeatNumber)
@@ -352,8 +349,8 @@ public class TicketBookingTests : IDisposable
         foreach (var row in allSeats.GroupBy(s => s.RowNumber))
         {
             // Leave seats 4-5 and 8-9 available in each row
-            var seatsToBook = row.Where(s => 
-                s.SeatNumber <= 3 || 
+            var seatsToBook = row.Where(s =>
+                s.SeatNumber <= 3 ||
                 (s.SeatNumber >= 6 && s.SeatNumber <= 7) ||
                 s.SeatNumber == 10
             ).ToList();
@@ -439,7 +436,7 @@ public class TicketBookingTests : IDisposable
             .Include(p => p.Hall)
             .ThenInclude(h => h.Seats)
             .FirstOrDefaultAsync(p => p.Id == request.PresentationId);
-        
+
         Console.WriteLine($"Presentation details:");
         Console.WriteLine($"- ID: {presentation?.Id}");
         Console.WriteLine($"- Hall ID: {presentation?.HallId}");
@@ -455,14 +452,14 @@ public class TicketBookingTests : IDisposable
         {
             Assert.Fail($"Controller returned 500 Internal Server Error: {objectResult.Value}");
         }
-        
+
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var response = Assert.IsType<GroupOrderResponse>(okResult.Value);
 
         // Assert
         var seatLocks = await _context.SeatLocks.ToListAsync();
         Assert.Equal(3, seatLocks.Count);
-        Assert.All(seatLocks, l => 
+        Assert.All(seatLocks, l =>
         {
             Assert.Equal(response.OrderToken, l.OrderToken);
             Assert.Contains(l.SeatId, response.SeatIds);
@@ -641,4 +638,4 @@ public class TicketBookingTests : IDisposable
         _context.Database.EnsureDeleted();
         _context.Dispose();
     }
-} 
+}

@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using FrontEnd.Models;
-
 namespace FrontEnd.Models.Responses
 {
     public class MovieDetailSchedule
@@ -16,4 +13,4 @@ namespace FrontEnd.Models.Responses
         public List<FormatInfo> Formats { get; set; } = new List<FormatInfo>();
         public List<DailyMovieSchedule> Schedule { get; set; } = new List<DailyMovieSchedule>();
     }
-} 
+}

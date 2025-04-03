@@ -23,6 +23,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<SeatPresentation> SeatPresentations { get; set; } = null!;
     public DbSet<ConcessionItem> ConcessionItems { get; set; } = null!;
     public DbSet<OrderConcessionItem> OrderConcessionItems { get; set; } = null!;
+    public DbSet<Review> Reviews { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -95,5 +96,11 @@ public class ApplicationDbContext : DbContext
             .WithMany()
             .HasForeignKey(oci => oci.ConcessionItemId)
             .OnDelete(DeleteBehavior.Restrict);
+        // Configure Review entity
+        modelBuilder.Entity<Review>()
+            .HasOne(r => r.Movie)
+            .WithMany(m => m.Reviews)  // One movie has many reviews
+            .HasForeignKey(r => r.MovieId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

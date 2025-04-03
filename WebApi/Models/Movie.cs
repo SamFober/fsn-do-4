@@ -24,5 +24,6 @@ namespace WebApi.Models
 
         public ICollection<Presentation> Presentations { get; set; }
         public ICollection<MovieFormat> Formats { get; set; }
+        public ICollection<Review> Reviews { get; set; }
     }
 }

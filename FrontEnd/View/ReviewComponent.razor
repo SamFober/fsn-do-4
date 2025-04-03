@@ -1,0 +1,200 @@
+﻿@using FrontEnd.Models
+@inject HttpClient httpClient
+@inject IJSRuntime JS
+
+
+<link href="css/movie-detail.css" rel="stylesheet" />
+<link href="css/review.css" rel="stylesheet" />
+
+<h2 class="section-heading">Reviews</h2>
+<!--Form-->
+<div class="formContainer">
+    <form method="post">
+        <div class="row">
+            <div class="col-25">
+                <label for="fname">First Name</label>
+            </div>
+            <div class="col-75">
+                <input type="text" id="fname" name="firstname" placeholder="Your name.." @bind="firstName">
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-25">
+                <label for="email">Email</label>
+            </div>
+            <div class="col-75">
+                <input type="text" id="email" name="email" placeholder="Your email.." @bind="email">
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-25">
+                <label for="rating">Rating</label>
+            </div>
+            <div class="col-75">
+                <!--Star rating-->
+                <div id="divRating" class="rating">
+                    <span id="spanRatingExcellent" title="Excellent" @onclick="() => SetRating(5)">☆</span>
+                    <span id="spanRatingGood" title="Good" @onclick="() => SetRating(4)">☆</span>
+                    <span id="spanRatingFair" title="Fair" @onclick="() => SetRating(3)">☆</span>
+                    <span id="spanRatingPoor" title="Poor" @onclick="() => SetRating(2)">☆</span>
+                    <span id="spanRatingAwful" title="Awful" @onclick="() => SetRating(1)">☆</span>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-25">
+                <label for="review">Review</label>
+            </div>
+            <div class="col-75">
+                <textarea id="review" name="review" placeholder="Write something.." style="height:200px" @bind="review"></textarea>
+            </div>
+        </div>
+        <div class="row">
+            <button type="button" @onclick="SubmitReview">Submit</button>
+        </div>
+    </form>
+
+    <!--View reviews-->
+    @if (reviews != null && reviews.Any())
+    {
+        <div class="reviews-section">
+            @foreach (var review in reviews)
+            {
+                <div class="review-card">
+                    <h4>@review.AuthorName</h4>
+                    <p>@review.Content</p>
+                    <p>Rating: @review.Rating/5</p>
+                    <span>@review.CreatedAt.ToString("dd MMM yyyy")</span>
+                    <button class="delete-button" @onclick="() => DeleteReview(review.Id)">🗑</button>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <p>Er zijn nog geen reviews voor deze film.</p>
+    }
+
+</div>
+
+<!--Script for Star rating-->
+<script>
+    document.getElementById('divRating').addEventListener('click', function(event) {
+    if (event.target.tagName.toLowerCase() != 'span') return;
+
+    if (event.target.classList.contains('rated')) {
+    event.target.classList.remove('rated');
+    } else {
+    Array.prototype.forEach.call(document.getElementsByClassName('rated'), function(el) {
+    el.classList.remove('rated');
+    });
+    event.target.classList.add('rated');
+    }
+    });
+
+    function resetStars() {
+        document.querySelectorAll('.rating span').forEach(function (star) {
+            star.classList.remove('rated');
+        });
+    }
+</script>
+
+@code {
+    //Submit form to DB
+    [Parameter]
+    public int movieId { get; set; }
+
+    string firstName = "";
+    string email = "";
+    string review = "";
+    int rating = 0;
+
+    public void SetRating(int rating)
+    {
+        this.rating = rating;
+    }
+
+    private async Task SubmitReview()
+    {
+        //Check if form is valid
+        if (string.IsNullOrEmpty(firstName) ||
+            string.IsNullOrEmpty(email) ||
+            string.IsNullOrEmpty(review) ||
+            rating == 0)
+        {
+            await JS.InvokeVoidAsync("alert", "Please fill in all fields.");
+            return;
+        }
+
+        if (!IsValidEmail(email))
+        {
+            await JS.InvokeVoidAsync("alert", "Please enter a valid email address.");
+            return;
+        }
+
+        var newReview = new Review()
+            {
+                MovieId = movieId,
+                AuthorName = firstName,
+                Email = email,
+                Rating = rating,
+                Content = review,
+                CreatedAt = DateTime.Now
+            };
+
+        var response = await httpClient.PostAsJsonAsync("api/review", newReview);
+
+        //Reset form
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadReviews();
+            firstName = "";
+            email = "";
+            review = "";
+            rating = 0;
+            await JS.InvokeVoidAsync("resetStars");
+        }
+    }
+
+    private bool IsValidEmail(string email)
+    {
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email);
+            return addr.Address == email;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    //Review list
+    private List<Review> reviews = new List<Review>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReviews();
+    }
+
+    private async Task LoadReviews()
+    {
+        reviews = await httpClient.GetFromJsonAsync<List<Review>>($"api/review/{movieId}");
+    }
+
+    //Delete review
+    private async Task DeleteReview(int reviewId)
+    {
+        var response = await httpClient.DeleteAsync($"api/review/{reviewId}");
+
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadReviews(); //Reloads reviews after deleting
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("alert", "deleting failed.");
+        }
+    }
+
+}

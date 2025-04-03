@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using WebApi.Data;
 using Microsoft.OpenApi.Models;
-using System.Reflection;
-using WebApi.Interfaces.Services;
 using QuestPDF.Infrastructure;
+using System.Reflection;
+using WebApi.Data;
+using WebApi.Interfaces.Services;
 using WebApi.Services;
 using WebApi.Interfaces.Repositories;
 using WebApi.Repositories;
@@ -56,6 +56,8 @@ builder.Services.AddScoped<IMovieService, MovieService>();
 builder.Services.AddScoped<ITicketRepository, TicketRepository>();
 builder.Services.AddScoped<ITicketService, TicketService>();
 builder.Services.AddScoped<IConcessionRepository, ConcessionRepository>();
+builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -69,6 +71,7 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
 
 // Use CORS
 app.UseCors("AllowAll");
