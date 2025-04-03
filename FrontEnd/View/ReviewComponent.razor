@@ -65,6 +65,7 @@
                     <p>@review.Content</p>
                     <p>Rating: @review.Rating/5</p>
                     <span>@review.CreatedAt.ToString("dd MMM yyyy")</span>
+                    <button class="delete-button" @onclick="() => DeleteReview(review.Id)">🗑</button>
                 </div>
             }
         </div>
@@ -181,4 +182,20 @@
     {
         reviews = await httpClient.GetFromJsonAsync<List<Review>>($"api/review/{movieId}");
     }
+
+    //Delete review
+    private async Task DeleteReview(int reviewId)
+    {
+        var response = await httpClient.DeleteAsync($"api/review/{reviewId}");
+
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadReviews(); //Reloads reviews after deleting
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("alert", "deleting failed.");
+        }
+    }
+
 }

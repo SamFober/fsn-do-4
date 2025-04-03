@@ -32,10 +32,17 @@ namespace WebApi.Controllers
             return Ok(reviews);
         }
 
-        public async Task<IActionResult> DeleteReview([FromBody] Review review)
+        [HttpDelete("{reviewId}")]
+        public async Task<IActionResult> DeleteReview(int reviewId)
         {
-            var deletedReview = await _reviewRepository.DeleteReview(review);
-            return Ok(deletedReview);
-        }
+            var review = await _reviewRepository.GetReviewById(reviewId);
+            if (review == null)
+            {
+                return NotFound();
+            }
+
+            await _reviewRepository.DeleteReview(review);
+            return Ok(new {message = "Review succesfully deleted"});
+        }   
     }
 }

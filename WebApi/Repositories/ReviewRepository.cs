@@ -31,5 +31,9 @@ namespace WebApi.Repositories
             await _context.SaveChangesAsync();
             return review;
         }
+        public async Task<Review> GetReviewById(int reviewId)
+        {
+            return await _context.Reviews.FindAsync(reviewId);
+        }
     }
 }
