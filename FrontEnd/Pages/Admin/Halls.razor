@@ -1,0 +1,792 @@
+@page "/admin/halls"
+@layout AdminLayout
+@using FrontEnd.Models
+@using System.ComponentModel.DataAnnotations
+@using FrontEnd.Components
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<PageTitle>Halls Management - Cinemagia</PageTitle>
+
+<div class="admin-container">
+    <div class="page-header">
+        <h1 class="page-title">Hall Management</h1>
+        <p class="page-description">Manage cinema halls and seating arrangements</p>
+    </div>
+    
+    @if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>Loading halls data...</p>
+        </div>
+    }
+    else
+    {
+        <div class="filters-bar">
+            <div class="search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input 
+                    type="text" 
+                    class="form-control"
+                    placeholder="Search halls..." 
+                    @bind="searchQuery" 
+                    @bind:event="oninput" 
+                    @onkeyup="HandleSearchKeyUp" />
+            </div>
+            
+            <div class="filters-section">
+                <select class="filter-select" @bind="selectedStatus">
+                    <option value="">All Status</option>
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                </select>
+                
+                <select class="filter-select" @bind="sortBy">
+                    <option value="id">Sort by ID</option>
+                    <option value="name">Sort by Name</option>
+                    <option value="capacity">Sort by Capacity</option>
+                </select>
+                
+                <button class="filter-btn filter-btn-primary" @onclick="ApplyFilters">
+                    <i class="fas fa-filter"></i>
+                    <span>Apply Filters</span>
+                </button>
+                <button class="filter-btn" @onclick="ResetFilters">
+                    <i class="fas fa-undo"></i>
+                    <span>Reset</span>
+                </button>
+                
+                <button class="filter-btn filter-btn-primary" @onclick="AddNewHall">
+                    <i class="fas fa-plus"></i>
+                    <span>Add New Hall</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h3>All Halls</h3>
+                <div class="card-actions">
+                    <button class="btn-icon" title="Refresh" @onclick="ApplyFilters">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                @if (filteredHalls.Count == 0)
+                {
+                    <div class="table-empty">
+                        <i class="fas fa-film fa-3x"></i>
+                        <p>No halls found matching your filters</p>
+                        <button class="btn-secondary" @onclick="ResetFilters">Clear Filters</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-container">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Capacity</th>
+                                    <th>Rows</th>
+                                    <th>Seats Per Row</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var hall in paginatedHalls)
+                                {
+                                    <tr>
+                                        <td>@hall.Id</td>
+                                        <td>@hall.Name</td>
+                                        <td>@hall.Capacity seats</td>
+                                        <td>@hall.Rows</td>
+                                        <td>@hall.SeatsPerRow</td>
+                                        <td>
+                                            <span class="status-badge @(hall.IsActive ? "status-active" : "status-inactive")">
+                                                @(hall.IsActive ? "Active" : "Inactive")
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                <button class="btn-text" title="View" @onclick="() => ViewHall(hall)">
+                                                    View
+                                                </button>
+                                                <button class="btn-text" title="Edit" @onclick="() => EditHall(hall)">
+                                                   Edit
+                                                </button>
+                                                <button class="btn-text" title="Delete" @onclick="() => DeleteHall(hall)">
+                                                   Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        
+                        <Pagination 
+                            CurrentPage="@currentPage"
+                            PageSize="@pageSize"
+                            TotalItems="@filteredHalls.Count"
+                            OnPageChanged="@HandlePageChange"
+                            OnPageSizeChanged="@HandlePageSizeChange" />
+                    </div>
+                }
+            </div>
+        </div>
+        
+        @* Add/Edit Hall Modal *@
+        @if (showAddEditModal)
+        {
+            <div class="modal-overlay" @onclick="CloseModal"></div>
+            <div class="modal-container modal-md" @onclick:stopPropagation="true">
+                <div class="modal-header">
+                    <h2 class="modal-title">@(editingHall == null ? "Add New Hall" : "Edit Hall")</h2>
+                    <button class="modal-close" @onclick="CloseModal">×</button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="@currentHall" OnValidSubmit="SaveHall">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger mb-3" />
+                        
+                        <div class="form-group mb-3">
+                            <label for="name">Hall Name*</label>
+                            <InputText id="name" class="form-control" @bind-Value="currentHall.Name" />
+                            <ValidationMessage For="@(() => currentHall.Name)" />
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="rows">Rows*</label>
+                            <InputNumber id="rows" class="form-control" @bind-Value="currentHall.Rows" />
+                            <ValidationMessage For="@(() => currentHall.Rows)" />
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="seatsPerRow">Seats Per Row*</label>
+                            <InputNumber id="seatsPerRow" class="form-control" @bind-Value="currentHall.SeatsPerRow" />
+                            <ValidationMessage For="@(() => currentHall.SeatsPerRow)" />
+                        </div>
+                
+                        <div class="form-group mb-3">
+                            <div class="form-check">
+                                <InputCheckbox id="isActive" class="form-check-input" @bind-Value="currentHall.IsActive" />
+                                <label class="form-check-label" for="isActive">Active</label>
+                            </div>
+                        </div>
+                    </EditForm>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" @onclick="CloseModal">
+                        <i class="fas fa-times"></i>
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn-primary" @onclick="SaveHall">
+                        <i class="fas fa-save"></i>
+                        Save Hall
+                    </button>
+                </div>
+            </div>
+        }
+        
+        @* Delete Confirmation Modal *@
+        @if (showDeleteModal && deletingHall != null)
+        {
+            <div class="modal-overlay" @onclick="CloseModal"></div>
+            <div class="modal-container modal-sm" @onclick:stopPropagation="true">
+                <div class="modal-header">
+                    <h2 class="modal-title">Confirm Delete</h2>
+                    <button class="modal-close" @onclick="CloseModal">×</button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the hall "<strong>@deletingHall.Name</strong>"?</p>
+                    <p class="text-danger">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" @onclick="CloseModal">
+                        <i class="fas fa-times"></i>
+                        Cancel
+                    </button>
+                    <button type="button" class="btn-danger" @onclick="ConfirmDeleteHall">
+                        <i class="fas fa-trash"></i>
+                        Delete
+                    </button>
+                </div>
+            </div>
+        }
+        
+        @* View Hall Modal *@
+        @if (showViewModal && viewingHall != null)
+        {
+            <div class="modal-overlay" @onclick="CloseModal"></div>
+            <div class="modal-container modal-lg" @onclick:stopPropagation="true">
+                <div class="modal-header">
+                    <h2 class="modal-title">Hall Details: @viewingHall.Name</h2>
+                    <button class="modal-close" @onclick="CloseModal">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="detail-section">
+                        <h4>General Information</h4>
+                        <dl class="detail-list">
+                            <dt>ID:</dt>
+                            <dd>@viewingHall.Id</dd>
+                            
+                            <dt>Name:</dt>
+                            <dd>@viewingHall.Name</dd>
+                            
+                            <dt>Capacity:</dt>
+                            <dd>@viewingHall.Capacity seats</dd>
+                            
+                            <dt>Rows:</dt>
+                            <dd>@viewingHall.Rows</dd>
+                            
+                            <dt>Seats Per Row:</dt>
+                            <dd>@viewingHall.SeatsPerRow</dd>
+                            
+                            <dt>Status:</dt>
+                            <dd>@(viewingHall.IsActive ? "Active" : "Inactive")</dd>
+                        </dl>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h4>Seating Layout</h4>
+                        <div class="seating-layout">
+                            <div class="screen-label">Screen</div>
+                            @{
+                                char rowLetter = 'A';
+                            }
+                            @for (int i = 0; i < viewingHall.Rows; i++)
+                            {
+                                <div class="hall-seat-row">
+                                    <span class="row-letter">@rowLetter</span>
+                                    @for (int j = 0; j < viewingHall.SeatsPerRow; j++)
+                                    {
+                                        <div class="hall-seat"></div>
+                                    }
+                                </div>
+                                rowLetter++;
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" @onclick="CloseModal">
+                        <i class="fas fa-times"></i>
+                        Close
+                    </button>
+                    <button type="button" class="btn-primary" @onclick="() => EditHall(viewingHall)">
+                        <i class="fas fa-edit"></i>
+                        Edit
+                    </button>
+                </div>
+            </div>
+        }
+    }
+    
+    @if (successMessage != null)
+    {
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i>
+            <span>@successMessage</span>
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+    
+    @if (errorMessage != null)
+    {
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-circle"></i>
+            <span>@errorMessage</span>
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+</div>
+
+<style>
+    .feature-badge {
+        display: inline-block;
+        padding: 3px 6px;
+        margin-right: 5px;
+        border-radius: 4px;
+        background-color: var(--primary-color);
+        color: white;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .hall-preview-large {
+        margin-top: 20px;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .hall-screen {
+        width: 100%;
+        max-width: 600px;
+        padding: 10px;
+        text-align: center;
+        background-color: #111;
+        color: white;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    
+    .hall-seats {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        align-items: center;
+    }
+    
+    .hall-seat-row {
+        display: flex;
+        gap: 5px;
+    }
+    
+    .hall-seat-mini {
+        width: 20px;
+        height: 20px;
+        background-color: var(--primary-color);
+        border-radius: 3px;
+    }
+    
+    .seating-layout {
+        margin-top: 20px;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .screen-label {
+        width: 100%;
+        max-width: 600px;
+        padding: 10px;
+        text-align: center;
+        background-color: #111;
+        color: white;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    
+    .hall-seat {
+        width: 20px;
+        height: 20px;
+        background-color: var(--primary-color);
+        border-radius: 3px;
+    }
+    
+    .row-letter {
+        display: inline-block;
+        padding: 3px 6px;
+        margin-right: 5px;
+        border-radius: 4px;
+        background-color: var(--primary-color);
+        color: white;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+</style>
+
+@code {
+    private bool isLoading = true;
+    private string? errorMessage = null;
+    private string? successMessage = null;
+    
+    // Hall data
+    private List<HallViewModel> halls = new();
+    private List<HallViewModel> filteredHalls => GetFilteredHalls();
+    
+    // Filters
+    private string searchQuery = "";
+    private string selectedStatus = "";
+    private string sortBy = "id";
+    
+    // Modal states
+    private bool showAddEditModal = false;
+    private bool showDeleteModal = false;
+    private bool showViewModal = false;
+    private HallViewModel? editingHall = null;
+    private HallViewModel? deletingHall = null;
+    private HallViewModel? viewingHall = null;
+    
+    // Form data
+    private HallFormModel currentHall = new();
+    
+    // Random for generating sample data
+    private Random random = new Random();
+    
+    // Pagination
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalPages => (int)Math.Ceiling(filteredHalls.Count / (double)pageSize);
+    
+    private List<HallViewModel> paginatedHalls => filteredHalls
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+    
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+            await LoadData();
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading halls: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private async Task LoadData()
+    {
+        try
+        {
+            // Fetch halls data from the API
+            var apiResponse = await Http.GetFromJsonAsync<List<ApiHallResponse>>("api/halls");
+            
+            if (apiResponse != null)
+            {
+                // Map API response to our view model
+                halls = apiResponse.Select(h => new HallViewModel
+                {
+                    Id = h.Id,
+                    Name = h.Name,
+                    Capacity = h.Capacity,
+                    // Use actual values from API rather than calculating
+                    Rows = h.Rows,
+                    SeatsPerRow = h.SeatsPerRow,
+                    IsActive = h.IsActive,
+                    Description = h.Description ?? $"Hall with {h.Capacity} seats.", // Use API description or fallback
+                    // Set layout based on name for visualization
+                    Layout = h.Name.Contains("IMAX") ? "IMAX" : (h.Name.Contains("4DX") ? "4DX" : "Standard"),
+                    CreatedAt = h.CreatedAt,
+                    UpdatedAt = h.UpdatedAt,
+                    Seats = h.Seats?.Select(s => new SeatInfo 
+                    { 
+                        Id = s.Id, 
+                        RowNumber = s.RowNumber, 
+                        SeatNumber = s.SeatNumber 
+                    }).ToList() ?? new List<SeatInfo>()
+                }).ToList();
+            }
+            else
+            {
+                errorMessage = "Failed to load halls from API";
+                halls = new List<HallViewModel>();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading halls: {ex.Message}";
+            halls = new List<HallViewModel>();
+        }
+    }
+    
+    private void ApplyFilters()
+    {
+        // The GetFilteredHalls method will use these filters
+        // Simply calling StateHasChanged will cause the UI to refresh
+        // and use the GetFilteredHalls method with the current filters
+        
+        // Force a UI refresh
+        StateHasChanged();
+    }
+    
+    private void ResetFilters()
+    {
+        searchQuery = "";
+        selectedStatus = "";
+        sortBy = "id";
+        ApplyFilters();
+    }
+    
+    private async Task HandleSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await Task.Delay(1); // Ensure the search query is updated
+            ApplyFilters();
+        }
+    }
+    
+    private void AddNewHall()
+    {
+        editingHall = null;
+        currentHall = new HallFormModel
+        {
+            IsActive = true,
+            Layout = "Standard",
+            Capacity = 100
+        };
+        showAddEditModal = true;
+    }
+    
+    private void EditHall(HallViewModel hall)
+    {
+        editingHall = hall;
+        currentHall = new HallFormModel
+        {
+            Id = hall.Id,
+            Name = hall.Name,
+            Capacity = hall.Capacity,
+            Layout = hall.Layout,
+            Description = hall.Description,
+            IsActive = hall.IsActive,
+            Rows = hall.Rows,
+            SeatsPerRow = hall.SeatsPerRow,
+        };
+        showAddEditModal = true;
+    }
+    
+    private void ViewHall(HallViewModel hall)
+    {
+        viewingHall = hall;
+        showViewModal = true;
+    }
+    
+    private void DeleteHall(HallViewModel hall)
+    {
+        deletingHall = hall;
+        showDeleteModal = true;
+    }
+    
+    private async Task SaveHall()
+    {
+        try
+        {
+            if (editingHall == null)
+            {
+                // Creating a new hall
+                var createRequest = new
+                {
+                    Name = currentHall.Name,
+                    Rows = currentHall.Rows,
+                    SeatsPerRow = currentHall.SeatsPerRow,
+                    IsActive = currentHall.IsActive,
+                    Description = currentHall.Description
+                };
+
+                // Call the API to create the hall
+                var response = await Http.PostAsJsonAsync("api/halls", createRequest);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var createdHall = await response.Content.ReadFromJsonAsync<ApiHallResponse>();
+                    successMessage = $"Hall '{currentHall.Name}' has been created successfully.";
+                    
+                    // Refresh the data
+                    await LoadData();
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    throw new Exception($"Failed to create hall. Status: {response.StatusCode}, Error: {errorContent}");
+                }
+            }
+            else
+            {
+                // Updating an existing hall
+                var updateRequest = new
+                {
+                    Name = currentHall.Name,
+                    Rows = currentHall.Rows,
+                    SeatsPerRow = currentHall.SeatsPerRow,
+                    IsActive = currentHall.IsActive,
+                    Description = currentHall.Description
+                };
+                
+                // Call the API to update the hall
+                var response = await Http.PutAsJsonAsync($"api/halls/{editingHall.Id}", updateRequest);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    successMessage = $"Hall '{currentHall.Name}' has been updated successfully.";
+                    
+                    // Refresh the data
+                    await LoadData();
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    throw new Exception($"Failed to update hall. Status: {response.StatusCode}, Error: {errorContent}");
+                }
+            }
+            
+            // Close the modal and refresh the list
+            CloseModal();
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving hall: {ex.Message}";
+        }
+    }
+    
+    private async Task ConfirmDeleteHall()
+    {
+        if (deletingHall == null) return;
+        
+        try
+        {
+            // Call the API to delete the hall
+            var response = await Http.DeleteAsync($"api/halls/{deletingHall.Id}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = $"Hall '{deletingHall.Name}' has been deleted successfully.";
+                
+                // Refresh the data
+                await LoadData();
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                throw new Exception($"Failed to delete hall. Status: {response.StatusCode}, Error: {errorContent}");
+            }
+            
+            CloseModal();
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting hall: {ex.Message}";
+        }
+    }
+    
+    private void CloseModal()
+    {
+        showAddEditModal = false;
+        showDeleteModal = false;
+        showViewModal = false;
+        editingHall = null;
+        deletingHall = null;
+        viewingHall = null;
+        currentHall = new HallFormModel();
+    }
+    
+    // Filter halls based on search and status
+    private List<HallViewModel> GetFilteredHalls()
+    {
+        // Start with all halls
+        var query = halls.AsQueryable();
+        
+        // Apply search query
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            query = query.Where(h => 
+                h.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                h.Layout.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                (h.Description != null && h.Description.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)));
+        }
+        
+        // Apply status filter
+        if (!string.IsNullOrWhiteSpace(selectedStatus))
+        {
+            bool isActive = selectedStatus == "true";
+            query = query.Where(h => h.IsActive == isActive);
+        }
+        
+        // Apply sorting
+        query = sortBy switch
+        {
+            "name" => query.OrderBy(h => h.Name),
+            "capacity" => query.OrderByDescending(h => h.Capacity),
+            _ => query.OrderBy(h => h.Id)
+        };
+        
+        // Return the filtered and sorted results
+        return query.ToList();
+    }
+    
+    // Hall view model
+    private class HallViewModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public int Capacity { get; set; }
+        public bool IsActive { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+        public string? Description { get; set; }
+        public int Rows { get; set; }
+        public int SeatsPerRow { get; set; }
+        public string Layout { get; set; } = "";
+        public List<SeatInfo> Seats { get; set; } = new List<SeatInfo>();
+    }
+    
+    // API response model from Hall controller
+    private class ApiHallResponse
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public int Rows { get; set; }
+        public int SeatsPerRow { get; set; }
+        public int Capacity { get; set; }
+        public bool IsActive { get; set; }
+        public string? Description { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+        public List<ApiSeatInfo>? Seats { get; set; }
+    }
+    
+    public class ApiSeatInfo
+    {
+        public int Id { get; set; }
+        public int RowNumber { get; set; }
+        public int SeatNumber { get; set; }
+    }
+    
+    public class SeatInfo
+    {
+        public int Id { get; set; }
+        public int RowNumber { get; set; }
+        public int SeatNumber { get; set; }
+    }
+    
+    // Form model for hall creation/editing
+    private class HallFormModel
+    {
+        [Required(ErrorMessage = "Hall name is required")]
+        [StringLength(100, ErrorMessage = "Hall name cannot exceed 100 characters")]
+        public string Name { get; set; } = "";
+        
+        [Required(ErrorMessage = "Capacity is required")]
+        [Range(1, 1000, ErrorMessage = "Capacity must be between 1 and 1000")]
+        public int Capacity { get; set; } = 100;
+        
+        public string? Description { get; set; }
+        public int Rows { get; set; } = 10;
+        public int SeatsPerRow { get; set; } = 10;
+        public bool IsActive { get; set; } = true;
+        public int Id { get; set; }
+        public string Layout { get; set; } = "Standard";
+    }
+    
+    private void HandlePageChange(int page)
+    {
+        currentPage = page;
+        StateHasChanged();
+    }
+    
+    private void HandlePageSizeChange(int size)
+    {
+        pageSize = size;
+        currentPage = 1; // Reset to first page when changing page size
+        StateHasChanged();
+    }
+} 

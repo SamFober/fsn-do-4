@@ -12,6 +12,8 @@ namespace WebApi.Interfaces.Repositories
         Task RemoveSeatLocks(List<SeatLock> locks);
         Task<bool> AddSeatLocks(List<SeatLock> locks);
         Task<TicketOrder?> GetOrderByToken(Guid orderToken, bool includeItems = false);
+        Task<TicketOrder?> GetOnlineOrderByToken(Guid orderToken, bool includeItems = false);
+        Task<TicketOrder?> GetOnlineOrderByMolliePaymentid(string molliePaymentId, bool includeItems = false);
         Task<bool> SaveOrder(TicketOrder order);
         Task<List<Ticket>> CreateTickets(List<Ticket> tickets);
         Task<List<SeatLock>> GetLocksByOrderAndSeat(Guid orderToken, int seatId);
@@ -27,6 +29,6 @@ namespace WebApi.Interfaces.Repositories
         Task<List<SeatLock>> GetLocksByOrder(string orderToken);
         Task<ConcessionItem?> GetConcessionById(int concessionItemId);
         Task<bool> AddConcessionToOrder(OrderConcessionItem orderConcessionItem);
-        Task<List<OrderConcessionItem>?> FindConcessionItemsByOrderToken(Guid orderToken);
+        Task<List<OrderConcessionItem>> FindConcessionItemsByOrderToken(Guid orderToken);
     }
 }

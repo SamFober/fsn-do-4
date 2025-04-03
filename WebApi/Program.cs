@@ -50,12 +50,16 @@ builder.Services.AddMemoryCache(); // For seat locking
 builder.Services.AddScoped<IMailService, MailServiceMailKit>();
 builder.Services.AddScoped<ITicketPdfService, TicketPdfServiceQuestPdf>();
 
+builder.Services.AddScoped<IPaymentService, MolliePaymentService>();
+
 builder.Services.AddScoped<IMovieRepository, MovieRepository>();
 builder.Services.AddScoped<IMovieService, MovieService>();
 
 builder.Services.AddScoped<ITicketRepository, TicketRepository>();
 builder.Services.AddScoped<ITicketService, TicketService>();
 builder.Services.AddScoped<IConcessionRepository, ConcessionRepository>();
+builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -69,6 +73,7 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
 
 // Use CORS
 app.UseCors("AllowAll");

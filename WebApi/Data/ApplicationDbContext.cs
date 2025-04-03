@@ -17,6 +17,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<Presentation> Presentations { get; set; } = null!;
     public DbSet<Ticket> Tickets { get; set; } = null!;
     public DbSet<TicketOrder> TicketOrders { get; set; } = null!;
+    public DbSet<Customer> Customers { get; set; }
+    public DbSet<Payment> Payments { get; set; }
     public DbSet<TicketOrderItem> TicketOrderItems { get; set; } = null!;
     public DbSet<SeatLock> SeatLocks { get; set; } = null!;
     public DbSet<MovieFormat> MovieFormats { get; set; } = null!;
@@ -89,7 +91,7 @@ public class ApplicationDbContext : DbContext
             .HasOne(oci => oci.Order)
             .WithMany(o => o.ConcessionItems)
             .HasForeignKey(oci => oci.OrderId)
-            .OnDelete(DeleteBehavior.Cascade); 
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<OrderConcessionItem>()
             .HasOne(oci => oci.ConcessionItem)

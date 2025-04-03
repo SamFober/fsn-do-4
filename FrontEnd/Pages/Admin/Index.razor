@@ -1,0 +1,1003 @@
+@page "/admin"
+@layout AdminLayout
+@using FrontEnd.Models
+@using System.Text.Json
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<PageTitle>Dashboard - Cinemagia</PageTitle>
+
+<link href="css/admin.css" rel="stylesheet" />
+
+<div class="admin-dashboard">
+    @if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>Loading dashboard data...</p>
+        </div>
+    }
+    else
+    {
+        <!-- Quick Stats Row -->
+        <div class="dashboard-grid">
+            <div class="col-3">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h3>Total Movies</h3>
+                        <div class="card-actions">
+                            <button class="btn-icon" title="Refresh" @onclick="RefreshMoviesData">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="stat-value">@(moviesCount)</div>
+                        <div class="stat-description">Active movies in the database</div>
+                        <div class="trend-indicator @GetTrendClass(moviesGrowth)">
+                            <i class="@GetTrendIcon(moviesGrowth)"></i>
+                            <span>@Math.Abs(moviesGrowth)% from last month</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-3">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h3>Total Tickets</h3>
+                        <div class="card-actions">
+                            <button class="btn-icon" title="Refresh" @onclick="RefreshTicketsData">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="stat-value">@(ticketsCount)</div>
+                        <div class="stat-description">Tickets sold this month</div>
+                        <div class="trend-indicator @GetTrendClass(ticketsGrowth)">
+                            <i class="@GetTrendIcon(ticketsGrowth)"></i>
+                            <span>@Math.Abs(ticketsGrowth)% from last month</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-3">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h3>Revenue</h3>
+                        <div class="card-actions">
+                            <button class="btn-icon" title="Refresh" @onclick="RefreshRevenueData">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="stat-value">€@(revenue.ToString("N0"))</div>
+                        <div class="stat-description">Total revenue this month</div>
+                        <div class="trend-indicator @GetTrendClass(revenueGrowth)">
+                            <i class="@GetTrendIcon(revenueGrowth)"></i>
+                            <span>@Math.Abs(revenueGrowth)% from last month</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-3">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h3>Presentations</h3>
+                        <div class="card-actions">
+                            <button class="btn-icon" title="Refresh" @onclick="RefreshPresentationsData">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="stat-value">@(presentationsCount)</div>
+                        <div class="stat-description">Active presentations</div>
+                        <div class="trend-indicator @GetTrendClass(presentationsGrowth)">
+                            <i class="@GetTrendIcon(presentationsGrowth)"></i>
+                            <span>@Math.Abs(presentationsGrowth)% from last month</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts & Tables Row -->
+        <div class="dashboard-grid">
+            <!-- Revenue Chart -->
+            <div class="col-8">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h3>Revenue Overview</h3>
+                        <div class="card-actions">
+                            <select class="filter-select" @onchange="OnRevenueTimeRangeChanged">
+                                <option value="7" selected>Last 7 days</option>
+                                <option value="30">Last 30 days</option>
+                                <option value="90">Last 90 days</option>
+                                <option value="365">This year</option>
+                            </select>
+                            <button class="btn-icon" title="Download" @onclick="DownloadRevenueChart">
+                                <i class="fas fa-download"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        @if (loadingCharts)
+                        {
+                            <div class="loading-container">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <span>Loading chart data...</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="chart-container">
+                                <!-- Chart will be rendered by JS -->
+                                <canvas id="revenueChartCanvas"></canvas>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Movie Performance -->
+            <div class="col-4">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h3>Top Movies</h3>
+                        <div class="card-actions">
+                            <select class="filter-select" @onchange="OnMovieChartMetricChanged">
+                                <option value="tickets" selected>By Tickets</option>
+                                <option value="revenue">By Revenue</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        @if (loadingCharts)
+                        {
+                            <div class="loading-container">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <span>Loading chart data...</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="chart-container">
+                                <!-- Chart will be rendered by JS -->
+                                <canvas id="movieChartCanvas"></canvas>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Orders -->
+        <div class="dashboard-grid">
+            <div class="col-12">
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h3>Recent Orders</h3>
+                        <div class="card-actions">
+                            <a href="/admin/orders" class="btn-secondary">
+                                <i class="fas fa-eye"></i>
+                                <span>View All</span>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        @if (loadingOrders)
+                        {
+                            <div class="loading-container">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <span>Loading orders...</span>
+                            </div>
+                        }
+                        else if (recentOrders.Count == 0)
+                        {
+                            <div class="table-empty">
+                                <i class="fas fa-inbox fa-3x"></i>
+                                <p>No recent orders found</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-container">
+                                <table class="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Order ID</th>
+                                            <th>Customer</th>
+                                            <th>Movie</th>
+                                            <th>Date</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var order in recentOrders)
+                                        {
+                                            <tr>
+                                                <td>@order.Id</td>
+                                                <td>@order.Customer</td>
+                                                <td>@order.Movie</td>
+                                                <td>@order.Date.ToShortDateString()</td>
+                                                <td>€@order.Amount.ToString("N2")</td>
+                                                <td>
+                                                    <span class="status-badge @GetStatusClass(order.Status)">
+                                                        @order.Status
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div class="action-buttons">
+                                                        <button class="btn-icon" title="View" @onclick="() => ViewOrder(order)">
+                                                            <i class="fas fa-eye"></i>
+                                                        </button>
+                                                        <button class="btn-icon" title="Email" @onclick="() => ResendEmail(order)">
+                                                            <i class="fas fa-envelope"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (errorMessage != null)
+        {
+            <div class="alert alert-danger mt-3">
+                <strong>Error:</strong> @errorMessage
+                <button type="button" class="btn-close float-end" @onclick="() => errorMessage = null"></button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private bool isLoading = true;
+    private bool loadingCharts = true;
+    private bool loadingOrders = true;
+    private string? errorMessage = null;
+    
+    // Statistics
+    private int moviesCount = 0;
+    private int ticketsCount = 0;
+    private decimal revenue = 0;
+    private int presentationsCount = 0;
+    
+    // Growth statistics (as percentage)
+    private int moviesGrowth = 12;
+    private int ticketsGrowth = 8;
+    private int revenueGrowth = 15;
+    private int presentationsGrowth = 0;
+    
+    // Chart data
+    private string revenueTimeRange = "7"; // days
+    private string movieChartMetric = "tickets"; // or "revenue"
+    
+    // Chart data objects
+    private object? revenueChartData;
+    private object? movieChartData;
+    
+    // Sample data for the recent orders table
+    private List<OrderViewModel> recentOrders = new List<OrderViewModel>();
+    
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+            
+            // Load all data asynchronously
+            var statsTask = LoadDashboardStats();
+            var ordersTask = LoadRecentOrders();
+            var chartDataTask = LoadChartData();
+            
+            await Task.WhenAll(statsTask, ordersTask, chartDataTask);
+            
+            // Charts will be initialized later in OnAfterRenderAsync
+            // We don't need to call InitializeCharts() here
+            
+            isLoading = false;
+            
+            // Make sure we start with sample data if we didn't get data from the API
+            if (recentOrders.Count == 0)
+            {
+                LoadSampleOrders();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading dashboard: {ex.Message}";
+            isLoading = false;
+        }
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await InitializeChartsAsync();
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Error initializing charts: {ex.Message}";
+                loadingCharts = false;
+                StateHasChanged();
+            }
+        }
+    }
+    
+    private async Task LoadDashboardStats()
+    {
+        try
+        {
+            // Fetch statistics from API
+            var response = await Http.GetAsync("api/admin/stats");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var stats = await response.Content.ReadFromJsonAsync<DashboardStats>();
+                if (stats != null)
+                {
+                    // Update dashboard stats
+                    moviesCount = stats.MoviesCount;
+                    moviesGrowth = (int)stats.MoviesGrowthPercent;
+                    
+                    ticketsCount = stats.TicketsCount;
+                    ticketsGrowth = (int)stats.TicketsGrowthPercent;
+                    
+                    revenue = stats.RevenueTotal;
+                    revenueGrowth = (int)stats.RevenueGrowthPercent;
+                    
+                    presentationsCount = stats.PresentationsCount;
+                    presentationsGrowth = (int)stats.PresentationsGrowthPercent;
+                }
+                else
+                {
+                    // Fallback to sample data
+                    SetSampleStats();
+                }
+            }
+            else
+            {
+                Console.WriteLine($"Failed to fetch stats: {response.StatusCode}");
+                // Fallback to sample data
+                SetSampleStats();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception loading stats: {ex.Message}");
+            // Fallback to sample data
+            SetSampleStats();
+        }
+    }
+    
+    private void SetSampleStats()
+    {
+        // Default sample stats
+        moviesCount = 28;
+        moviesGrowth = (int)12.5;
+        
+        ticketsCount = 854;
+        ticketsGrowth = (int)23.7;
+        
+        revenue = 25450.75m;
+        revenueGrowth = (int)18.2;
+        
+        presentationsCount = 145;
+        presentationsGrowth = (int)5.3;
+    }
+    
+    private async Task LoadRecentOrders()
+    {
+        try
+        {
+            loadingOrders = true;
+            
+            // Fetch recent orders from API
+            var response = await Http.GetAsync("api/orders/recent");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var apiOrders = await response.Content.ReadFromJsonAsync<List<OrderViewModel>>();
+                if (apiOrders != null && apiOrders.Any())
+                {
+                    recentOrders = apiOrders;
+                    loadingOrders = false;
+                    return;
+                }
+            }
+            
+            // If we get here, either the request failed or returned no data
+            Console.WriteLine($"Failed to fetch recent orders: {response.StatusCode}");
+            LoadSampleOrders();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception loading recent orders: {ex.Message}");
+            LoadSampleOrders();
+        }
+        finally
+        {
+            loadingOrders = false;
+        }
+    }
+    
+    private void LoadSampleOrders()
+    {
+        Console.WriteLine("Loading sample orders data");
+        // Sample order data for demo
+        recentOrders = new List<OrderViewModel>
+        {
+            new OrderViewModel 
+            { 
+                Id = "ORD-9385", 
+                Customer = "John Doe", 
+                Movie = "Inception", 
+                Date = DateTime.Now.AddDays(-1), 
+                Amount = 45.90m, 
+                Status = "Completed" 
+            },
+            new OrderViewModel 
+            { 
+                Id = "ORD-9384", 
+                Customer = "Jane Smith", 
+                Movie = "The Dark Knight", 
+                Date = DateTime.Now.AddDays(-1), 
+                Amount = 32.50m, 
+                Status = "Completed" 
+            },
+            new OrderViewModel 
+            { 
+                Id = "ORD-9383", 
+                Customer = "Bob Johnson", 
+                Movie = "Interstellar", 
+                Date = DateTime.Now.AddDays(-2), 
+                Amount = 65.75m, 
+                Status = "Completed" 
+            },
+            new OrderViewModel 
+            { 
+                Id = "ORD-9382", 
+                Customer = "Alice Brown", 
+                Movie = "The Godfather", 
+                Date = DateTime.Now.AddDays(-2), 
+                Amount = 28.50m, 
+                Status = "Processing" 
+            },
+            new OrderViewModel 
+            { 
+                Id = "ORD-9381", 
+                Customer = "David Wilson", 
+                Movie = "Pulp Fiction", 
+                Date = DateTime.Now.AddDays(-3), 
+                Amount = 38.25m, 
+                Status = "Completed" 
+            }
+        };
+    }
+    
+    private async Task LoadChartData()
+    {
+        try
+        {
+            Console.WriteLine("Fetching chart data from API...");
+            
+            // Fetch chart data from API with the current time range
+            var response = await Http.GetAsync($"api/admin/chart-data?timeRange={revenueTimeRange}&metric={movieChartMetric}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var chartData = await response.Content.ReadFromJsonAsync<ChartDataResponse>();
+                if (chartData != null)
+                {
+                    // Store the chart data for use during initialization
+                    revenueChartData = chartData.RevenueData;
+                    movieChartData = chartData.MovieData;
+                    Console.WriteLine("Successfully loaded chart data from API");
+                    return;
+                }
+            }
+            
+            Console.WriteLine($"Failed to fetch chart data: {response.StatusCode}");
+            // Fallback to sample data if API call fails
+            CreateSampleChartData();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception loading chart data: {ex.Message}");
+            // Fallback to sample data if there's an exception
+            CreateSampleChartData();
+        }
+    }
+    
+    private void CreateSampleChartData()
+    {
+        Console.WriteLine("Creating sample chart data");
+        
+        // Sample revenue chart data
+        revenueChartData = new
+        {
+            labels = new[] { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" },
+            datasets = new[]
+            {
+                new
+                {
+                    label = "Revenue (€)",
+                    data = new[] { 2150, 1890, 2340, 3120, 3450, 2980, 2720 },
+                    borderColor = "#f5c518",
+                    backgroundColor = "rgba(245, 197, 24, 0.1)",
+                    borderWidth = 2,
+                    fill = true
+                }
+            }
+        };
+        
+        // Sample movie chart data
+        movieChartData = new
+        {
+            labels = new[] { "Inception", "Dark Knight", "Interstellar", "Pulp Fiction", "The Godfather" },
+            datasets = new[]
+            {
+                new
+                {
+                    label = "Tickets Sold",
+                    data = new[] { 350, 290, 260, 240, 180 },
+                    backgroundColor = new[] { "#4e73df", "#1cc88a", "#36b9cc", "#f6c23e", "#e74a3b" },
+                    borderWidth = 1
+                }
+            }
+        };
+    }
+    
+    private async Task InitializeChartsAsync()
+    {
+        loadingCharts = true;
+        StateHasChanged();
+        
+        try
+        {
+            Console.WriteLine("Starting chart initialization...");
+            
+            // If we don't have chart data yet, fetch it
+            if (revenueChartData == null || movieChartData == null)
+            {
+                await LoadChartData();
+            }
+            
+            // Convert to JSON
+            var revenueChartJson = JsonSerializer.Serialize(revenueChartData);
+            var movieChartJson = JsonSerializer.Serialize(movieChartData);
+            
+            // Give a longer delay to ensure DOM elements and Chart.js are ready
+            Console.WriteLine("Waiting for DOM elements to be ready...");
+            await Task.Delay(1000);
+            
+            // First make sure loadingCharts is set to false so the canvas elements are visible
+            loadingCharts = false;
+            StateHasChanged();
+            
+            // Additional delay after DOM update
+            await Task.Delay(500);
+            
+            // Call the JavaScript function
+            Console.WriteLine("Calling initializeAdminCharts...");
+            var result = await JS.InvokeAsync<bool>("initializeAdminCharts", revenueChartJson, movieChartJson);
+            
+            if (result)
+            {
+                Console.WriteLine("Charts initialized successfully");
+            }
+            else
+            {
+                Console.WriteLine("Charts initialization failed");
+                errorMessage = "Failed to initialize charts. Please try refreshing the page.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing charts: {ex.Message}");
+            errorMessage = $"Error initializing charts: {ex.Message}";
+            loadingCharts = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task OnRevenueTimeRangeChanged(ChangeEventArgs e)
+    {
+        if (e.Value != null)
+        {
+            revenueTimeRange = e.Value.ToString() ?? "7";
+            
+            try
+            {
+                loadingCharts = true;
+                StateHasChanged();
+                
+                // Fetch new data for the selected time range
+                var response = await Http.GetAsync($"api/admin/chart-data?timeRange={revenueTimeRange}&metric={movieChartMetric}");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var chartData = await response.Content.ReadFromJsonAsync<ChartDataResponse>();
+                    if (chartData?.RevenueData != null)
+                    {
+                        // Update the chart with new data
+                        var revenueChartJson = JsonSerializer.Serialize(chartData.RevenueData);
+                        await JS.InvokeVoidAsync("updateRevenueChart", revenueChartJson);
+                        Console.WriteLine("Updated revenue chart with new data");
+                    }
+                }
+                else
+                {
+                    // If API call fails, use the JavaScript function that has hardcoded data
+                    await JS.InvokeVoidAsync("updateRevenueChartRange", revenueTimeRange);
+                    Console.WriteLine("Using fallback data for revenue chart update");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating revenue chart: {ex.Message}");
+                // Fallback to the client-side update
+                await JS.InvokeVoidAsync("updateRevenueChartRange", revenueTimeRange);
+            }
+            finally
+            {
+                loadingCharts = false;
+                StateHasChanged();
+            }
+        }
+    }
+    
+    private async Task OnMovieChartMetricChanged(ChangeEventArgs e)
+    {
+        if (e.Value != null)
+        {
+            movieChartMetric = e.Value.ToString() ?? "tickets";
+            
+            try
+            {
+                loadingCharts = true;
+                StateHasChanged();
+                
+                // Fetch new data for the selected metric
+                var response = await Http.GetAsync($"api/admin/chart-data?timeRange={revenueTimeRange}&metric={movieChartMetric}");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var chartData = await response.Content.ReadFromJsonAsync<ChartDataResponse>();
+                    if (chartData?.MovieData != null)
+                    {
+                        // Update the chart with new data
+                        var movieChartJson = JsonSerializer.Serialize(chartData.MovieData);
+                        await JS.InvokeVoidAsync("updateMovieChart", movieChartJson);
+                        Console.WriteLine("Updated movie chart with new data");
+                    }
+                }
+                else
+                {
+                    // If API call fails, use the JavaScript function that has hardcoded data
+                    await JS.InvokeVoidAsync("updateMovieChartMetric", movieChartMetric);
+                    Console.WriteLine("Using fallback data for movie chart update");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating movie chart: {ex.Message}");
+                // Fallback to the client-side update
+                await JS.InvokeVoidAsync("updateMovieChartMetric", movieChartMetric);
+            }
+            finally
+            {
+                loadingCharts = false;
+                StateHasChanged();
+            }
+        }
+    }
+    
+    private string GetStatusClass(string status)
+    {
+        return status.ToLower() switch
+        {
+            "completed" => "status-active",
+            "processing" => "status-pending",
+            "cancelled" => "status-error",
+            _ => "status-inactive"
+        };
+    }
+    
+    private string GetTrendClass(int growth)
+    {
+        return growth switch
+        {
+            > 0 => "trend-up",
+            < 0 => "trend-down",
+            _ => "trend-neutral"
+        };
+    }
+    
+    private string GetTrendIcon(double growth)
+    {
+        return growth >= 0 ? "fas fa-arrow-up" : "fas fa-arrow-down";
+    }
+    
+    private void ViewOrder(OrderViewModel order)
+    {
+        // View order implementation
+    }
+    
+    private void EditOrder(OrderViewModel order)
+    {
+        // Edit order implementation
+    }
+    
+    private void DeleteOrder(OrderViewModel order)
+    {
+        // Delete order implementation
+    }
+    
+    // View model for orders in the admin dashboard
+    public class OrderViewModel
+    {
+        public string Id { get; set; } = "";
+        public string Customer { get; set; } = "";
+        public string Movie { get; set; } = "";
+        public DateTime Date { get; set; }
+        public decimal Amount { get; set; }
+        public string Status { get; set; } = "";
+    }
+    
+    // Models for dashboard data
+    public class DashboardStats
+    {
+        public int MoviesCount { get; set; }
+        public double MoviesGrowthPercent { get; set; }
+        
+        public int TicketsCount { get; set; }
+        public double TicketsGrowthPercent { get; set; }
+        
+        public decimal RevenueTotal { get; set; }
+        public double RevenueGrowthPercent { get; set; }
+        
+        public int PresentationsCount { get; set; }
+        public double PresentationsGrowthPercent { get; set; }
+    }
+    
+    public class ChartDataResponse
+    {
+        public object? RevenueData { get; set; }
+        public object? MovieData { get; set; }
+    }
+
+    // Add the missing methods
+    private async Task RefreshMoviesData()
+    {
+        try
+        {
+            // Show spinner in the card
+            await JS.InvokeVoidAsync("showRefreshSpinner", "movies-card");
+            
+            // Fetch updated data from API
+            var response = await Http.GetAsync("api/admin/stats/movies");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var data = await response.Content.ReadFromJsonAsync<MovieStats>();
+                if (data != null)
+                {
+                    moviesCount = data.Count;
+                    moviesGrowth = data.GrowthPercent;
+                }
+            }
+            
+            // Hide spinner
+            await JS.InvokeVoidAsync("hideRefreshSpinner", "movies-card");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error refreshing movies data: {ex.Message}");
+            // Just keep the current data
+        }
+    }
+    
+    private async Task RefreshTicketsData()
+    {
+        try
+        {
+            // Show spinner in the card
+            await JS.InvokeVoidAsync("showRefreshSpinner", "tickets-card");
+            
+            // Fetch updated data from API
+            var response = await Http.GetAsync("api/admin/stats/tickets");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var data = await response.Content.ReadFromJsonAsync<TicketStats>();
+                if (data != null)
+                {
+                    ticketsCount = data.Count;
+                    ticketsGrowth = data.GrowthPercent;
+                }
+            }
+            
+            // Hide spinner
+            await JS.InvokeVoidAsync("hideRefreshSpinner", "tickets-card");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error refreshing tickets data: {ex.Message}");
+            // Just keep the current data
+        }
+    }
+    
+    private async Task RefreshRevenueData()
+    {
+        try
+        {
+            // Show spinner in the card
+            await JS.InvokeVoidAsync("showRefreshSpinner", "revenue-card");
+            
+            // Fetch updated data from API
+            var response = await Http.GetAsync("api/admin/stats/revenue");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var data = await response.Content.ReadFromJsonAsync<RevenueStats>();
+                if (data != null)
+                {
+                    revenue = data.Amount;
+                    revenueGrowth = data.GrowthPercent;
+                }
+            }
+            
+            // Hide spinner
+            await JS.InvokeVoidAsync("hideRefreshSpinner", "revenue-card");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error refreshing revenue data: {ex.Message}");
+            // Just keep the current data
+        }
+    }
+    
+    private async Task RefreshPresentationsData()
+    {
+        try
+        {
+            // Show spinner in the card
+            await JS.InvokeVoidAsync("showRefreshSpinner", "presentations-card");
+            
+            // Fetch updated data from API
+            var response = await Http.GetAsync("api/admin/stats/presentations");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var data = await response.Content.ReadFromJsonAsync<PresentationStats>();
+                if (data != null)
+                {
+                    presentationsCount = data.Count;
+                    presentationsGrowth = data.GrowthPercent;
+                }
+            }
+            
+            // Hide spinner
+            await JS.InvokeVoidAsync("hideRefreshSpinner", "presentations-card");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error refreshing presentations data: {ex.Message}");
+            // Just keep the current data
+        }
+    }
+    
+    private async Task DownloadRevenueChart()
+    {
+        try
+        {
+            // Call JavaScript function to download the chart as an image
+            await JS.InvokeVoidAsync("downloadChart", "revenueChartCanvas", "revenue_chart.png");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error downloading chart: {ex.Message}");
+            errorMessage = $"Error downloading chart: {ex.Message}";
+        }
+    }
+    
+    private async Task ResendEmail(OrderViewModel order)
+    {
+        try
+        {
+            // Call API to resend email
+            var response = await Http.PostAsync($"api/orders/{order.Id}/resend-email", null);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                await JS.InvokeVoidAsync("alert", $"Confirmation email resent for order {order.Id}");
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                throw new Exception($"API returned status code {response.StatusCode}: {error}");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error resending email: {ex.Message}";
+        }
+    }
+    
+    // Additional stats classes
+    public class MovieStats
+    {
+        public int Count { get; set; }
+        public int GrowthPercent { get; set; }
+    }
+    
+    public class TicketStats
+    {
+        public int Count { get; set; }
+        public int GrowthPercent { get; set; }
+    }
+    
+    public class RevenueStats
+    {
+        public decimal Amount { get; set; }
+        public int GrowthPercent { get; set; }
+    }
+    
+    public class PresentationStats
+    {
+        public int Count { get; set; }
+        public int GrowthPercent { get; set; }
+    }
+} 
+
+<style>
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 3rem;
+    }
+    
+    .chart-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 200px;
+        color: #777;
+        gap: 0.5rem;
+    }
+    
+    button.action-btn {
+        background: none;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+    }
+</style> 

@@ -6,6 +6,8 @@ namespace WebApi.Models
     {
         public int Id { get; set; }
         public Guid OrderToken { get; set; } // Unique token for frontend reference
+        public bool IsOnlineOrder { get; set; } = false;
+        public string? OrderCode { get; set; }
         public int PresentationId { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime ExpiresAt { get; set; } // Hold seats for X minutes
@@ -17,6 +19,9 @@ namespace WebApi.Models
         public ICollection<SeatLock> SeatLocks { get; set; } = new List<SeatLock>();
         public ICollection<TicketOrderItem> Items { get; set; } = new List<TicketOrderItem>();
         public ICollection<OrderConcessionItem> ConcessionItems { get; set; } = new List<OrderConcessionItem>();
+
+        public Payment? Payment { get; set; }
+        public Customer? Customer { get; set; }
     }
 
     public class TicketOrderItem

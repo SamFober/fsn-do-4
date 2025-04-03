@@ -287,7 +287,7 @@ namespace WebApi.Data
                             AuthorName = "Lisa Vermeer",
                             Email = "lisa.vermeer@example.com",
                             Rating = 5,
-                            Content = "Eén van de beste films die ik in lange tijd heb gezien!",
+                            Content = "Eï¿½n van de beste films die ik in lange tijd heb gezien!",
                             CreatedAt = DateTime.UtcNow.AddDays(-3)
                         },
                         new Review

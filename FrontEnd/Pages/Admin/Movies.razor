@@ -1,0 +1,854 @@
+@page "/admin/movies"
+@layout AdminLayout
+@using FrontEnd.Models
+@using System.ComponentModel.DataAnnotations
+@using FrontEnd.Components
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<PageTitle>Movies Management - Cinemagia</PageTitle>
+
+<div class="admin-container">
+    <div class="page-header">
+        <h1 class="page-title">Movies Management</h1>
+        <p class="page-description">Manage all movies in the cinema database</p>
+    </div>
+    
+    @if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>Loading movies data...</p>
+        </div>
+    }
+    else
+    {
+        <div class="filters-bar">
+            <div class="search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input 
+                    type="text" 
+                    class="form-control"
+                    placeholder="Search movies..." 
+                    @bind="searchQuery" 
+                    @bind:event="oninput" 
+                    @onkeyup="HandleSearchKeyUp" />
+            </div>
+            
+            <div class="filters-section">
+                <select class="filter-select" @bind="selectedGenre">
+                    <option value="">All Genres</option>
+                    @foreach (var genre in genres)
+                    {
+                        <option value="@genre">@genre</option>
+                    }
+                </select>
+                
+                <select class="filter-select" @bind="selectedStatus">
+                    <option value="">All Status</option>
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                </select>
+                
+                <select class="filter-select" @bind="sortBy">
+                    <option value="title">Sort by Title</option>
+                    <option value="releaseDate">Sort by Release Date</option>
+                    <option value="id">Sort by ID</option>
+                </select>
+                
+                <button class="filter-btn filter-btn-primary" @onclick="() => ApplyFilters()">
+                    <i class="fas fa-filter"></i>
+                    <span>Apply Filters</span>
+                </button>
+                <button class="filter-btn" @onclick="ResetFilters">
+                    <i class="fas fa-undo"></i>
+                    <span>Reset</span>
+                </button>
+                
+                <button class="filter-btn filter-btn-primary" @onclick="AddMovie">
+                    <i class="fas fa-plus"></i>
+                    <span>Add New Movie</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h3>All Movies</h3>
+                <div class="card-actions">
+                    <button class="btn-icon" title="Refresh" @onclick="() => ApplyFilters()">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                @if (filteredMovies.Count == 0)
+                {
+                    <div class="table-empty">
+                        <i class="fas fa-film fa-3x"></i>
+                        <p>No movies found matching your filters</p>
+                        <button class="btn-secondary" @onclick="ResetFilters">Clear Filters</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-container">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Poster</th>
+                                    <th>Title</th>
+                                    <th>Genre</th>
+                                    <th>Age Rating</th>
+                                    <th>Duration</th>
+                                    <th>Release Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var movie in paginatedMovies)
+                                {
+                                    <tr>
+                                        <td>@movie.Id</td>
+                                        <td>
+                                            <img src="@movie.PosterUrl" alt="@movie.Title" style="width: 50px; height: 75px; object-fit: cover; border-radius: 4px;" />
+                                        </td>
+                                        <td>@movie.Title</td>
+                                        <td>@movie.Genre</td>
+                                        <td>@movie.AgeRating</td>
+                                        <td>@FormatRuntime(movie.DurationMinutes)</td>
+                                        <td>@(movie.ReleaseDate?.ToShortDateString() ?? "Not set")</td>
+                                        <td>
+                                            <span class="status-badge @(movie.IsActive ? "status-active" : "status-inactive")">
+                                                @(movie.IsActive ? "Active" : "Inactive")
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                <button class="btn-text" title="View" @onclick="() => ViewMovie(movie)">
+                                                    View
+                                                </button>
+                                                <button class="btn-text" title="Edit" @onclick="() => EditMovie(movie)">
+                                                    Edit
+                                                </button>
+                                                <button class="btn-text" title="Delete" @onclick="() => DeleteMovie(movie)">
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <Pagination 
+                        CurrentPage="@currentPage"
+                        PageSize="@pageSize"
+                        TotalItems="@filteredMovies.Count"
+                        OnPageChanged="@HandlePageChange"
+                        OnPageSizeChanged="@HandlePageSizeChange" />
+                }
+            </div>
+        </div>
+        
+        <!-- Movie Form Modal -->
+        @if (showAddEditModal)
+        {
+            <div class="modal-overlay" @onclick="CloseModals"></div>
+            <div class="modal-container modal-md" @onclick:stopPropagation="true">
+                <div class="modal-header">
+                    <h2 class="modal-title">@(editingMovie == null ? "Add New Movie" : $"Edit Movie: {editingMovie.Title}")</h2>
+                    <button class="modal-close" @onclick="CloseModals">×</button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="@currentMovie" OnValidSubmit="SaveMovie">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger mb-3" />
+                        
+                        <div class="form-group mb-3">
+                            <label for="title">Title*</label>
+                            <InputText id="title" class="form-control" @bind-Value="currentMovie.Title" />
+                            <ValidationMessage For="@(() => currentMovie.Title)" />
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="description">Description</label>
+                            <InputTextArea id="description" class="form-control" @bind-Value="currentMovie.Description" rows="3" />
+                            <ValidationMessage For="@(() => currentMovie.Description)" />
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="genre">Genre*</label>
+                            <InputText id="genre" class="form-control" @bind-Value="currentMovie.Genre" />
+                            <ValidationMessage For="@(() => currentMovie.Genre)" />
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="ageRating">Age Rating*</label>
+                            <InputText id="ageRating" class="form-control" @bind-Value="currentMovie.AgeRating" />
+                            <small class="form-text text-muted">E.g., G, PG, PG-13, R, NC-17</small>
+                            <ValidationMessage For="@(() => currentMovie.AgeRating)" />
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="duration">Duration (minutes)*</label>
+                            <InputNumber id="duration" class="form-control" @bind-Value="currentMovie.DurationMinutes" />
+                            <ValidationMessage For="@(() => currentMovie.DurationMinutes)" />
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="releaseDate">Release Date*</label>
+                            <InputDate id="releaseDate" class="form-control" @bind-Value="currentMovie.ReleaseDate" />
+                            <ValidationMessage For="@(() => currentMovie.ReleaseDate)" />
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="posterUrl">Poster URL</label>
+                            <InputText id="posterUrl" class="form-control" @bind-Value="currentMovie.PosterUrl" />
+                            <small class="form-text text-muted">Enter URL to movie poster image</small>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="trailer">Trailer URL</label>
+                            <InputText id="trailer" class="form-control" @bind-Value="currentMovie.TrailerUrl" />
+                            <small class="form-text text-muted">Enter YouTube or Vimeo trailer URL</small>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <div class="form-check">
+                                <InputCheckbox id="isActive" class="form-check-input" @bind-Value="currentMovie.IsActive" />
+                                <label class="form-check-label" for="isActive">Active (Visible to customers)</label>
+                            </div>
+                        </div>
+                        
+                    </EditForm>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" @onclick="CloseModals">
+                        <i class="fas fa-times"></i>
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn-primary" @onclick="SaveMovie">
+                        <i class="fas fa-save"></i>
+                        Save Movie
+                    </button>
+                </div>
+            </div>
+        }
+        
+        <!-- Delete Confirmation Modal -->
+        @if (showDeleteModal && deletingMovie != null)
+        {
+            <div class="modal-overlay" @onclick="CloseModals"></div>
+            <div class="modal-container modal-sm" @onclick:stopPropagation="true">
+                <div class="modal-header">
+                    <h2 class="modal-title">Confirm Delete</h2>
+                    <button class="modal-close" @onclick="CloseModals">×</button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the movie: <strong>@deletingMovie.Title</strong>?</p>
+                    <p class="text-danger">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" @onclick="CloseModals">
+                        <i class="fas fa-times"></i>
+                        Cancel
+                    </button>
+                    <button type="button" class="btn-danger" @onclick="ConfirmDelete">
+                        <i class="fas fa-trash"></i>
+                        Delete
+                    </button>
+                </div>
+            </div>
+        }
+        
+        <!-- View Movie Modal -->
+        @if (showViewModal && viewingMovie != null)
+        {
+            <div class="modal-overlay" @onclick="CloseModals"></div>
+            <div class="modal-container modal-lg" @onclick:stopPropagation="true">
+                <div class="modal-header">
+                    <h2 class="modal-title">@viewingMovie.Title</h2>
+                    <button class="modal-close" @onclick="CloseModals">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="movie-details-grid">
+                        <div class="movie-poster-column">
+                            <div class="movie-poster-large">
+                                <img src="@(string.IsNullOrEmpty(viewingMovie.PosterUrl) ? "/images/no-poster.png" : viewingMovie.PosterUrl)" alt="@viewingMovie.Title poster">
+                            </div>
+                        </div>
+                        <div class="movie-info-column">
+                            <div class="detail-section">
+                                <h4>Movie Information</h4>
+                                <dl class="detail-list">
+                                    <dt>Genres:</dt>
+                                    <dd>@viewingMovie.Genre</dd>
+                                    
+                                    <dt>Age Rating:</dt>
+                                    <dd>@viewingMovie.AgeRating</dd>
+                                    
+                                    <dt>Release Date:</dt>
+                                    <dd>@(viewingMovie.ReleaseDate?.ToString("yyyy-MM-dd") ?? "Unknown")</dd>
+                                    
+                                    <dt>Runtime:</dt>
+                                    <dd>@FormatRuntime(viewingMovie.DurationMinutes)</dd>
+                                    
+                                    <dt>Status:</dt>
+                                    <dd>
+                                        <span class="status-badge @(viewingMovie.IsActive ? "status-active" : "status-inactive")">
+                                            @(viewingMovie.IsActive ? "Active" : "Inactive")
+                                        </span>
+                                    </dd>
+                                    
+                                    <dt>Added:</dt>
+                                    <dd>@viewingMovie.CreatedAt.ToString("yyyy-MM-dd")</dd>
+                                </dl>
+                            </div>
+                            
+                            @if (!string.IsNullOrEmpty(viewingMovie.Description))
+                            {
+                                <div class="detail-section">
+                                    <h4>Synopsis</h4>
+                                    <p>@viewingMovie.Description</p>
+                                </div>
+                            }
+                            
+                            @if (!string.IsNullOrEmpty(viewingMovie.TrailerUrl))
+                            {
+                                <div class="detail-section">
+                                    <h4>Trailer</h4>
+                                    <div class="trailer-container">
+                                        <a href="@viewingMovie.TrailerUrl" target="_blank" class="btn-primary">
+                                            <i class="fas fa-play"></i>
+                                            Watch Trailer
+                                        </a>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" @onclick="CloseModals">
+                        <i class="fas fa-times"></i>
+                        Close
+                    </button>
+                    <button type="button" class="btn-primary" @onclick="() => EditMovie(viewingMovie)">
+                        <i class="fas fa-edit"></i>
+                        Edit Movie
+                    </button>
+                </div>
+            </div>
+        }
+        
+        @if (successMessage != null)
+        {
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i>
+                <span>@successMessage</span>
+                <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+            </div>
+        }
+        
+        @if (errorMessage != null)
+        {
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle"></i>
+                <span>@errorMessage</span>
+                <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private bool isLoading = true;
+    private string? errorMessage = null;
+    private string? successMessage = null;
+    
+    // Movie data
+    private List<Movie> movies = new();
+    private List<Movie> filteredMovies => GetFilteredMovies();
+    private List<string> genres = new();
+    
+    // Filters
+    private string searchQuery = "";
+    private string selectedStatus = "";
+    private string selectedGenre = "";
+    private string sortBy = "releaseDate";
+    
+    // Pagination
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalPages => (int)Math.Ceiling(filteredMovies.Count / (double)pageSize);
+    
+    private List<Movie> paginatedMovies => filteredMovies
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+    
+    // Modal states
+    private bool showAddEditModal = false;
+    private bool showDeleteModal = false;
+    private bool showViewModal = false;
+    private Movie? viewingMovie;
+    private Movie? editingMovie;
+    private Movie? deletingMovie;
+    private MovieFormModel currentMovie = new();
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMoviesFromApi();
+    }
+    
+    private async Task LoadMoviesFromApi()
+    {
+        try
+        {
+            isLoading = true;
+            var apiMovies = await Http.GetFromJsonAsync<List<ApiMovieModel>>("api/movies") ?? new List<ApiMovieModel>();
+            
+            // Map API response to our model
+            movies = apiMovies.Select(m => new Movie
+            {
+                Id = m.Id,
+                Title = m.Title,
+                Description = m.Description ?? "",
+                PosterUrl = m.PosterUrl ?? "",
+                Genre = m.Genre ?? "",
+                DurationMinutes = m.DurationMinutes,
+                ReleaseDate = m.ReleaseDate,
+                IsActive = m.IsActive,
+                CreatedAt = m.CreatedAt,
+                UpdatedAt = m.UpdatedAt,
+                BackdropUrl = m.BackdropUrl ?? "",
+                TrailerUrl = m.TrailerUrl ?? "",
+                AgeRating = m.AgeRating ?? ""
+            }).ToList();
+
+            // Add custom properties needed by the UI
+            foreach (var movie in movies)
+            {
+                // We'll add extension data through an anonymous object that we'll access in the UI
+                movie.Formats = movie.Formats ?? new List<MovieFormat>();
+            }
+            
+            // Extract unique genres for filtering
+            genres = movies
+                .Where(m => !string.IsNullOrEmpty(m.Genre))
+                .Select(m => m.Genre)
+                .Distinct()
+                .OrderBy(g => g)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading movies: {ex.Message}";
+            movies = new List<Movie>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private List<Movie> GetFilteredMovies()
+    {
+        var query = movies.AsQueryable();
+        
+        // Apply search filter
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            query = query.Where(m => 
+                m.Title.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                m.Description.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                m.Genre.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                m.AgeRating.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+        }
+        
+        // Apply genre filter
+        if (!string.IsNullOrWhiteSpace(selectedGenre))
+        {
+            query = query.Where(m => m.Genre.Contains(selectedGenre, StringComparison.OrdinalIgnoreCase));
+        }
+        
+        // Apply status filter
+        if (!string.IsNullOrWhiteSpace(selectedStatus))
+        {
+            bool isActive = selectedStatus == "true";
+            query = query.Where(m => m.IsActive == isActive);
+        }
+        
+        // Apply sorting
+        query = sortBy switch
+        {
+            "title" => query.OrderBy(m => m.Title),
+            "releaseDate" => query.OrderBy(m => m.ReleaseDate),
+            "id" => query.OrderBy(m => m.Id),
+            _ => query.OrderBy(m => m.ReleaseDate)
+        };
+        
+        return query.ToList();
+    }
+    
+    private void HandleSearch()
+    {
+        currentPage = 1;
+        StateHasChanged();
+    }
+    
+    private async Task HandleSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await Task.Delay(1); // Ensure the search query is updated
+            HandleSearch();
+        }
+    }
+    
+    private void ApplyFilters()
+    {
+        currentPage = 1;
+        StateHasChanged();
+    }
+    
+    private void ResetFilters()
+    {
+        searchQuery = "";
+        selectedGenre = "";
+        selectedStatus = "";
+        sortBy = "releaseDate";
+        currentPage = 1;
+        StateHasChanged();
+    }
+    
+    private void SortMovies(string column)
+    {
+        if (sortBy == column)
+        {
+            sortBy = sortBy == "title" ? "releaseDate" : "title";
+        }
+        else
+        {
+            sortBy = column;
+        }
+        
+        StateHasChanged();
+    }
+    
+    private string GetSortIcon(string column)
+    {
+        if (sortBy != column) return "fas fa-sort";
+        return sortBy == "title" ? "fas fa-sort-up" : "fas fa-sort-down";
+    }
+    
+    private void HandlePageChange(int page)
+    {
+        currentPage = page;
+        StateHasChanged();
+    }
+    
+    private void HandlePageSizeChange(int size)
+    {
+        pageSize = size;
+        currentPage = 1; // Reset to first page when changing page size
+        StateHasChanged();
+    }
+    
+    private void ChangePage(int page)
+    {
+        currentPage = page;
+        StateHasChanged();
+    }
+    
+    private List<string> GetUniqueGenres()
+    {
+        return movies
+            .Select(m => m.Genre)
+            .Where(g => !string.IsNullOrWhiteSpace(g))
+            .Distinct()
+            .OrderBy(g => g)
+            .ToList();
+    }
+    
+    private void AddMovie()
+    {
+        editingMovie = null;
+        currentMovie = new MovieFormModel
+        {
+            IsActive = true,
+            ReleaseDate = DateTime.Today
+        };
+        showAddEditModal = true;
+    }
+    
+    private void ViewMovie(Movie movie)
+    {
+        viewingMovie = movie;
+        showViewModal = true;
+    }
+    
+    private void EditMovie(Movie movie)
+    {
+        editingMovie = movie;
+        currentMovie = new MovieFormModel
+        {
+            Id = movie.Id,
+            Title = movie.Title,
+            Description = movie.Description ?? "",
+            DurationMinutes = movie.DurationMinutes,
+            Genre = movie.Genre,
+            ReleaseDate = movie.ReleaseDate ?? DateTime.Today,
+            PosterUrl = movie.PosterUrl,
+            TrailerUrl = movie.TrailerUrl,
+            IsActive = movie.IsActive,
+            AgeRating = movie.AgeRating
+        };
+        showAddEditModal = true;
+    }
+    
+    private void DeleteMovie(Movie movie)
+    {
+        deletingMovie = movie;
+        showDeleteModal = true;
+    }
+    
+    private async Task SaveMovie()
+    {
+        try
+        {
+            if (editingMovie == null)
+            {
+                // Create new movie
+                var createRequest = new
+                {
+                    Title = currentMovie.Title,
+                    Description = currentMovie.Description,
+                    PosterUrl = currentMovie.PosterUrl,
+                    BackdropUrl = currentMovie.BackdropUrl,
+                    TrailerUrl = currentMovie.TrailerUrl,
+                    Genre = currentMovie.Genre,
+                    DurationMinutes = currentMovie.DurationMinutes,
+                    ReleaseDate = currentMovie.ReleaseDate,
+                    IsActive = currentMovie.IsActive,
+                    AgeRating = currentMovie.AgeRating
+                };
+                
+                var response = await Http.PostAsJsonAsync("api/movies", createRequest);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var createdMovie = await response.Content.ReadFromJsonAsync<ApiMovieModel>();
+                    successMessage = $"Movie '{currentMovie.Title}' has been created successfully.";
+                    await LoadMoviesFromApi();
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    errorMessage = $"Failed to create movie: {errorContent}";
+                }
+            }
+            else
+            {
+                // Update existing movie
+                var updateRequest = new
+                {
+                    Title = currentMovie.Title,
+                    Description = currentMovie.Description,
+                    PosterUrl = currentMovie.PosterUrl,
+                    BackdropUrl = currentMovie.BackdropUrl,
+                    TrailerUrl = currentMovie.TrailerUrl,
+                    Genre = currentMovie.Genre,
+                    DurationMinutes = currentMovie.DurationMinutes,
+                    ReleaseDate = currentMovie.ReleaseDate,
+                    IsActive = currentMovie.IsActive,
+                    AgeRating = currentMovie.AgeRating
+                };
+                
+                var response = await Http.PutAsJsonAsync($"api/movies/{editingMovie.Id}", updateRequest);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    successMessage = $"Movie '{currentMovie.Title}' has been updated successfully.";
+                    await LoadMoviesFromApi();
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    errorMessage = $"Failed to update movie: {errorContent}";
+                }
+            }
+            
+            CloseModals();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving movie: {ex.Message}";
+        }
+    }
+    
+    private async Task ConfirmDelete()
+    {
+        if (deletingMovie == null) return;
+        
+        try
+        {
+            var response = await Http.DeleteAsync($"api/movies/{deletingMovie.Id}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = $"Movie '{deletingMovie.Title}' has been deleted successfully.";
+                await LoadMoviesFromApi();
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Failed to delete movie: {errorContent}";
+            }
+            
+            CloseModals();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting movie: {ex.Message}";
+        }
+    }
+    
+    private void CloseModals()
+    {
+        showAddEditModal = false;
+        showDeleteModal = false;
+        showViewModal = false;
+        editingMovie = null;
+        deletingMovie = null;
+        viewingMovie = null;
+        currentMovie = new MovieFormModel();
+    }
+    
+    // API model for movie data
+    private class ApiMovieModel
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = "";
+        public string? Description { get; set; }
+        public string? PosterUrl { get; set; }
+        public string? BackdropUrl { get; set; }
+        public string? TrailerUrl { get; set; }
+        public string? Genre { get; set; }
+        public string? AgeRating { get; set; }
+        public int DurationMinutes { get; set; }
+        public DateTime? ReleaseDate { get; set; }
+        public bool IsActive { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+    }
+    
+    // Form model for movie creation and editing
+    private class MovieFormModel
+    {
+        public int Id { get; set; }
+        
+        [Required(ErrorMessage = "Title is required")]
+        [StringLength(100, ErrorMessage = "Title cannot exceed 100 characters")]
+        public string Title { get; set; } = "";
+        
+        [Required(ErrorMessage = "Description is required")]
+        public string Description { get; set; } = "";
+        
+        [Required(ErrorMessage = "Poster URL is required")]
+        [Url(ErrorMessage = "Please enter a valid URL")]
+        public string PosterUrl { get; set; } = "";
+        
+        [Url(ErrorMessage = "Please enter a valid URL")]
+        public string BackdropUrl { get; set; } = "";
+        
+        [Url(ErrorMessage = "Please enter a valid URL")]
+        public string TrailerUrl { get; set; } = "";
+        
+        [Required(ErrorMessage = "Genre is required")]
+        public string Genre { get; set; } = "";
+        
+        [Required(ErrorMessage = "Duration is required")]
+        [Range(1, 300, ErrorMessage = "Duration must be between 1 and 300 minutes")]
+        public int DurationMinutes { get; set; }
+        
+        [Required(ErrorMessage = "Release date is required")]
+        public DateTime ReleaseDate { get; set; }
+        
+        public bool IsActive { get; set; } = true;
+        
+        [Required(ErrorMessage = "Age rating is required")]
+        public string AgeRating { get; set; } = "";
+    }
+    
+    // Helper method to format runtime as hours and minutes
+    private string FormatRuntime(int minutes)
+    {
+        int hours = minutes / 60;
+        int mins = minutes % 60;
+        return $"{hours}h {mins}m";
+    }
+}
+
+<style>
+    .movie-details-grid {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 20px;
+    }
+    
+    .movie-poster-large {
+        width: 100%;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .movie-poster-large img {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+    
+    .trailer-container {
+        margin-top: 10px;
+    }
+    
+    /* Pagination styles */
+    .pagination {
+        display: flex;
+        justify-content: center;
+        gap: 5px;
+        padding: 15px 0;
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .pagination-btn {
+        padding: 5px 10px;
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    .pagination-btn.active {
+        background-color: var(--primary-color);
+        color: white;
+        border-color: var(--primary-color);
+    }
+    
+    .pagination-btn:hover:not(.active):not(:disabled) {
+        background-color: var(--hover-bg);
+    }
+    
+    .pagination-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+</style> 
