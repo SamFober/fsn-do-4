@@ -99,6 +99,15 @@
     gap: 20px;
 }
 
+.share-icon button {
+    font-size: 18px;
+    color: white;
+    cursor: pointer;
+    transition: color 0.3s ease;
+    background: none;
+    border: none;
+}
+
 .search-icon, .account-icon {
     font-size: 18px;
     color: white;
