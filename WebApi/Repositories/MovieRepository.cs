@@ -31,5 +31,52 @@ namespace WebApi.Repositories
             .Include(m => m.Formats)      // Include formats for the movie
             .FirstOrDefaultAsync(m => m.Id == id);
         }
+
+        public async Task<Movie> AddAsync(Movie movie)
+        {
+            try
+            {
+                _context.Movies.Add(movie);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Movie {Title} created with ID {Id}", movie.Title, movie.Id);
+                return movie;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding movie {Title}", movie.Title);
+                throw;
+            }
+        }
+
+        public async Task<Movie> UpdateAsync(Movie movie)
+        {
+            try
+            {
+                _context.Entry(movie).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Movie {Title} with ID {Id} updated", movie.Title, movie.Id);
+                return movie;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating movie {Title} with ID {Id}", movie.Title, movie.Id);
+                throw;
+            }
+        }
+
+        public async Task DeleteAsync(Movie movie)
+        {
+            try
+            {
+                _context.Movies.Remove(movie);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Movie {Title} with ID {Id} deleted", movie.Title, movie.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting movie {Title} with ID {Id}", movie.Title, movie.Id);
+                throw;
+            }
+        }
     }
 }

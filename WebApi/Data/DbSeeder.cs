@@ -287,7 +287,7 @@ namespace WebApi.Data
                             AuthorName = "Lisa Vermeer",
                             Email = "lisa.vermeer@example.com",
                             Rating = 5,
-                            Content = "Eén van de beste films die ik in lange tijd heb gezien!",
+                            Content = "Eï¿½n van de beste films die ik in lange tijd heb gezien!",
                             CreatedAt = DateTime.UtcNow.AddDays(-3)
                         },
                         new Review
@@ -418,7 +418,7 @@ namespace WebApi.Data
                                     int totalSeats = hall.Rows * hall.SeatsPerRow;
                                     
                                     // Randomly decide if this presentation is secret (~0.5% chance)
-                                    bool isSecret = random.NextDouble() < 0.005;
+                                    bool isSecret = randomSecret.NextDouble() < 0.005;
 
                                     // Create the presentation
                                     presentations.Add(new Presentation

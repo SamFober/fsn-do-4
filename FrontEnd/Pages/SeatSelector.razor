@@ -147,23 +147,31 @@
                                         <div class="ticket-seat-info">Row @seat.RowNumber, Seat @seat.SeatNumber</div>
                                         <div class="ticket-type-selector">
                                             <select class="form-select" value="@(ticketTypes.ContainsKey(seat.Id) ? ticketTypes[seat.Id] : "adult")" 
-                                            @onchange="@(e => SelectTicketType(seat.Id, e.Value.ToString()))">
+                                            @onchange="@(e => SelectTicketType(seat.Id, e.Value?.ToString()))">
                                                 <option value="adult">Adult - €@GetTicketTypePrice("adult")</option>
                                                 <option value="child">Child - €@GetTicketTypePrice("child")</option>
                                                 <option value="senior">Senior - €@GetTicketTypePrice("senior")</option>
                                                 <option value="student">Student - €@GetTicketTypePrice("student")</option>
                                             </select>
-                                            <select class="form-select" @onchange="@(e => SelectPopcornType(seat.Id, e.Value.ToString()))">
-                                                <option value="">Concessions</option>
-                                                @foreach (var item in concessions)
-                                                {
-                                                    <option value="@item.Id">@item.Name (€@item.Price.ToString("F2"))</option>
-                                                }
-                                            </select>
                                         </div>
                                     </div>
                                 }
-
+                                <div class="package-type-section">
+                                    <h4>Select consumables/deals:</h4>
+                                    @foreach (var item in concessions)
+                                    {
+                                        <div class="package-type-row">
+                                            <div class="package-type-info">
+                                                @item.Name - €@item.Price.ToString("F2")
+                                            </div>
+                                            <div class="package-quantity-selector">
+                                                <button @onclick="() => ChangePackageQuantity(item.Id, -1)">-</button>
+                                                <span>@GetPackageCount(item.Id)</span>
+                                                <button @onclick="() => ChangePackageQuantity(item.Id, +1)">+</button>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
                                 <div class="price-summary">
                                     <div class="price-details">
                                         @foreach (var ticketGroup in ticketTypes.GroupBy(t => t.Value).OrderBy(g => g.Key))
@@ -173,11 +181,11 @@
                                                 <span>€@((GetTicketTypePrice(ticketGroup.Key) * ticketGroup.Count()).ToString("F2"))</span>
                                             </div>
                                         }
-                                        @foreach (var popcornType in popcornTypes.GroupBy(t => t.Value))
+                                        @foreach (var package in selectedPackages.OrderBy(item => item.Key))
                                         {
                                             <div class="price-row">
-                                                <span>@GetConcessionTypeName(int.Parse(popcornType.Key)) (@popcornType.Count())</span>
-                                                <span>€@(GetConcessionTypePrice(int.Parse(popcornType.Key)) * (popcornType.Count()))</span>
+                                                <span>@GetConcessionTypeName(package.Key) (@package.Value)</span>
+                                                <span>€@(GetConcessionTypePrice(package.Key) * package.Value)</span>
                                             </div>
                                         }
                                     </div>
@@ -257,11 +265,14 @@
                             value="@option.Key" @onchange="@(e => selectedOption = option.Key)" 
                             checked="@(selectedOption == option.Key)" />
                             <div class="cinema-radio-content">
-                                <span class="cinema-radio-title">@option.Value.Description</span>
+                                <span class="cinema-radio-title">@(option.Value?.Description ?? "No description")</span>
                                 <div class="cinema-option-details">
-                                    @foreach (var group in option.Value.Groups)
+                                    @if (option.Value?.Groups != null)
                                     {
-                                        <div>@group.Description</div>
+                                        @foreach (var group in option.Value.Groups)
+                                        {
+                                            <div>@(group?.Description ?? "No group description")</div>
+                                        }
                                     }
                                 </div>
                             </div>
@@ -403,7 +414,6 @@
     private List<Seat> selectedSeats = new List<Seat>();
     private List<ConcessionItem> concessions = new List<ConcessionItem>();
     private string? orderToken;
-    private int? preselectedSeatId;
     private Dictionary<string, SeatingOption>? availableOptions;
     private string? selectedOption;
     private string? singleOptionMessage;
@@ -418,7 +428,7 @@
     private TimeSpan timeRemaining = TimeSpan.Zero;
 
     private Dictionary<int, string> ticketTypes = new Dictionary<int, string>();
-    private Dictionary<int, string> popcornTypes = new Dictionary<int, string>();
+    private Dictionary<int, int> selectedPackages = new Dictionary<int, int>();
     private int activeStep = 1;
 
     private Timer messageTimer = new Timer(5000); // 5 seconds
@@ -426,7 +436,7 @@
     private Timer fadeTimer = new Timer(400); // For the fade out transition
 
     // Static instance management for JS Interop
-    private static SeatSelector _instance;
+    private static SeatSelector? _instance;
 
     // Modal visibility control
     private bool showSeatSelectionModal = true;
@@ -1005,9 +1015,9 @@
             validationTimer.Stop();
             orderExpirationTime = null;
 
-            foreach (var popcornType in popcornTypes.GroupBy(t => t.Value))
+            foreach (var package in selectedPackages)
             {
-                var concessionsResponse = await Http.PostAsJsonAsync($"api/concessions/{orderToken}", new { ConcessionItemId = popcornType.Key, quantity = popcornType.Count() });
+                var concessionsResponse = await Http.PostAsJsonAsync($"api/concessions/{orderToken}", new { ConcessionItemId = package.Key, quantity = package.Value });
             }
 
             var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { customerName = "John Doe", customerEmail = "j.doe@example.com" });
@@ -1113,8 +1123,10 @@
     {
         try
         {
-    string? tokenToCancel = orderToken ?? pendingGroupOrder?.OrderToken;
-    if (tokenToCancel != null)
+    string? tokenToCancel = orderToken;
+    
+    // Only proceed if we have a token to cancel
+    if (!string.IsNullOrEmpty(tokenToCancel))
     {
         // Hide any open modals
         showSeatSelectionModal = false;
@@ -1164,43 +1176,42 @@
         }
     }
 
-    private void SelectTicketType(int seatId, string ticketType)
+    private void SelectTicketType(int seatId, string? ticketType)
     {
+        if (ticketType == null)
+        {
+            ticketType = "adult"; // Default to adult if null
+        }
+
         if (ticketTypes.ContainsKey(seatId))
         {
-    ticketTypes[seatId] = ticketType;
+            ticketTypes[seatId] = ticketType;
         }
         else
         {
-    ticketTypes.Add(seatId, ticketType);
+            ticketTypes.Add(seatId, ticketType);
         }
-
         StateHasChanged();
     }
 
-    private void SelectPopcornType(int seatId, string popcornType = null)
+    private void ChangePackageQuantity(int packageId, int change)
     {
-        if (string.IsNullOrEmpty(popcornType)) 
+        if (!selectedPackages.ContainsKey(packageId))
         {
-    if (popcornTypes.ContainsKey(seatId))
-    {
-        popcornTypes.Remove(seatId);
-        StateHasChanged(); 
-    }
+            if (change > 0)
+            selectedPackages[packageId] = change;
         }
         else
         {
-    if (popcornTypes.ContainsKey(seatId))
-    {
-        popcornTypes[seatId] = popcornType;
-    }
-    else
-    {
-        popcornTypes.Add(seatId, popcornType);
-    }
-    StateHasChanged();
+            selectedPackages[packageId] += change;
+
+            if (selectedPackages[packageId] <= 0)
+                selectedPackages.Remove(packageId);
         }
     }
+
+    private int GetPackageCount(int packageId) => selectedPackages.TryGetValue(packageId, out var count) ? count : 0;
+
 
     private string GetTicketTypeName(string type)
     {
@@ -1225,7 +1236,7 @@
             _ => 12.50m
         };
 
-        if (presentation.IsSecretMovie)
+        if (presentation != null && presentation.IsSecretMovie)
         {
             price -= 2.50m;
         }
@@ -1250,21 +1261,19 @@
         // Ensure we have ticket types for all selected seats
         foreach (var seat in selectedSeats)
         {
-    string ticketType = ticketTypes.ContainsKey(seat.Id) ? ticketTypes[seat.Id] : "adult";
+            string ticketType = ticketTypes.ContainsKey(seat.Id) ? ticketTypes[seat.Id] : "adult";
 
-    if (!ticketTypes.ContainsKey(seat.Id))
-    {
-        ticketTypes.Add(seat.Id, ticketType);
-    }
-
-    total += GetTicketTypePrice(ticketType);
+            if (!ticketTypes.ContainsKey(seat.Id))
+            {
+                ticketTypes.Add(seat.Id, ticketType);
+            }
+            total += GetTicketTypePrice(ticketType);
         }
 
-        foreach (var type in popcornTypes)
+        foreach (var package in selectedPackages)
         {
-            total += GetConcessionTypePrice(int.Parse(type.Value));
+            total += (GetConcessionTypePrice(package.Key) * package.Value);
         }
-
         return total;
     }
 
@@ -1279,15 +1288,10 @@
         // Initialize default ticket types for all selected seats
         foreach (var seat in selectedSeats)
         {
-    if (!ticketTypes.ContainsKey(seat.Id))
-    {
-        ticketTypes.Add(seat.Id, "adult");
-    }
-
-    if (!popcornTypes.ContainsKey(seat.Id))
-    {
-        popcornTypes.Add(seat.Id, "");
-    }
+            if (!ticketTypes.ContainsKey(seat.Id))
+            {
+                ticketTypes.Add(seat.Id, "adult");
+            }
         }
 
         // Remove ticket types for seats that are no longer selected
@@ -1296,13 +1300,7 @@
 
         foreach (var key in keysToRemove)
         {
-    ticketTypes.Remove(key);
-        }
-
-        keysToRemove = popcornTypes.Keys.Where(k => !seatIds.Contains(k)).ToList();
-        foreach (var key in keysToRemove)
-        {
-    popcornTypes.Remove(key);
+            ticketTypes.Remove(key);
         }
     }
 
@@ -1310,7 +1308,7 @@
     {
         if (firstRender)
         {
-    await JSRuntime.InvokeVoidAsync("initScrollTracking");
+            await JSRuntime.InvokeVoidAsync("initScrollTracking");
         }
     }
 
@@ -1322,14 +1320,14 @@
     {
         if (numpadInputValue == "Invalid PIN") NumpadClearInput();
         if (numpadInputValue.Length < 4)
-    numpadInputValue += number;
+        numpadInputValue += number;
     }
 
     private void NumpadRemoveNumber()
     {
         if (!string.IsNullOrEmpty(numpadInputValue) && numpadInputValue != "Error" && numpadInputValue != "Confirmed")
         {
-    numpadInputValue = numpadInputValue[..^1];
+            numpadInputValue = numpadInputValue[..^1];
         }
     }
 
