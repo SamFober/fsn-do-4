@@ -247,7 +247,8 @@ namespace WebApi.Data
                     {
                         var presentations = new List<Presentation>();
                         var random = new Random(42); // Fixed seed for consistent results
-                        
+                        var randomSecret = new Random(); // Random seed for secret movies
+
                         // Create presentations for the next 14 days
                         for (int day = 0; day < 14; day++)
                         {
@@ -288,7 +289,7 @@ namespace WebApi.Data
                                     int totalSeats = hall.Rows * hall.SeatsPerRow;
                                     
                                     // Randomly decide if this presentation is secret (~0.5% chance)
-                                    bool isSecret = random.NextDouble() < 0.005;
+                                    bool isSecret = randomSecret.NextDouble() < 0.005;
 
                                     // Create the presentation
                                     presentations.Add(new Presentation
