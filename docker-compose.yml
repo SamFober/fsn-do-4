@@ -1,5 +1,13 @@
 version: '3.8'
 
+# ⚠️ IMPORTANT: Do not use this file directly with docker-compose commands!
+# Always use either:
+#   - ./run-cinemagia.sh
+#   - make start / make rebuild (from the Makefile)
+#
+# Direct docker-compose usage will NOT configure Serveo URLs properly,
+# causing payment integration to fail with "example.serveo.net" errors.
+
 services:
   # Frontend Blazor WebAssembly - Development Mode
   frontend:
