@@ -1,0 +1,1113 @@
+@page "/admin/orders"
+@layout AdminLayout
+@using FrontEnd.Models
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<PageTitle>Orders Management - Cinemagia</PageTitle>
+
+<div class="admin-container">
+    @if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>Loading orders data...</p>
+        </div>
+    }
+    else
+    {
+        <div class="page-header">
+            <h1 class="page-title">Orders Management</h1>
+            <p class="page-description">View and manage customer orders</p>
+        </div>
+        
+        <div class="filters-bar">
+            <div class="search-box">
+                <i class="search-icon fas fa-search"></i>
+                <input 
+                    type="text" 
+                    placeholder="Search by order ID or customer..." 
+                    @bind="searchQuery" 
+                    @bind:event="oninput" 
+                    @onkeyup="HandleSearchKeyUp" />
+            </div>
+            
+            <div class="filters">
+                <select class="filter-select" @bind="selectedStatus">
+                    <option value="">All Status</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Cancelled">Cancelled</option>
+                    <option value="Refunded">Refunded</option>
+                </select>
+                
+                <select class="filter-select" @bind="selectedDateRange">
+                    <option value="">All Dates</option>
+                    <option value="today">Today</option>
+                    <option value="yesterday">Yesterday</option>
+                    <option value="last7days">Last 7 Days</option>
+                    <option value="last30days">Last 30 Days</option>
+                </select>
+                
+                <button class="btn-primary" @onclick="ApplyFilters">
+                    <i class="fas fa-filter"></i>
+                    Apply Filters
+                </button>
+                <button class="btn-secondary" @onclick="ResetFilters">
+                    <i class="fas fa-times"></i>
+                    Reset
+                </button>
+            </div>
+        </div>
+        
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h3>Orders List</h3>
+                <div class="card-actions">
+                    <button class="btn-icon" title="Refresh" @onclick="LoadOrders">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button class="btn-icon" title="Export" @onclick="ExportOrders">
+                        <i class="fas fa-download"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" @onclick="@(() => SortBy("Id"))">
+                                    Order ID
+                                    <i class="sort-icon @GetSortIcon("Id")"></i>
+                                </th>
+                                <th class="sortable" @onclick="@(() => SortBy("CreatedAt"))">
+                                    Date
+                                    <i class="sort-icon @GetSortIcon("CreatedAt")"></i>
+                                </th>
+                                <th class="sortable" @onclick="@(() => SortBy("CustomerName"))">
+                                    Customer
+                                    <i class="sort-icon @GetSortIcon("CustomerName")"></i>
+                                </th>
+                                <th class="sortable" @onclick="@(() => SortBy("TicketCount"))">
+                                    Tickets
+                                    <i class="sort-icon @GetSortIcon("TicketCount")"></i>
+                                </th>
+                                <th class="sortable" @onclick="@(() => SortBy("TotalAmount"))">
+                                    Total
+                                    <i class="sort-icon @GetSortIcon("TotalAmount")"></i>
+                                </th>
+                                <th class="sortable" @onclick="@(() => SortBy("Status"))">
+                                    Status
+                                    <i class="sort-icon @GetSortIcon("Status")"></i>
+                                </th>
+                                <th>Payment</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (filteredOrders.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="8" class="table-empty">
+                                        <i class="fas fa-inbox fa-3x"></i>
+                                        <p>No orders found matching your filters.</p>
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var order in paginatedOrders)
+                                {
+                                    <tr>
+                                        <td>@order.Id</td>
+                                        <td>@order.CreatedAt.ToString("g")</td>
+                                        <td>@order.CustomerName</td>
+                                        <td>@order.TicketCount</td>
+                                        <td>€@order.TotalAmount.ToString("0.00")</td>
+                                        <td>
+                                            <span class="status-badge @GetStatusClass(order.Status)">
+                                                @order.Status
+                                            </span>
+                                        </td>
+                                        <td>@order.PaymentMethod</td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                <button class="btn-text" title="View" @onclick="() => ViewOrder(order)">
+                                                    View
+                                                </button>
+                                                <button class="btn-text" title="Email" @onclick="() => ResendEmail(order)">
+                                                    Resend Email
+                                                </button>
+                                                @if (order.Status == "Pending")
+                                                {
+                                                    <button class="btn-text" title="Cancel" @onclick="() => ShowCancelConfirmation(order)">
+                                                        Cancel
+                                                    </button>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Pagination -->
+        @if (filteredOrders.Count > 0)
+        {
+            <div class="pagination">
+                <button class="pagination-btn" disabled="@(currentPage == 1)" @onclick="() => ChangePage(currentPage - 1)">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                
+                @for (int i = 1; i <= totalPages; i++)
+                {
+                    var pageNumber = i;
+                    <button class="pagination-btn @(currentPage == pageNumber ? "active" : "")" @onclick="() => ChangePage(pageNumber)">
+                        @pageNumber
+                    </button>
+                }
+                
+                <button class="pagination-btn" disabled="@(currentPage == totalPages)" @onclick="() => ChangePage(currentPage + 1)">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        }
+        
+        <!-- View Order Modal -->
+        @if (showViewModal && viewingOrder != null)
+        {
+            <div class="modal-overlay" @onclick="CloseModal">
+                <div class="modal-container modal-lg" @onclick:stopPropagation="true">
+                    <div class="modal-header">
+                        <h2 class="modal-title">Order #@viewingOrder.Id</h2>
+                        <button class="modal-close" @onclick="CloseModal">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="dashboard-grid">
+                            <div class="col-6">
+                                <div class="detail-section">
+                                    <h4>Order Information</h4>
+                                    <div class="detail-content">
+                                        <div class="detail-item">
+                                            <div class="detail-label">Order ID:</div>
+                                            <div class="detail-value">@viewingOrder.Id</div>
+                                        </div>
+                                        
+                                        <div class="detail-item">
+                                            <div class="detail-label">Date:</div>
+                                            <div class="detail-value">@viewingOrder.CreatedAt.ToString("g")</div>
+                                        </div>
+                                        
+                                        <div class="detail-item">
+                                            <div class="detail-label">Status:</div>
+                                            <div class="detail-value">
+                                                <span class="status-badge @GetStatusClass(viewingOrder.Status)">
+                                                    @viewingOrder.Status
+                                                </span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="detail-item">
+                                            <div class="detail-label">Payment Method:</div>
+                                            <div class="detail-value">@viewingOrder.PaymentMethod</div>
+                                        </div>
+                                        
+                                        <div class="detail-item">
+                                            <div class="detail-label">Payment ID:</div>
+                                            <div class="detail-value">@viewingOrder.PaymentId</div>
+                                        </div>
+                                        
+                                        <div class="detail-item">
+                                            <div class="detail-label">Total Amount:</div>
+                                            <div class="detail-value">€@viewingOrder.TotalAmount.ToString("0.00")</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-6">
+                                <div class="detail-section">
+                                    <h4>Customer</h4>
+                                    <div class="detail-content">
+                                        <div class="detail-item">
+                                            <div class="detail-label">Name:</div>
+                                            <div class="detail-value">@viewingOrder.CustomerName</div>
+                                        </div>
+                                        
+                                        <div class="detail-item">
+                                            <div class="detail-label">Email:</div>
+                                            <div class="detail-value">@viewingOrder.CustomerEmail</div>
+                                        </div>
+                                        
+                                        <div class="detail-item">
+                                            <div class="detail-label">Phone:</div>
+                                            <div class="detail-value">@viewingOrder.CustomerPhone</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-section">
+                            <h4>Tickets</h4>
+                            @if (viewingOrder.Tickets.Count == 0)
+                            {
+                                <div class="table-empty">
+                                    <i class="fas fa-ticket-alt fa-3x"></i>
+                                    <p>No tickets found for this order</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="table-container">
+                                    <table class="admin-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Ticket ID</th>
+                                                <th>Movie</th>
+                                                <th>Presentation</th>
+                                                <th>Seat</th>
+                                                <th>Price</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var ticket in viewingOrder.Tickets)
+                                            {
+                                                <tr>
+                                                    <td>@ticket.Id</td>
+                                                    <td>@ticket.MovieTitle</td>
+                                                    <td>@ticket.PresentationDateTime.ToString("g")</td>
+                                                    <td>@ticket.Seat</td>
+                                                    <td>€@ticket.Price.ToString("0.00")</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-secondary" @onclick="CloseModal">
+                            <i class="fas fa-times"></i>
+                            Close
+                        </button>
+                        <button class="btn-primary" @onclick="() => ResendEmail(viewingOrder)">
+                            <i class="fas fa-envelope"></i>
+                            Resend Email
+                        </button>
+                        @if (viewingOrder.Status == "Pending")
+                        {
+                            <button class="btn-danger" @onclick="() => ShowCancelConfirmation(viewingOrder)">
+                                <i class="fas fa-ban"></i>
+                                Cancel Order
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+        
+        <!-- Cancel Confirmation Modal -->
+        @if (showCancelModal && cancellingOrder != null)
+        {
+            <div class="modal-overlay" @onclick="CloseCancelModal">
+                <div class="modal-container modal-sm" @onclick:stopPropagation="true">
+                    <div class="modal-header">
+                        <h2 class="modal-title">Cancel Order</h2>
+                        <button class="modal-close" @onclick="CloseCancelModal">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to cancel Order #@cancellingOrder.Id?</p>
+                        <p>This will free up the reserved seats and mark the order as cancelled.</p>
+                        <p>The customer will receive a cancellation email.</p>
+                        
+                        @if (cancelError != null)
+                        {
+                            <div class="alert alert-danger">
+                                <i class="fas fa-exclamation-circle"></i>
+                                <span>@cancelError</span>
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-secondary" @onclick="CloseCancelModal">
+                            <i class="fas fa-times"></i>
+                            No, Keep Order
+                        </button>
+                        <button class="btn-danger" disabled="@isProcessingCancel" @onclick="CancelOrder">
+                            @if (isProcessingCancel)
+                            {
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Processing...</span>
+                                </div>
+                                <span>Processing...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-ban"></i>
+                                <span>Yes, Cancel Order</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+        
+        <!-- Success Alert -->
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success" role="alert">
+                <i class="fas fa-check-circle"></i>
+                <span>@successMessage</span>
+                <button type="button" class="btn-close" @onclick="ClearSuccessMessage">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        }
+        
+        <!-- Error Alert -->
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger" role="alert">
+                <i class="fas fa-exclamation-circle"></i>
+                <span>@errorMessage</span>
+                <button type="button" class="btn-close" @onclick="ClearErrorMessage">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private bool isLoading = true;
+    private string? errorMessage = null;
+    private string? successMessage = null;
+    private string? cancelError = null;
+    private bool isProcessingCancel = false;
+    
+    // Sorting
+    private string sortColumn = "CreatedAt";  
+    private string sortDirection = "desc";
+    
+    // Order data
+    private List<OrderViewModel> orders = new();
+    private List<OrderViewModel> filteredOrders = new();
+    
+    // Filters
+    private string searchQuery = "";
+    private string selectedStatus = "";
+    private string selectedDateRange = "";
+    
+    // Pagination
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalPages => (int)Math.Ceiling(filteredOrders.Count / (double)pageSize);
+    private List<OrderViewModel> paginatedOrders => filteredOrders
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+    
+    // Modal states
+    private bool showViewModal = false;
+    private OrderViewModel? viewingOrder = null;
+    private bool showCancelModal = false;
+    private OrderViewModel? cancellingOrder = null;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+            await LoadOrdersFromApi();
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading orders: {ex.Message}";
+            // Fallback to sample data if API fails
+            orders = GetSampleOrders();
+            ApplyFilters();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private async Task LoadOrdersFromApi()
+    {
+        try {
+            // Fetch real orders from API
+            try {
+                var response = await Http.GetAsync("api/orders");
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiOrders = await response.Content.ReadFromJsonAsync<List<OrderViewModel>>();
+                    if (apiOrders != null)
+                    {
+                        orders = apiOrders;
+                    }
+                    else
+                    {
+                        // Fallback to sample data if API returns null
+                        orders = GetSampleOrders();
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"Failed to fetch orders: {response.StatusCode}");
+                    // Fallback to sample data if API fails
+                    orders = GetSampleOrders();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Exception fetching orders: {ex.Message}");
+                // Fallback to sample data if API throws exception
+                orders = GetSampleOrders();
+            }
+        }
+        catch (Exception ex) {
+            throw new Exception($"Failed to load orders from API: {ex.Message}");
+        }
+    }
+    
+    private List<OrderViewModel> GetSampleOrders()
+    {
+        // This would normally come from the API
+        var random = new Random();
+        var result = new List<OrderViewModel>();
+        
+        string[] statuses = { "Completed", "Pending", "Cancelled", "Refunded" };
+        string[] paymentMethods = { "Credit Card", "PayPal", "Bank Transfer", "Cash" };
+        string[] firstNames = { "John", "Emma", "Michael", "Sophia", "Robert", "Olivia", "William", "Ava", "David", "Isabella" };
+        string[] lastNames = { "Smith", "Johnson", "Williams", "Jones", "Brown", "Davis", "Miller", "Wilson", "Moore", "Taylor" };
+        
+        // Generate sample orders
+        for (int i = 1; i <= 50; i++)
+        {
+            int ticketCount = random.Next(1, 6);
+            string status = statuses[random.Next(statuses.Length)];
+            string paymentMethod = paymentMethods[random.Next(paymentMethods.Length)];
+            
+            string firstName = firstNames[random.Next(firstNames.Length)];
+            string lastName = lastNames[random.Next(lastNames.Length)];
+            string customerName = $"{firstName} {lastName}";
+            string email = $"{firstName.ToLower()}.{lastName.ToLower()}@example.com";
+            string phone = $"+1 {random.Next(100, 999)}-{random.Next(100, 999)}-{random.Next(1000, 9999)}";
+            
+            int dayOffset = -random.Next(0, 60); // Past orders
+            DateTime orderDate = DateTime.Today.AddDays(dayOffset);
+            
+            decimal subtotalAmount = 0;
+            var tickets = new List<TicketViewModel>();
+            
+            // Generate tickets for this order
+            for (int t = 1; t <= ticketCount; t++)
+            {
+                decimal ticketPrice = (decimal)(9.5 + random.NextDouble() * 5);
+                subtotalAmount += ticketPrice;
+                
+                string movieTitle = $"Movie {random.Next(1, 20)}";
+                DateTime showTime = orderDate.AddDays(random.Next(1, 7))
+                                        .AddHours(random.Next(10, 23))
+                                        .AddMinutes(random.Next(0, 4) * 15);
+                
+                string hallName = $"Hall {random.Next(1, 7)}";
+                string seatRow = ((char)('A' + random.Next(0, 15))).ToString();
+                int seatNum = random.Next(1, 25);
+                
+                tickets.Add(new TicketViewModel
+                {
+                    Id = 10000 + (i * 10) + t,
+                    MovieTitle = movieTitle,
+                    ShowDateTime = showTime,
+                    HallName = hallName,
+                    SeatNumber = $"{seatRow}{seatNum}",
+                    Price = ticketPrice,
+                    Status = status
+                });
+            }
+            
+            decimal discountAmount = random.Next(0, 5) == 0 ? Math.Round(subtotalAmount * 0.1m, 2) : 0; // 20% chance of discount
+            decimal totalAmount = subtotalAmount - discountAmount;
+            
+            result.Add(new OrderViewModel
+            {
+                Id = 20000 + i,
+                CreatedAt = orderDate,
+                CustomerName = customerName,
+                CustomerEmail = email,
+                CustomerPhone = phone,
+                TicketCount = ticketCount,
+                Status = status,
+                PaymentMethod = paymentMethod,
+                PaymentId = $"TXN{random.Next(100000, 999999)}",
+                SubtotalAmount = subtotalAmount,
+                DiscountAmount = discountAmount,
+                TotalAmount = totalAmount,
+                Tickets = tickets
+            });
+        }
+        
+        // Sort by date descending (most recent first)
+        return result.OrderByDescending(o => o.CreatedAt).ToList();
+    }
+    
+    private void ApplyFilters()
+    {
+        // Start with all orders
+        var query = orders.AsQueryable();
+        
+        // Apply search query
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            query = query.Where(o => 
+                o.Id.ToString().Contains(searchQuery) ||
+                o.CustomerName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                o.CustomerEmail.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                o.PaymentId.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+        }
+        
+        // Apply status filter
+        if (!string.IsNullOrWhiteSpace(selectedStatus))
+        {
+            query = query.Where(o => o.Status == selectedStatus);
+        }
+        
+        // Apply date range filter
+        if (!string.IsNullOrWhiteSpace(selectedDateRange))
+        {
+            DateTime today = DateTime.Today;
+            query = selectedDateRange switch
+            {
+                "today" => query.Where(o => o.CreatedAt.Date == today),
+                "yesterday" => query.Where(o => o.CreatedAt.Date == today.AddDays(-1)),
+                "last7days" => query.Where(o => o.CreatedAt.Date >= today.AddDays(-7) && o.CreatedAt.Date <= today),
+                "last30days" => query.Where(o => o.CreatedAt.Date >= today.AddDays(-30) && o.CreatedAt.Date <= today),
+                _ => query
+            };
+        }
+        
+        // Set the filtered results
+        filteredOrders = query.ToList();
+        
+        // Reset to first page when filters change
+        currentPage = 1;
+    }
+    
+    private void ResetFilters()
+    {
+        searchQuery = "";
+        selectedStatus = "";
+        selectedDateRange = "";
+        ApplyFilters();
+    }
+    
+    private string GetStatusClass(string status)
+    {
+        return status switch
+        {
+            "Completed" => "status-active",
+            "Pending" => "status-pending",
+            "Cancelled" => "status-error",
+            "Refunded" => "status-warning",
+            _ => "status-inactive"
+        };
+    }
+    
+    private async Task HandleSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await Task.Delay(1); // Ensure the search query is updated
+            ApplyFilters();
+        }
+    }
+    
+    private void ChangePage(int page)
+    {
+        currentPage = page;
+        StateHasChanged();
+    }
+    
+    private void ViewOrder(OrderViewModel order)
+    {
+        viewingOrder = order;
+        showViewModal = true;
+    }
+    
+    private void ShowCancelConfirmation(OrderViewModel order)
+    {
+        cancellingOrder = order;
+        showCancelModal = true;
+    }
+    
+    private async Task ConfirmCancelOrder()
+    {
+        if (cancellingOrder == null) return;
+        
+        try
+        {
+            // Call API to cancel the order
+            var response = await Http.PostAsync($"api/tickets/orders/{cancellingOrder.Id}/cancel", null);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                // Update local state
+                cancellingOrder.Status = "Cancelled";
+                foreach (var ticket in cancellingOrder.Tickets)
+                {
+                    ticket.Status = "Cancelled";
+                }
+                
+                successMessage = $"Order #{cancellingOrder.Id} has been cancelled successfully.";
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                throw new Exception($"API returned status code {response.StatusCode}: {error}");
+            }
+            
+            CloseCancelModal();
+            CloseModal(); // Close the view modal if it's open
+            ApplyFilters(); // Refresh the list with updated status
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error cancelling order: {ex.Message}";
+        }
+    }
+    
+    private void CloseCancelModal()
+    {
+        showCancelModal = false;
+        cancellingOrder = null;
+    }
+    
+    private async Task ResendEmail(OrderViewModel order)
+    {
+        if (order == null) return;
+        
+        try
+        {
+            // Call API to resend email
+            var response = await Http.PostAsync($"api/orders/{order.Id}/resend-email", null);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = $"Confirmation email for order #{order.Id} has been resent to {order.CustomerEmail}.";
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                throw new Exception($"API returned status code {response.StatusCode}: {error}");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error resending email: {ex.Message}";
+        }
+    }
+    
+    private void CloseModal()
+    {
+        showViewModal = false;
+        viewingOrder = null;
+    }
+    
+    private async Task LoadOrders()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+            await LoadOrdersFromApi();
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading orders: {ex.Message}";
+            // Fallback to sample data if API fails
+            orders = GetSampleOrders();
+            ApplyFilters();
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task ExportOrders()
+    {
+        try
+        {
+            // Sample implementation - in a real app this would call an API
+            await JS.InvokeVoidAsync("alert", "Export functionality would generate CSV/Excel of orders");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error exporting orders: {ex.Message}";
+        }
+    }
+    
+    private void SortBy(string column)
+    {
+        if (sortColumn == column)
+        {
+            // Toggle direction if same column
+            sortDirection = sortDirection == "asc" ? "desc" : "asc";
+        }
+        else
+        {
+            // Default to ascending for new column
+            sortColumn = column;
+            sortDirection = "asc";
+        }
+        
+        // Apply sorting
+        IEnumerable<OrderViewModel> query = filteredOrders;
+        
+        query = column switch
+        {
+            "Id" => sortDirection == "asc" 
+                ? query.OrderBy(o => o.Id) 
+                : query.OrderByDescending(o => o.Id),
+                
+            "CreatedAt" => sortDirection == "asc" 
+                ? query.OrderBy(o => o.CreatedAt) 
+                : query.OrderByDescending(o => o.CreatedAt),
+                
+            "CustomerName" => sortDirection == "asc" 
+                ? query.OrderBy(o => o.CustomerName) 
+                : query.OrderByDescending(o => o.CustomerName),
+                
+            "TicketCount" => sortDirection == "asc" 
+                ? query.OrderBy(o => o.TicketCount) 
+                : query.OrderByDescending(o => o.TicketCount),
+                
+            "TotalAmount" => sortDirection == "asc" 
+                ? query.OrderBy(o => o.TotalAmount) 
+                : query.OrderByDescending(o => o.TotalAmount),
+                
+            "Status" => sortDirection == "asc" 
+                ? query.OrderBy(o => o.Status) 
+                : query.OrderByDescending(o => o.Status),
+                
+            _ => query
+        };
+        
+        filteredOrders = query.ToList();
+        StateHasChanged();
+    }
+    
+    private async Task CancelOrder()
+    {
+        if (cancellingOrder == null) return;
+        
+        try
+        {
+            isProcessingCancel = true;
+            cancelError = null;
+            StateHasChanged();
+            
+            await Task.Delay(1000); // Simulate API call
+            
+            // Call API to cancel the order
+            var response = await Http.PostAsync($"api/orders/{cancellingOrder.Id}/cancel", null);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                // Update local state
+                var order = orders.FirstOrDefault(o => o.Id == cancellingOrder.Id);
+                if (order != null)
+                {
+                    order.Status = "Cancelled";
+                    foreach (var ticket in order.Tickets)
+                    {
+                        ticket.Status = "Cancelled";
+                    }
+                }
+                
+                successMessage = $"Order #{cancellingOrder.Id} has been cancelled successfully.";
+                CloseCancelModal();
+                
+                if (viewingOrder != null && viewingOrder.Id == cancellingOrder.Id)
+                {
+                    viewingOrder.Status = "Cancelled";
+                    foreach (var ticket in viewingOrder.Tickets)
+                    {
+                        ticket.Status = "Cancelled";
+                    }
+                }
+                
+                ApplyFilters();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                cancelError = $"Failed to cancel order: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            cancelError = $"Error cancelling order: {ex.Message}";
+        }
+        finally
+        {
+            isProcessingCancel = false;
+            StateHasChanged();
+        }
+    }
+    
+    private void ClearSuccessMessage()
+    {
+        successMessage = null;
+    }
+    
+    private void ClearErrorMessage()
+    {
+        errorMessage = null;
+    }
+    
+    // Order view model
+    public class OrderViewModel
+    {
+        public int Id { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string Status { get; set; } = "";
+        public decimal TotalAmount { get; set; }
+        public decimal SubtotalAmount { get; set; }
+        public decimal DiscountAmount { get; set; }
+        public string CustomerName { get; set; } = "";
+        public string CustomerEmail { get; set; } = "";
+        public string CustomerPhone { get; set; } = "";
+        public string PaymentMethod { get; set; } = "";
+        public string PaymentId { get; set; } = "";
+        public List<TicketViewModel> Tickets { get; set; } = new();
+        
+        // Variable to store ticket count, defaulting to Tickets.Count
+        private int _ticketCount = 0;
+        public int TicketCount 
+        { 
+            get => _ticketCount > 0 ? _ticketCount : Tickets.Count; 
+            set => _ticketCount = value; 
+        }
+    }
+    
+    // Ticket view model for orders
+    public class TicketViewModel
+    {
+        public int Id { get; set; }
+        public string MovieTitle { get; set; } = "";
+        public string HallName { get; set; } = "";
+        public string SeatNumber { get; set; } = "";
+        public decimal Price { get; set; }
+        public DateTime PresentationDateTime { get; set; }
+        public string Seat { get { return SeatNumber; } }
+        public string Status { get; set; } = "";
+        
+        // Use PresentationDateTime internally
+        public DateTime ShowDateTime 
+        { 
+            get => PresentationDateTime; 
+            set => PresentationDateTime = value; 
+        }
+    }
+    
+    private string GetSortIcon(string column)
+    {
+        if (sortColumn != column)
+            return "fas fa-sort";
+            
+        return sortDirection == "asc" ? "fas fa-sort-up" : "fas fa-sort-down";
+    }
+}
+
+<style>
+    /* Order Management specific styles */
+    .wide-modal {
+        width: 80%;
+        max-width: 1200px;
+    }
+    
+    .order-detail-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+    
+    @@media (max-width: 900px) {
+        .order-detail-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    .detail-list {
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 8px 16px;
+        margin: 0;
+    }
+    
+    .detail-list dt {
+        font-weight: bold;
+        color: #555;
+    }
+    
+    .detail-list dd {
+        margin: 0;
+    }
+    
+    .text-right {
+        text-align: right;
+    }
+    
+    .mt-4 {
+        margin-top: 1.5rem;
+    }
+    
+    /* Modal styles */
+    .admin-modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+    }
+    
+    .admin-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1001;
+    }
+    
+    .admin-modal-content {
+        background-color: white;
+        border-radius: 8px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .admin-modal-lg .admin-modal-content {
+        max-width: 800px;
+    }
+    
+    .admin-modal-xl .admin-modal-content {
+        max-width: 1000px;
+    }
+    
+    .admin-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .admin-header-primary {
+        background-color: #0d6efd;
+        color: white;
+        border-radius: 8px 8px 0 0;
+    }
+    
+    .admin-header-primary .admin-modal-close {
+        color: white;
+    }
+    
+    .admin-modal-header h3 {
+        margin: 0;
+        font-size: 1.25rem;
+    }
+    
+    .admin-modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #999;
+    }
+    
+    .admin-modal-close:hover {
+        color: #333;
+    }
+    
+    .admin-modal-body {
+        padding: 16px;
+        overflow-y: auto;
+        flex: 1;
+    }
+    
+    .admin-modal-footer {
+        padding: 16px;
+        border-top: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+    
+    .detail-section {
+        border-radius: 6px;
+        padding: 16px;
+        margin-bottom: 16px;
+    }
+    
+    .alert {
+        padding: 12px 16px;
+        border-radius: 4px;
+        margin-bottom: 16px;
+        position: relative;
+    }
+    
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .float-end {
+        float: right;
+    }
+    
+    .btn-close {
+        background: none;
+        border: none;
+        font-size: 1.25rem;
+        line-height: 1;
+        opacity: 0.5;
+        cursor: pointer;
+    }
+    
+    .btn-close:hover {
+        opacity: 1;
+    }
+</style> 

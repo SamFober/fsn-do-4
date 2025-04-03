@@ -33,10 +33,71 @@
         });
     </script>
     
+    <!-- Modal Fix Script -->
+    <script>
+        // Modal helper function - called from Blazor
+        window.fixModals = function() {
+            // Ensure modals are properly positioned when displayed
+            document.querySelectorAll('.modal-overlay').forEach(overlay => {
+                if (overlay.style.display !== 'none') {
+                    overlay.style.position = 'fixed';
+                    overlay.style.top = '0';
+                    overlay.style.left = '0';
+                    overlay.style.width = '100%';
+                    overlay.style.height = '100%';
+                    overlay.style.zIndex = '2000';
+                    
+                    // Fix containers inside overlays
+                    const containers = overlay.querySelectorAll('.modal-container');
+                    containers.forEach(container => {
+                        container.style.position = 'fixed';
+                        container.style.top = '50%';
+                        container.style.left = '50%';
+                        container.style.transform = 'translate(-50%, -50%)';
+                        container.style.zIndex = '2001';
+                        container.style.maxHeight = '90vh';
+                        container.style.overflowY = 'auto';
+                    });
+                }
+            });
+            
+            // Fix body scroll when modals are open
+            const activeModals = document.querySelectorAll('.modal-overlay');
+            if (activeModals.length > 0 && Array.from(activeModals).some(m => m.style.display !== 'none')) {
+                document.body.style.overflow = 'hidden';
+            } else {
+                document.body.style.overflow = '';
+            }
+        };
+        
+        // Run on page load and periodically check
+        window.addEventListener('DOMContentLoaded', function() {
+            // Initial check
+            window.fixModals();
+            
+            // Check periodically for any dynamically added modals
+            setInterval(window.fixModals, 500);
+            
+            // Also set up a mutation observer
+            const observer = new MutationObserver(function() {
+                window.fixModals();
+            });
+            
+            // Start observing the document body for added nodes
+            observer.observe(document.body, { 
+                childList: true, 
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['style', 'class']
+            });
+        });
+    </script>
+    
     <link href="css/bootstrap/bootstrap.min.css" rel="stylesheet" />
     <link href="css/app.css" rel="stylesheet" />
     <link href="css/home_style.css" rel="stylesheet" />
     <link href="css/home_navbar.css" rel="stylesheet" />
+    <link href="css/admin.css" rel="stylesheet" />
     <link rel="stylesheet" href="css/seating.css" />
     <link rel="stylesheet" href="css/modals.css" />
     <link rel="stylesheet" href="css/home_footer.css" />
@@ -48,6 +109,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js - Make sure it loads before our scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    
     <style>
         html, body, #app {
             width: 100vw;
@@ -127,10 +192,12 @@
 
 <body>
     <div id="app">
-        <div style="position:absolute; top:30vh; width:100%; text-align:center">
-            <div style="display:flex; gap:10px; justify-content:center; align-items:center">
-                <div class="spinner-border" role="status"></div>
-                <div>Loading...</div>
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+            <div class="d-flex align-items-center justify-content-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h3 class="ms-3">Loading Cinemagia...</h3>
             </div>
         </div>
     </div>
@@ -149,6 +216,7 @@
     <script src="js/print-ticket.js"></script>
     <script src="js/home.js" type="module"></script>
     <script src="js/site.js"></script>
+    <script src="js/admin-charts.js"></script>
     <script>
         // Initialize all modals on page load
         document.addEventListener('DOMContentLoaded', function() {

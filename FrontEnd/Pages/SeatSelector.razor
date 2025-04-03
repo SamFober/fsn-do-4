@@ -147,7 +147,7 @@
                                         <div class="ticket-seat-info">Row @seat.RowNumber, Seat @seat.SeatNumber</div>
                                         <div class="ticket-type-selector">
                                             <select class="form-select" value="@(ticketTypes.ContainsKey(seat.Id) ? ticketTypes[seat.Id] : "adult")" 
-                                            @onchange="@(e => SelectTicketType(seat.Id, e.Value.ToString()))">
+                                            @onchange="@(e => SelectTicketType(seat.Id, e.Value?.ToString()))">
                                                 <option value="adult">Adult - €@GetTicketTypePrice("adult")</option>
                                                 <option value="child">Child - €@GetTicketTypePrice("child")</option>
                                                 <option value="senior">Senior - €@GetTicketTypePrice("senior")</option>
@@ -265,11 +265,14 @@
                             value="@option.Key" @onchange="@(e => selectedOption = option.Key)" 
                             checked="@(selectedOption == option.Key)" />
                             <div class="cinema-radio-content">
-                                <span class="cinema-radio-title">@option.Value.Description</span>
+                                <span class="cinema-radio-title">@(option.Value?.Description ?? "No description")</span>
                                 <div class="cinema-option-details">
-                                    @foreach (var group in option.Value.Groups)
+                                    @if (option.Value?.Groups != null)
                                     {
-                                        <div>@group.Description</div>
+                                        @foreach (var group in option.Value.Groups)
+                                        {
+                                            <div>@(group?.Description ?? "No group description")</div>
+                                        }
                                     }
                                 </div>
                             </div>
@@ -411,7 +414,6 @@
     private List<Seat> selectedSeats = new List<Seat>();
     private List<ConcessionItem> concessions = new List<ConcessionItem>();
     private string? orderToken;
-    private int? preselectedSeatId;
     private Dictionary<string, SeatingOption>? availableOptions;
     private string? selectedOption;
     private string? singleOptionMessage;
@@ -434,7 +436,7 @@
     private Timer fadeTimer = new Timer(400); // For the fade out transition
 
     // Static instance management for JS Interop
-    private static SeatSelector _instance;
+    private static SeatSelector? _instance;
 
     // Modal visibility control
     private bool showSeatSelectionModal = true;
@@ -1121,8 +1123,10 @@
     {
         try
         {
-    string? tokenToCancel = orderToken ?? pendingGroupOrder?.OrderToken;
-    if (tokenToCancel != null)
+    string? tokenToCancel = orderToken;
+    
+    // Only proceed if we have a token to cancel
+    if (!string.IsNullOrEmpty(tokenToCancel))
     {
         // Hide any open modals
         showSeatSelectionModal = false;
@@ -1172,8 +1176,13 @@
         }
     }
 
-    private void SelectTicketType(int seatId, string ticketType)
+    private void SelectTicketType(int seatId, string? ticketType)
     {
+        if (ticketType == null)
+        {
+            ticketType = "adult"; // Default to adult if null
+        }
+
         if (ticketTypes.ContainsKey(seatId))
         {
             ticketTypes[seatId] = ticketType;
@@ -1227,7 +1236,7 @@
             _ => 12.50m
         };
 
-        if (presentation.IsSecretMovie)
+        if (presentation != null && presentation.IsSecretMovie)
         {
             price -= 2.50m;
         }
