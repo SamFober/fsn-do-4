@@ -54,6 +54,8 @@ services:
       - MailKitConfig__SenderName=Cinemagia
       - MailKitConfig__SenderAddress=cinemagia@example.com
       - AppConfig__BaseUrl=http://localhost:5002
+      - Serveo__BackEndUrl=${SERVEO_BACKEND_URL}
+      - Serveo__FrontEndUrl=${SERVEO_FRONTEND_URL}
     depends_on:
       db:
         condition: service_healthy
@@ -100,6 +102,40 @@ services:
     ports:
       - "1025:1025"  # SMTP port
       - "8025:8025"  # Web UI
+    networks:
+      - cinemagia-network
+
+  serveo:
+    image: taichunmin/serveo:latest
+    platform: linux/amd64  # Specify platform to fix ARM64 compatibility issues
+    container_name: cinemagia-serveo-tunneling-backend
+    tty: true
+    stdin_open: true
+    command: >
+      autossh -M 0
+      -o ServerAliveInterval=60
+      -o ServerAliveCountMax=3
+      -o ExitOnForwardFailure=yes
+      -o StrictHostKeyChecking=no
+      -R 80:host.docker.internal:5001
+      serveo.net
+    networks:
+      - cinemagia-network
+
+  serveo-frontend:
+    image: taichunmin/serveo:latest
+    platform: linux/amd64  # Specify platform to fix ARM64 compatibility issues
+    container_name: cinemagia-serveo-tunneling-frontend
+    tty: true
+    stdin_open: true
+    command: >
+      autossh -M 0
+      -o ServerAliveInterval=60
+      -o ServerAliveCountMax=3
+      -o ExitOnForwardFailure=yes
+      -o StrictHostKeyChecking=no
+      -R 80:host.docker.internal:5002
+      serveo.net
     networks:
       - cinemagia-network
 

@@ -25,6 +25,7 @@ public class TicketBookingTests : IDisposable
     private readonly Mock<ILogger<TicketService>> _serviceLoggerMock;
     private readonly Mock<ITicketRepository> _repositoryMock;
     private readonly IMailService _mailService;
+    private readonly IPaymentService _paymentService;
     private readonly ITicketPdfService _ticketPdfService;
     private readonly ITicketService _ticketService;
     private readonly IServiceProvider _services;  // Add this for cleanup service testing
@@ -67,10 +68,11 @@ public class TicketBookingTests : IDisposable
             capturedException = exception;
         }));
 
+        _paymentService = new PaymenServiceMock();
         _ticketPdfService = new TicketPdfServiceMock();
         _mailService = new MailServiceMock();
-        _ticketService = new TicketService(_repositoryMock.Object, _mailService, _ticketPdfService, loggerMock.Object, _context);
-        _controller = new TicketsController(_ticketService, _context, _loggerMock.Object);
+        _ticketService = new TicketService(_paymentService, _repositoryMock.Object, _mailService, _ticketPdfService, loggerMock.Object, _context);
+        _controller = new TicketsController(_ticketService, _context, _loggerMock.Object, _mailService);
 
         // Setup services for cleanup service testing
         var services = new ServiceCollection();
@@ -379,7 +381,7 @@ public class TicketBookingTests : IDisposable
     {
         // Arrange
         var order = await CreateTestOrder(4);
-        var request = new ConfirmOrderRequest("Test User", "test@example.com");
+        var request = new ConfirmOrderRequest("Test", "User", "test@example.com");
 
         // Act
         var result = await _controller.ConfirmOrder(order.OrderToken, request);
@@ -399,7 +401,7 @@ public class TicketBookingTests : IDisposable
         order.Status = OrderStatus.Expired;  // Set status to expired instead of just changing ExpiresAt
         await _context.SaveChangesAsync();
 
-        var request = new ConfirmOrderRequest("Test User", "test@example.com");
+        var request = new ConfirmOrderRequest("Test", "User", "test@example.com");
 
         // Act
         var result = await _controller.ConfirmOrder(order.OrderToken, request);
@@ -498,7 +500,7 @@ public class TicketBookingTests : IDisposable
         var okResult = Assert.IsType<OkObjectResult>(startResult.Result);
         var response = Assert.IsType<GroupOrderResponse>(okResult.Value);
 
-        var confirmRequest = new ConfirmOrderRequest("Test User", "test@example.com");
+        var confirmRequest = new ConfirmOrderRequest("Test", "User", "test@example.com");
 
         // Act
         var confirmResult = await _controller.ConfirmOrder(response.OrderToken, confirmRequest);

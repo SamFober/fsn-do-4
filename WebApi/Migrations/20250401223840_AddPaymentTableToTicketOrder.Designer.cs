@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -9,9 +10,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace WebApi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250401223840_AddPaymentTableToTicketOrder")]
+    partial class AddPaymentTableToTicketOrder
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -36,35 +39,6 @@ namespace WebApi.Migrations
                     b.ToTable("ConcessionItems");
                 });
 
-            modelBuilder.Entity("WebApi.Models.Customer", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<string>("EmailAddress")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("FirstName")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("LastName")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<int?>("TicketOrderId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TicketOrderId")
-                        .IsUnique();
-
-                    b.ToTable("Customers");
-                });
-
             modelBuilder.Entity("WebApi.Models.Hall", b =>
                 {
                     b.Property<int>("Id")
@@ -73,12 +47,6 @@ namespace WebApi.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("longtext");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -89,9 +57,6 @@ namespace WebApi.Migrations
 
                     b.Property<int>("SeatsPerRow")
                         .HasColumnType("int");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
 
                     b.HasKey("Id");
 
@@ -292,40 +257,6 @@ namespace WebApi.Migrations
                     b.ToTable("Presentations");
                 });
 
-            modelBuilder.Entity("WebApi.Models.Review", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<string>("AuthorName")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<int>("MovieId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Rating")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MovieId");
-
-                    b.ToTable("Reviews");
-                });
-
             modelBuilder.Entity("WebApi.Models.Seat", b =>
                 {
                     b.Property<int>("Id")
@@ -343,9 +274,6 @@ namespace WebApi.Migrations
 
                     b.Property<int>("SeatNumber")
                         .HasColumnType("int");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
 
                     b.HasKey("Id");
 
@@ -489,9 +417,6 @@ namespace WebApi.Migrations
                     b.Property<bool>("IsOnlineOrder")
                         .HasColumnType("tinyint(1)");
 
-                    b.Property<string>("OrderCode")
-                        .HasColumnType("longtext");
-
                     b.Property<Guid>("OrderToken")
                         .HasColumnType("char(36)");
 
@@ -533,15 +458,6 @@ namespace WebApi.Migrations
                     b.HasIndex("TicketOrderId");
 
                     b.ToTable("TicketOrderItems");
-                });
-
-            modelBuilder.Entity("WebApi.Models.Customer", b =>
-                {
-                    b.HasOne("WebApi.Models.TicketOrder", "TicketOrder")
-                        .WithOne("Customer")
-                        .HasForeignKey("WebApi.Models.Customer", "TicketOrderId");
-
-                    b.Navigation("TicketOrder");
                 });
 
             modelBuilder.Entity("WebApi.Models.MovieFormat", b =>
@@ -598,17 +514,6 @@ namespace WebApi.Migrations
                         .IsRequired();
 
                     b.Navigation("Hall");
-
-                    b.Navigation("Movie");
-                });
-
-            modelBuilder.Entity("WebApi.Models.Review", b =>
-                {
-                    b.HasOne("WebApi.Models.Movie", "Movie")
-                        .WithMany("Reviews")
-                        .HasForeignKey("MovieId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
 
                     b.Navigation("Movie");
                 });
@@ -729,8 +634,6 @@ namespace WebApi.Migrations
                     b.Navigation("Formats");
 
                     b.Navigation("Presentations");
-
-                    b.Navigation("Reviews");
                 });
 
             modelBuilder.Entity("WebApi.Models.Presentation", b =>
@@ -746,8 +649,6 @@ namespace WebApi.Migrations
             modelBuilder.Entity("WebApi.Models.TicketOrder", b =>
                 {
                     b.Navigation("ConcessionItems");
-
-                    b.Navigation("Customer");
 
                     b.Navigation("Items");
 

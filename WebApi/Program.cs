@@ -50,6 +50,8 @@ builder.Services.AddMemoryCache(); // For seat locking
 builder.Services.AddScoped<IMailService, MailServiceMailKit>();
 builder.Services.AddScoped<ITicketPdfService, TicketPdfServiceQuestPdf>();
 
+builder.Services.AddScoped<IPaymentService, MolliePaymentService>();
+
 builder.Services.AddScoped<IMovieRepository, MovieRepository>();
 builder.Services.AddScoped<IMovieService, MovieService>();
 

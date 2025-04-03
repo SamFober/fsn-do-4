@@ -4,7 +4,6 @@ using WebApi.Exceptions;
 using WebApi.Interfaces.Repositories;
 using WebApi.Interfaces.Services;
 using WebApi.Models;
-using WebApi.Models.Exceptions;
 using WebApi.Models.Requests;
 using WebApi.Models.Responses;
 
@@ -13,18 +12,21 @@ namespace WebApi.Services
     public class TicketService : ITicketService
     {
         private readonly ITicketRepository _repository;
+        private readonly IPaymentService _paymentService;
         private readonly IMailService _mailService;
         private readonly ITicketPdfService _ticketPdfService;
         private readonly ILogger<TicketService> _logger;
         private readonly ApplicationDbContext _context;
 
         public TicketService(
+            IPaymentService paymentService,
             ITicketRepository repository,
             IMailService mailService,
             ITicketPdfService ticketPdfService,
             ILogger<TicketService> logger,
             ApplicationDbContext context)
         {
+            _paymentService = paymentService;
             _repository = repository;
             _mailService = mailService;
             _ticketPdfService = ticketPdfService;
@@ -32,7 +34,7 @@ namespace WebApi.Services
             _context = context;
         }
 
-        public async Task<OrderResponse> StartOrder(StartOrderRequest request)
+        public async Task<OrderResponse> StartOrder(StartOrderRequest request, bool isOnlineOrder)
         {
             try
             {
@@ -52,6 +54,7 @@ namespace WebApi.Services
                     PresentationId = request.PresentationId,
                     CreatedAt = DateTime.UtcNow,
                     ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+                    IsOnlineOrder = isOnlineOrder,
                     Status = OrderStatus.Pending,
                     Items = new List<TicketOrderItem>
                     {
@@ -96,7 +99,7 @@ namespace WebApi.Services
             }
         }
 
-        public async Task<GroupOrderResponse> StartGroupOrder(StartGroupOrderRequest request)
+        public async Task<GroupOrderResponse> StartGroupOrder(StartGroupOrderRequest request, bool isOnlineOrder)
         {
             try
             {
@@ -239,7 +242,8 @@ namespace WebApi.Services
                     ExpiresAt = DateTime.UtcNow.AddMinutes(10),
                     Status = OrderStatus.Pending,
                     RequestedSeats = request.NumberOfSeats,
-                    AvailableOptions = options
+                    AvailableOptions = options,
+                    IsOnlineOrder = isOnlineOrder
                 };
 
                 _logger.LogInformation("Creating initial order {OrderToken} for presentation {PresentationId} with options: {Options}",
@@ -457,11 +461,13 @@ namespace WebApi.Services
             }
         }
 
-        public async Task<List<TicketResponse>> ConfirmOrder(Guid orderToken, ConfirmOrderRequest request)
+        public async Task<ConfirmOrderResponse> ConfirmOrder(Guid orderToken, ConfirmOrderRequest request)
         {
             try
             {
                 _logger.LogInformation("Starting to confirm order {OrderToken}", orderToken);
+
+                string? checkOutUrl = string.Empty;
 
                 var order = await _repository.GetOrderByToken(orderToken, true);
                 if (order == null || order.Status != OrderStatus.Pending)
@@ -543,7 +549,24 @@ namespace WebApi.Services
                 }
 
                 // Update order status
-                order.Status = OrderStatus.Confirmed;
+                if (order.IsOnlineOrder)
+                {
+                    var customer = new Customer()
+                    {
+                        FirstName = request.CustomerFirstName,
+                        LastName = request.CustomerLastName,
+                        EmailAddress = request.CustomerEmail
+                    };
+
+                    var payment = await _paymentService.CreatePayment(orderToken, customer);
+
+                    checkOutUrl = payment.CheckoutUrl;
+                }
+                else
+                {
+                    order.Status = OrderStatus.Confirmed;
+                }
+
                 var saved = await _repository.SaveOrder(order);
                 if (!saved)
                 {
@@ -567,7 +590,7 @@ namespace WebApi.Services
                             PresentationId = order.PresentationId,
                             SeatId = item.SeatId,
                             TicketOrderId = order.Id,
-                            CustomerName = request.CustomerName,
+                            CustomerName = request.CustomerFirstName,
                             CustomerEmail = request.CustomerEmail,
                             Status = TicketStatus.Reserved,
                             PurchaseDate = DateTime.UtcNow,
@@ -587,6 +610,12 @@ namespace WebApi.Services
 
                 _logger.LogInformation("Successfully confirmed order {OrderToken} with {TicketCount} tickets",
                     orderToken.ToString(), createdTickets.Count);
+
+                var response = new ConfirmOrderResponse()
+                {
+                    orderToken = orderToken,
+                    checkoutUrl = checkOutUrl
+                };
 
                 // Now, fetch the full ticket information including navigation properties for the response
                 var fullTickets = new List<TicketResponse>();
@@ -616,7 +645,8 @@ namespace WebApi.Services
 
                 _logger.LogInformation("Returning {TicketCount} ticket details for order {OrderToken}",
                     fullTickets.Count, orderToken);
-                return fullTickets;
+
+                return response;
             }
             catch (Exception ex)
             {
@@ -645,7 +675,7 @@ namespace WebApi.Services
                 Quantity = request.Quantity
             };
 
-            bool success= await _repository.AddConcessionToOrder(orderConcession);
+            bool success = await _repository.AddConcessionToOrder(orderConcession);
             if (!success)
             {
                 throw new Exception("Failed to add concession item to order.");
@@ -965,7 +995,7 @@ namespace WebApi.Services
 
         public async Task FinalizeOrder(Guid orderToken)
         {
-            var order = await _repository.FindTicketOrderByOrderToken(orderToken);
+            var order = await _repository.GetOrderByToken(orderToken, includeItems: true);
 
             if (order != null)
             {
@@ -987,7 +1017,8 @@ namespace WebApi.Services
 
                 _mailService.SendEmail(customerName, customerEmail, "Your tickets are here!", MailTemplates.OrderCompleteMailTemplate(customerName, order.Presentation, tickets.Count), attachments);
 
-            } else
+            }
+            else
             {
                 throw new OrderNotFoundException("No order found with the given order token");
             }
@@ -1010,13 +1041,13 @@ namespace WebApi.Services
 
         public async Task<byte[]> GetTicketsByPhoneBookingCode(string phoneBookingCode)
         {
-            var tickets = await _repository.FindTicketsByPhoneBookingCode(phoneBookingCode); 
+            var tickets = await _repository.FindTicketsByPhoneBookingCode(phoneBookingCode);
             if (!tickets.Any())
             {
                 throw new TicketNotFoundException($"No tickets found with phone booking code {phoneBookingCode}");
             }
-            
-            return _ticketPdfService.CreatePdfTicketsAsByteArray(tickets, null ,Guid.NewGuid());
+
+            return _ticketPdfService.CreatePdfTicketsAsByteArray(tickets, null, Guid.NewGuid());
         }
 
         public async Task UpdateSeatAvailability(List<int> seatIds, bool isAvailable, int presentationId)

@@ -229,7 +229,7 @@ namespace WebApi.Controllers
         {
             try
             {
-                var response = await _ticketService.StartOrder(request);
+                var response = await _ticketService.StartOrder(request, request.isOnlineOrder);
                 return new OkObjectResult(response);
             }
             catch (NoSeatsAvailableException ex)
@@ -354,7 +354,7 @@ namespace WebApi.Controllers
                     return BadRequest("Invalid number of seats requested");
                 }
 
-                var response = await _ticketService.StartGroupOrder(request);
+                var response = await _ticketService.StartGroupOrder(request, request.isOnlineOrder);
                 if (response == null)
                 {
                     _logger.LogWarning("StartGroupOrder returned null response for presentation {PresentationId}", request.PresentationId);
@@ -455,21 +455,18 @@ namespace WebApi.Controllers
         /// <response code="400">If the seats are no longer available</response>
         /// <response code="404">If the order is not found or expired</response>
         [HttpPost("orders/{orderToken}/confirm")]
-        [ProducesResponseType(typeof(List<WebApi.Models.Responses.TicketResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ConfirmOrderResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult<List<WebApi.Models.Responses.TicketResponse>>> ConfirmOrder(
+        public async Task<ActionResult<ConfirmOrderResponse>> ConfirmOrder(
             Guid orderToken,
             [FromBody] ConfirmOrderRequest request)
         {
             try
             {
-                var tickets = await _ticketService.ConfirmOrder(orderToken, request);
-                if (tickets == null || !tickets.Any())
-                {
-                    return NotFound("Order not found or expired");
-                }
-                return Ok(tickets);
+                var response = await _ticketService.ConfirmOrder(orderToken, request);
+
+                return Ok(response);
             }
             catch (OrderNotFoundException)
             {

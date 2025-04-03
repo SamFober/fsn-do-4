@@ -33,13 +33,6 @@ public class MoviesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetMovies()
-    {
-        var movies = await _movieService.GetAllMovies();
-
-        return Ok(movies);
-    }
-
     public async Task<IActionResult> GetMovies([FromQuery] string? search, [FromQuery] string? genre)
     {
         var movies = await _movieService.GetAllMovies();

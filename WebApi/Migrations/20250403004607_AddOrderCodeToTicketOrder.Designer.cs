@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -9,9 +10,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace WebApi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250403004607_AddOrderCodeToTicketOrder")]
+    partial class AddOrderCodeToTicketOrder
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -292,40 +295,6 @@ namespace WebApi.Migrations
                     b.ToTable("Presentations");
                 });
 
-            modelBuilder.Entity("WebApi.Models.Review", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<string>("AuthorName")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<int>("MovieId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Rating")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MovieId");
-
-                    b.ToTable("Reviews");
-                });
-
             modelBuilder.Entity("WebApi.Models.Seat", b =>
                 {
                     b.Property<int>("Id")
@@ -602,17 +571,6 @@ namespace WebApi.Migrations
                     b.Navigation("Movie");
                 });
 
-            modelBuilder.Entity("WebApi.Models.Review", b =>
-                {
-                    b.HasOne("WebApi.Models.Movie", "Movie")
-                        .WithMany("Reviews")
-                        .HasForeignKey("MovieId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Movie");
-                });
-
             modelBuilder.Entity("WebApi.Models.Seat", b =>
                 {
                     b.HasOne("WebApi.Models.Hall", "Hall")
@@ -729,8 +687,6 @@ namespace WebApi.Migrations
                     b.Navigation("Formats");
 
                     b.Navigation("Presentations");
-
-                    b.Navigation("Reviews");
                 });
 
             modelBuilder.Entity("WebApi.Models.Presentation", b =>
