@@ -51,7 +51,7 @@ namespace WebApi.Services
                                 .PaddingBottom(5)
                                 .Text(text =>
                                 {
-                                    text.Span("Naam: " + ticket.CustomerName).SemiBold();
+                                    text.Span("Name: " + ticket.CustomerName).SemiBold();
                                 });
 
                                 column.Item()
@@ -86,11 +86,11 @@ namespace WebApi.Services
 
                                 table.Header(header =>
                                 {
-                                    header.Cell().Element(CellStyle).Text("Film");
-                                    header.Cell().Element(CellStyle).Text("Datum");
-                                    header.Cell().Element(CellStyle).AlignRight().Text("Zaal");
-                                    header.Cell().Element(CellStyle).AlignRight().Text("Rij");
-                                    header.Cell().Element(CellStyle).AlignRight().Text("Stoelnummer");
+                                    header.Cell().Element(CellStyle).Text("Title");
+                                    header.Cell().Element(CellStyle).Text("Date");
+                                    header.Cell().Element(CellStyle).AlignRight().Text("Hall");
+                                    header.Cell().Element(CellStyle).AlignRight().Text("Row");
+                                    header.Cell().Element(CellStyle).AlignRight().Text("Seat");
 
                                     static IContainer CellStyle(IContainer container)
                                     {
@@ -136,26 +136,54 @@ namespace WebApi.Services
                         {
                             column.Item()
                             .PaddingBottom(5)
-                            .Text("Concession Items")
+                            .Text("Package deals")
                             .FontSize(20).SemiBold();
                         });
+                        row.ConstantItem(100).Image(headerImageBytes);
                     });
-
-                    page.Content().Column(column =>
-                    {
-                        column.Spacing(10);
-
-                        foreach (var concessionItem in concessionItems)
+                    page.Content()
+                        .PaddingTop(10)
+                        .AlignCenter()
+                        .Column(column =>
                         {
-                            column.Item().Text(text =>
+                            column.Spacing(20);
+                            column.Item().Table(table =>
                             {
-                                text.Span(concessionItem.Quantity.ToString()).FontSize(14);
-                                text.Span(" x ").FontSize(14);
-                                text.Span(concessionItem.ConcessionItem.Name).FontSize(14);
-                                text.Span(" - €" + concessionItem.ConcessionItem.Price.ToString("0.00")).FontSize(14);
+                                table.ColumnsDefinition(columns =>
+                                {
+                                    columns.RelativeColumn();
+                                    columns.RelativeColumn();
+                                    columns.RelativeColumn();
+                                    columns.RelativeColumn();
+                                });
+
+                                table.Header(header =>
+                                {
+                                    header.Cell().Element(CellStyle).Text("Item");
+                                    header.Cell().Element(CellStyle).Text("Quantity");
+                                    header.Cell().Element(CellStyle).AlignRight().Text("Price");
+                                    header.Cell().Element(CellStyle).AlignRight().Text("Total");
+
+                                    static IContainer CellStyle(IContainer container)
+                                    {
+                                        return container.DefaultTextStyle(x => x.SemiBold()).PaddingVertical(5).BorderBottom(1).BorderColor(Colors.Black);
+                                    }
+                                });
+
+                                foreach (var concessionItem in concessionItems.OrderBy(item => item.ConcessionItem.Id))
+                                {
+                                    table.Cell().Element(CellStyle).Text(concessionItem.ConcessionItem.Name);
+                                    table.Cell().Element(CellStyle).Text(concessionItem.Quantity.ToString());
+                                    table.Cell().Element(CellStyle).AlignRight().Text("€" + concessionItem.ConcessionItem.Price.ToString("0.00"));
+                                    table.Cell().Element(CellStyle).AlignRight().Text("€" + (concessionItem.Quantity * concessionItem.ConcessionItem.Price).ToString("0.00"));
+                                }
+
+                                static IContainer CellStyle(IContainer container)
+                                {
+                                    return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5);
+                                }
                             });
-                        }
-                    });
+                        });
 
                     page.Footer().AlignCenter().Text(x =>
                     {
@@ -164,7 +192,6 @@ namespace WebApi.Services
                         x.TotalPages();
                     });
                 });
-
             });
         }
     }

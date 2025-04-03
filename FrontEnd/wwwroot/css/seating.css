@@ -301,6 +301,64 @@
     padding: 8px;
 }
 
+.package-type-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 12px 15px;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.package-type-row:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+.package-type-info {
+    font-weight: 500;
+    font-size: 1rem;
+    color: white;
+}
+
+.package-quantity-selector {
+    display: flex;
+    align-items: center;
+    width: 25%;
+    margin-right: 13%
+}
+
+.package-quantity-selector span {
+    color: white;
+    font-size: 1rem;
+    padding: 5px 10px;
+    width: 20%;
+    text-align: center;
+}
+
+.package-quantity-selector button {
+    background-color: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 50%; 
+    font-size: 1rem;
+    cursor: pointer;
+    appearance: none; 
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.package-quantity-selector button:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+}
+
+.package-quantity-selector button:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
+
 .price-summary {
     margin-top: 25px;
     padding: 20px;
