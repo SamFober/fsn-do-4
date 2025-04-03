@@ -7,8 +7,28 @@ set -e
 # 2. Detect Serveo URLs
 # 3. Configure the WebAPI service
 
+# More specific OS detection
+IS_WSL=0
+IS_MAC=0
+IS_LINUX=0
+OS_TYPE="unknown"
+
+if grep -q Microsoft /proc/version 2>/dev/null || [ -d "/mnt/c" ]; then
+    echo "Windows/WSL environment detected."
+    IS_WSL=1
+    OS_TYPE="windows"
+elif [ "$(uname)" == "Darwin" ]; then
+    echo "macOS environment detected."
+    IS_MAC=1
+    OS_TYPE="mac"
+else
+    echo "Linux environment detected."
+    IS_LINUX=1
+    OS_TYPE="linux"
+fi
+
 # First, remove any existing .env file to avoid issues
-rm -f .env
+rm -f .env 2>/dev/null || true
 
 # Check if docker and docker-compose are installed
 if ! command -v docker &> /dev/null; then
@@ -29,7 +49,7 @@ else
 fi
 
 # Make sure the serveo-init.sh script is executable
-chmod +x serveo-init.sh
+chmod +x serveo-init.sh 2>/dev/null || true
 
 echo "================================================================================"
 echo "Cinemagia - Automatic Mollie Payment Setup"
@@ -40,6 +60,12 @@ echo ""
 
 # Check if the Mollie API key is set
 MOLLIE_API_KEY=""
+
+# Check if WebApi directory exists
+if [ ! -d "WebApi" ]; then
+    echo "⚠️  WebApi directory not found. Creating it..."
+    mkdir -p WebApi
+fi
 
 # Check if the Mollie API key is in appsettings.json
 if [ -f "WebApi/appsettings.json" ]; then
@@ -152,7 +178,7 @@ echo "Configuring Serveo URLs..."
 echo ""
 
 # Run the serveo-init script to detect and configure Serveo URLs
-./serveo-init.sh
+bash serveo-init.sh
 
 # Extract and store the Serveo URLs for display
 if [ -z "${SERVEO_BACKEND_URL}" ] || [ -z "${SERVEO_FRONTEND_URL}" ]; then
@@ -199,4 +225,13 @@ echo "  Frontend: docker logs -f cinemagia-frontend"
 echo "  Backend: docker logs -f cinemagia-webapi"
 echo ""
 echo "To stop the application:"
-echo "  $DOCKER_COMPOSE down" 
+echo "  $DOCKER_COMPOSE down"
+
+# For Windows/WSL users, add an extra note about potential issues
+if [ "$IS_WSL" -eq 1 ]; then
+    echo ""
+    echo "Note for Windows/WSL users:"
+    echo "  If you encounter any script issues, run 'make fix-scripts' first"
+    echo "  If you have Docker connection issues, ensure Docker Desktop is running"
+    echo "  For networking issues, try restarting Docker Desktop"
+fi 

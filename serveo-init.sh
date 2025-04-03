@@ -5,6 +5,26 @@ set -e
 
 echo "Starting Serveo URL Detection..."
 
+# More specific OS detection
+IS_WSL=0
+IS_MAC=0
+IS_LINUX=0
+OS_TYPE="unknown"
+
+if grep -q Microsoft /proc/version 2>/dev/null || [ -d "/mnt/c" ]; then
+    echo "Windows/WSL environment detected."
+    IS_WSL=1
+    OS_TYPE="windows"
+elif [ "$(uname)" == "Darwin" ]; then
+    echo "macOS environment detected."
+    IS_MAC=1
+    OS_TYPE="mac"
+else
+    echo "Linux environment detected."
+    IS_LINUX=1
+    OS_TYPE="linux"
+fi
+
 # Determine which docker compose command to use
 if command -v docker-compose &> /dev/null; then
     DOCKER_COMPOSE="docker-compose"
@@ -47,12 +67,13 @@ extract_serveo_url() {
 # Make sure Serveo containers are running
 echo "Ensuring Serveo containers are running..."
 
-if ! docker ps | grep -q "cinemagia-serveo-tunneling-backend"; then
+# We need to use grep pattern that works in both GNU and BSD grep
+if ! docker ps | grep -E "cinemagia-serveo-tunneling-backend|cinemagia-serveo-tunnel" > /dev/null; then
     echo "Starting backend Serveo container..."
     $DOCKER_COMPOSE up -d serveo
 fi
 
-if ! docker ps | grep -q "cinemagia-serveo-tunneling-frontend"; then
+if ! docker ps | grep -E "cinemagia-serveo-tunneling-frontend|cinemagia-serveo-front" > /dev/null; then
     echo "Starting frontend Serveo container..."
     $DOCKER_COMPOSE up -d serveo-frontend
 fi
@@ -65,6 +86,29 @@ frontend_url=$(extract_serveo_url "cinemagia-serveo-tunneling-frontend")
 
 if [ -z "$backend_url" ] || [ -z "$frontend_url" ]; then
     echo "Failed to extract one or both URLs. Please check the Serveo containers."
+    
+    # Check container logs for debugging
+    echo "Backend container logs (last 20 lines):"
+    docker logs cinemagia-serveo-tunneling-backend 2>&1 | tail -20
+    
+    echo "Frontend container logs (last 20 lines):"
+    docker logs cinemagia-serveo-tunneling-frontend 2>&1 | tail -20
+    
+    # On Windows/WSL, sometimes the container can't access the host
+    if [ "$IS_WSL" -eq 1 ]; then
+        echo "
+WSL TROUBLESHOOTING:
+If you're using WSL on Windows, make sure:
+1. Docker Desktop is running 
+2. 'host.docker.internal' is properly configured
+3. Try adding the following to your /etc/wsl.conf file:
+
+[wsl2]
+localhostForwarding=true
+
+"
+    fi
+    
     exit 1
 fi
 
@@ -90,6 +134,10 @@ echo "Starting WebAPI container with updated Serveo URLs..."
 
 # Pass environment variables directly to the docker-compose command
 SERVEO_BACKEND_URL="$backend_url" SERVEO_FRONTEND_URL="$frontend_url" $DOCKER_COMPOSE up -d --remove-orphans webapi
+
+# Verify the environment variables are correctly set
+echo "Verifying environment variables in WebAPI container..."
+docker exec cinemagia-webapi env | grep -E "Serveo|SERVEO" || echo "⚠️ WARNING: Serveo variables not found in WebAPI container!"
 
 echo "Setup complete. The Mollie payment integration should now work automatically."
 echo "Backend URL: $backend_url"
