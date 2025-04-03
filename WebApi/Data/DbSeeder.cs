@@ -418,7 +418,7 @@ namespace WebApi.Data
                                     int totalSeats = hall.Rows * hall.SeatsPerRow;
                                     
                                     // Randomly decide if this presentation is secret (~0.5% chance)
-                                    bool isSecret = randomSecret.NextDouble() < 0.005;
+                                    bool isSecret = random.NextDouble() < 0.005;
 
                                     // Create the presentation
                                     presentations.Add(new Presentation
