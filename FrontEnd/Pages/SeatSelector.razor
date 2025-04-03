@@ -403,6 +403,26 @@
     color: white;
     border: 1px solid rgba(255, 0, 0, 0.3);
     }
+    
+    /* Error message display improvements */
+    .cinema-alert {
+        position: relative;
+        z-index: 2500 !important; /* Ensure alerts are always on top */
+        margin-top: 30px;
+        margin-bottom: 20px;
+        width: 90%;
+        max-width: 800px;
+    }
+    
+    /* Better spacing for content below the header */
+    .content-with-header-space {
+        padding-top: 120px !important; /* Extra padding to ensure content is visible */
+    }
+    
+    /* Ensure modals display properly */
+    .modal-dialog {
+        z-index: 2200 !important;
+    }
 </style>
 @code {
     [Parameter]
@@ -1023,7 +1043,13 @@
                 var concessionsResponse = await Http.PostAsJsonAsync($"api/concessions/{orderToken}", new { ConcessionItemId = package.Key, quantity = package.Value });
             }
 
-            var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { customerFirstName = "John", customerLastName = "Doe", customerEmail = "j.doe@example.com" });
+            // Added CustomerName field to match the API requirements
+            var confirmationResponse = await Http.PostAsJsonAsync($"api/tickets/orders/{orderToken}/confirm", new { 
+                CustomerName = "John Doe", 
+                customerFirstName = "John", 
+                customerLastName = "Doe", 
+                customerEmail = "j.doe@example.com" 
+            });
 
             if (confirmationResponse.IsSuccessStatusCode)
             {
@@ -1037,156 +1063,152 @@
                     await JSRuntime.InvokeVoidAsync("showModal", "numpadModal");
                 }            
             }
-
-            /*{
-            SetMessage("Tickets confirmed successfully!");
-            }*/
             else
-        {
-            var errorMessage = await confirmationResponse.Content.ReadAsStringAsync();
-            SetMessage($"Failed to confirm tickets: {errorMessage}");
+            {
+                var errorMessage = await confirmationResponse.Content.ReadAsStringAsync();
+                SetMessage($"Failed to confirm tickets: {errorMessage}");
+            }
         }
-    }
         catch (Exception ex)
         {
             SetMessage($"Error confirming tickets: {ex.Message}");
-    Console.WriteLine($"Error confirming tickets: {ex}");
+            Console.WriteLine($"Error confirming tickets: {ex}");
         }
-        }
-
-        private async Task ConfirmSeatingOption()
-        {
-            if (selectedOption != null)
-            {
-    await JSRuntime.InvokeVoidAsync("hideModal", "seatingOptionsModal");
-    await SelectSeatingOption(selectedOption);
-            }
-        }
-
-        private async Task ConfirmSingleOption()
-        {
-            if (selectedOption != null)
-            {
-    await JSRuntime.InvokeVoidAsync("hideModal", "singleOptionConfirmModal");
-    await SelectSeatingOption(selectedOption);
-            }
-        }
-
-        private async Task SelectSeatingOption(string option)
-        {
-            try
-            {
-    if (pendingGroupOrder?.OrderToken == null)
-    {
-        SetMessage("No pending group order found.");
-        return;
     }
 
-    var request = new { OrderToken = pendingGroupOrder.OrderToken };
-    var response = await Http.PostAsJsonAsync($"api/tickets/orders/select-option/{option}", request);
-
-    if (response.IsSuccessStatusCode)
+    private async Task ConfirmSeatingOption()
     {
-        var result = await response.Content.ReadFromJsonAsync<OrderResponse>();
-        orderToken = result.OrderToken;
-
-        // Now we can add the selected seats
-        if (result.SeatIds != null && result.SeatIds.Any())
+        if (selectedOption != null)
         {
-            var selectedSeatsFromResponse = presentation.Rows
-                .SelectMany(r => r.Seats)
-                .Where(s => result.SeatIds.Contains(s.Id))
-                .ToList();
+            await JSRuntime.InvokeVoidAsync("hideModal", "seatingOptionsModal");
+            await SelectSeatingOption(selectedOption);
+        }
+    }
 
-            selectedSeats.Clear();
-            selectedSeats.AddRange(selectedSeatsFromResponse);
-            SetMessage($"Group order started with {selectedSeats.Count} seats selected.");
+    private async Task ConfirmSingleOption()
+    {
+        if (selectedOption != null)
+        {
+            await JSRuntime.InvokeVoidAsync("hideModal", "singleOptionConfirmModal");
+            await SelectSeatingOption(selectedOption);
+        }
+    }
 
-            // Initialize ticket types for all seats in the group order
-            foreach (var seat in selectedSeats)
+    private async Task SelectSeatingOption(string option)
+    {
+        try
+        {
+            if (pendingGroupOrder?.OrderToken == null)
             {
-                if (!ticketTypes.ContainsKey(seat.Id))
+                SetMessage("No pending group order found.");
+                return;
+            }
+
+            var request = new { OrderToken = pendingGroupOrder.OrderToken };
+            var response = await Http.PostAsJsonAsync($"api/tickets/orders/select-option/{option}", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<OrderResponse>();
+                orderToken = result.OrderToken;
+
+                // Now we can add the selected seats
+                if (result.SeatIds != null && result.SeatIds.Any())
                 {
-                    ticketTypes.Add(seat.Id, "adult");
+                    var selectedSeatsFromResponse = presentation.Rows
+                        .SelectMany(r => r.Seats)
+                        .Where(s => result.SeatIds.Contains(s.Id))
+                        .ToList();
+
+                    selectedSeats.Clear();
+                    selectedSeats.AddRange(selectedSeatsFromResponse);
+                    SetMessage($"Group order started with {selectedSeats.Count} seats selected.");
+
+                    // Initialize ticket types for all seats in the group order
+                    foreach (var seat in selectedSeats)
+                    {
+                        if (!ticketTypes.ContainsKey(seat.Id))
+                        {
+                            ticketTypes.Add(seat.Id, "adult");
+                        }
+                    }
+
+                    // Load all seats to refresh the UI
+                    await LoadSeats();
                 }
-            }
 
-            // Load all seats to refresh the UI
-            await LoadSeats();
-        }
-
-        // Load all seats to refresh the UI
-        await LoadSeats();
-    }
-    else
-    {
-        var errorMessage = await response.Content.ReadAsStringAsync();
-        SetMessage($"Failed to select seating option: {errorMessage}");
-    }
+                // Load all seats to refresh the UI
+                await LoadSeats();
             }
-            catch (Exception ex)
+            else
             {
-    SetMessage($"Error selecting seating option: {ex.Message}");
-    Console.WriteLine($"Error selecting seating option: {ex.Message}");
+                var errorMessage = await response.Content.ReadAsStringAsync();
+                SetMessage($"Failed to select seating option: {errorMessage}");
             }
         }
+        catch (Exception ex)
+        {
+            SetMessage($"Error selecting seating option: {ex.Message}");
+            Console.WriteLine($"Error selecting seating option: {ex.Message}");
+        }
+    }
 
     private async Task CancelOrder()
     {
         try
         {
-    string? tokenToCancel = orderToken;
-    
-    // Only proceed if we have a token to cancel
-    if (!string.IsNullOrEmpty(tokenToCancel))
-    {
-        // Hide any open modals
-        showSeatSelectionModal = false;
-        await JSRuntime.InvokeVoidAsync("hideModal", "seatingOptionsModal");
-        await JSRuntime.InvokeVoidAsync("hideModal", "singleOptionConfirmModal");
-        await JSRuntime.InvokeVoidAsync("hideModal", "numpadModal");
-
-        // Call the API to cancel the order
-        var response = await Http.PostAsync($"api/tickets/orders/{tokenToCancel}/cancel", null);
-
-        if (response.IsSuccessStatusCode)
-        {
-            // Stop both timers
-            expirationTimer.Stop();
-            validationTimer.Stop();
-            orderExpirationTime = null;
-
-            // Clear local state
-            orderToken = null;
-            pendingGroupOrder = null;
-            selectedSeats.Clear();
-            availableOptions = null;
-            selectedOption = null;
-            SetMessage("Order cancelled successfully.");
-            numpadPinConfirmed = false;
-            NumpadClearInput();
-
-            // Navigate back to the previous page using our custom navigateBack function
-            await JSRuntime.InvokeVoidAsync("navigateBack");
-        }
-        else
-        {
-            var error = await response.Content.ReadAsStringAsync();
-            SetMessage($"Failed to cancel order: {error}");
-        }
-    }
-    else
-    {
-        // If there's no active order yet, just navigate back to the previous page
-        await JSRuntime.InvokeVoidAsync("navigateBack");
-    }
-            }
-            catch (Exception ex)
+            string? tokenToCancel = orderToken;
+            
+            // Only proceed if we have a token to cancel
+            if (!string.IsNullOrEmpty(tokenToCancel))
             {
-    SetMessage($"Error cancelling order: {ex.Message}");
-    Console.WriteLine($"Error cancelling order: {ex}");
+                // Hide any open modals
+                showSeatSelectionModal = false;
+                await JSRuntime.InvokeVoidAsync("hideModal", "seatingOptionsModal");
+                await JSRuntime.InvokeVoidAsync("hideModal", "singleOptionConfirmModal");
+                await JSRuntime.InvokeVoidAsync("hideModal", "numpadModal");
+
+                // Call the API to cancel the order
+                var response = await Http.PostAsync($"api/tickets/orders/{tokenToCancel}/cancel", null);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    // Stop both timers
+                    expirationTimer.Stop();
+                    validationTimer.Stop();
+                    orderExpirationTime = null;
+
+                    // Clear local state
+                    orderToken = null;
+                    pendingGroupOrder = null;
+                    selectedSeats.Clear();
+                    availableOptions = null;
+                    selectedOption = null;
+                    SetMessage("Order cancelled successfully.");
+                    numpadPinConfirmed = false;
+                    NumpadClearInput();
+
+                    // Navigate back to the previous page using our custom navigateBack function
+                    await JSRuntime.InvokeVoidAsync("navigateBack");
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    SetMessage($"Failed to cancel order: {error}");
+                }
+            }
+            else
+            {
+                // If there's no active order yet, just navigate back to the previous page
+                await JSRuntime.InvokeVoidAsync("navigateBack");
             }
         }
+        catch (Exception ex)
+        {
+            SetMessage($"Error cancelling order: {ex.Message}");
+            Console.WriteLine($"Error cancelling order: {ex}");
+        }
+    }
 
     private void SelectTicketType(int seatId, string? ticketType)
     {
@@ -1211,7 +1233,7 @@
         if (!selectedPackages.ContainsKey(packageId))
         {
             if (change > 0)
-            selectedPackages[packageId] = change;
+                selectedPackages[packageId] = change;
         }
         else
         {
@@ -1229,46 +1251,46 @@
     {
         return type switch
         {
-    "adult" => "Adult",
-    "child" => "Child",
-    "senior" => "Senior",
-    "student" => "Student",
-    _ => "Regular"
-            };
-        }
+            "adult" => "Adult",
+            "child" => "Child",
+            "senior" => "Senior",
+            "student" => "Student",
+            _ => "Regular"
+        };
+    }
 
-        private decimal GetTicketTypePrice(string type)
+    private decimal GetTicketTypePrice(string type)
+    {
+        decimal price = type switch
         {
-            decimal price = type switch
-            {
-    "adult" => 12.50m,
-    "child" => 8.50m,
-    "senior" => 10.50m,
-    "student" => 9.50m,
-    _ => 12.50m
-            };
+            "adult" => 12.50m,
+            "child" => 8.50m,
+            "senior" => 10.50m,
+            "student" => 9.50m,
+            _ => 12.50m
+        };
 
         if (presentation != null && presentation.IsSecretMovie)
         {
             price -= 2.50m;
         }
 
-            return price;
-        }
+        return price;
+    }
 
-        private string GetConcessionTypeName(int id)
-        {
-            return concessions.FirstOrDefault(c => c.Id == id)?.Name ?? "Unknown";
-        }
+    private string GetConcessionTypeName(int id)
+    {
+        return concessions.FirstOrDefault(c => c.Id == id)?.Name ?? "Unknown";
+    }
 
-        private decimal GetConcessionTypePrice(int id)
-        {
-            return concessions.FirstOrDefault(c => c.Id == id)?.Price ?? 0;
-        }
+    private decimal GetConcessionTypePrice(int id)
+    {
+        return concessions.FirstOrDefault(c => c.Id == id)?.Price ?? 0;
+    }
 
-        private decimal CalculateTotalPrice()
-        {
-            decimal total = 0;
+    private decimal CalculateTotalPrice()
+    {
+        decimal total = 0;
 
         // Ensure we have ticket types for all selected seats
         foreach (var seat in selectedSeats)
@@ -1289,11 +1311,11 @@
         return total;
     }
 
-        // When seats change, ensure we have ticket types for each seat
-        protected override void OnParametersSet()
-        {
-            InitializeTicketTypes();
-        }
+    // When seats change, ensure we have ticket types for each seat
+    protected override void OnParametersSet()
+    {
+        InitializeTicketTypes();
+    }
 
     private void InitializeTicketTypes()
     {
@@ -1306,9 +1328,9 @@
             }
         }
 
-            // Remove ticket types for seats that are no longer selected
-            var seatIds = selectedSeats.Select(s => s.Id).ToList();
-            var keysToRemove = ticketTypes.Keys.Where(k => !seatIds.Contains(k)).ToList();
+        // Remove ticket types for seats that are no longer selected
+        var seatIds = selectedSeats.Select(s => s.Id).ToList();
+        var keysToRemove = ticketTypes.Keys.Where(k => !seatIds.Contains(k)).ToList();
 
         foreach (var key in keysToRemove)
         {
@@ -1324,15 +1346,15 @@
         }
     }
 
-        // Numpad functions
-        private string numpadInputValue = "";
-        private bool numpadPinConfirmed = false;
+    // Numpad functions
+    private string numpadInputValue = "";
+    private bool numpadPinConfirmed = false;
 
     private void NumpadAddNumber(string number)
     {
         if (numpadInputValue == "Invalid PIN") NumpadClearInput();
         if (numpadInputValue.Length < 4)
-        numpadInputValue += number;
+            numpadInputValue += number;
     }
 
     private void NumpadRemoveNumber()
@@ -1343,7 +1365,7 @@
         }
     }
 
-        private void NumpadClearInput() => numpadInputValue = "";
+    private void NumpadClearInput() => numpadInputValue = "";
 
     public async Task NumpadConfirmInput()
     {

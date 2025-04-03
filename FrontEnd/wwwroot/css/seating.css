@@ -207,6 +207,8 @@
 
 .content-with-header-space {
     padding-top: 100px;
+    position: relative;
+    z-index: 1;
 }
 
 /* Layout sections */
@@ -547,4 +549,49 @@ body .modal .modal-dialog {
     display: none !important;
     content: none !important;
     background: none !important;
+}
+
+/* Body overrides to ensure modals and alerts are properly visible */
+body .cinema-alert {
+    position: relative;
+    z-index: 2000;
+    margin-top: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Sticky header styling */
+.sticky-header-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background-color: #0f1730;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Alert Styling with improved visibility */
+.cinema-alert {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+    transition: opacity 0.4s ease;
+}
+
+.cinema-alert-success {
+    background-color: rgba(39, 174, 96, 0.2);
+    border-left: 4px solid #27ae60;
+    color: #2ecc71;
+}
+
+.cinema-alert-danger {
+    background-color: rgba(231, 76, 60, 0.2);
+    border-left: 4px solid #e74c3c;
+    color: #e74c3c;
 } 

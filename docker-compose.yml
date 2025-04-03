@@ -54,6 +54,8 @@ services:
       - MailKitConfig__SenderName=Cinemagia
       - MailKitConfig__SenderAddress=cinemagia@example.com
       - AppConfig__BaseUrl=http://localhost:5002
+      - Serveo__BackEndUrl=${SERVEO_BACKEND_URL}
+      - Serveo__FrontEndUrl=${SERVEO_FRONTEND_URL}
     depends_on:
       db:
         condition: service_healthy
@@ -105,6 +107,7 @@ services:
 
   serveo:
     image: taichunmin/serveo:latest
+    platform: linux/amd64  # Specify platform to fix ARM64 compatibility issues
     container_name: cinemagia-serveo-tunneling-backend
     tty: true
     stdin_open: true
@@ -121,6 +124,7 @@ services:
 
   serveo-frontend:
     image: taichunmin/serveo:latest
+    platform: linux/amd64  # Specify platform to fix ARM64 compatibility issues
     container_name: cinemagia-serveo-tunneling-frontend
     tty: true
     stdin_open: true

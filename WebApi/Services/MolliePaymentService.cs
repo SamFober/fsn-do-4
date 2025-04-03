@@ -12,8 +12,8 @@ namespace WebApi.Services
 {
     public class MolliePaymentService : IPaymentService
     {
-        private const string FrontEndWebhookUrl = "https://52968e0118a6280819c64d84e6995213.serveo.net";
-        private const string BackendWebHookUrl = "https://7a2f968c17d477f303cf41c2df1b7b72.serveo.net";
+        private readonly string _frontEndWebhookUrl;
+        private readonly string _backEndWebhookUrl;
 
         private readonly ITicketRepository _ticketRepository;
         private readonly IMailService _mailService;
@@ -29,6 +29,12 @@ namespace WebApi.Services
         {
             var apiKey = config["Mollie:ApiKey"]
                 ?? throw new MollieApiKeyNotSetException();
+
+            _frontEndWebhookUrl = config["Serveo:FrontEndUrl"] 
+                ?? throw new Exception("Serveo:FrontEndUrl not configured in appsettings.json or environment variables");
+            
+            _backEndWebhookUrl = config["Serveo:BackEndUrl"]
+                ?? throw new Exception("Serveo:BackEndUrl not configured in appsettings.json or environment variables");
 
             _paymentMethodClient = new PaymentMethodClient(apiKey);
             _paymentClient = new PaymentClient(apiKey);
@@ -62,9 +68,9 @@ namespace WebApi.Services
             {
                 Description = $"Cinemagia order {orderToken}",
                 Amount = new Mollie.Api.Models.Amount("EUR", totalPaymentAmount),
-                RedirectUrl = $"{FrontEndWebhookUrl}/order/{orderToken}/complete",
-                WebhookUrl = $"{BackendWebHookUrl}/api/payment",
-                CancelUrl = $"{FrontEndWebhookUrl}"
+                RedirectUrl = $"{_frontEndWebhookUrl}/order/{orderToken}/complete",
+                WebhookUrl = $"{_backEndWebhookUrl}/api/payment",
+                CancelUrl = $"{_frontEndWebhookUrl}"
             };
 
             try

@@ -43,12 +43,14 @@ function showModal(modalId) {
     if (!isSeatMapModal) {
         var backdrop = document.createElement('div');
         backdrop.className = 'modal-backdrop show';
+        backdrop.style.zIndex = '2000'; // Set a high z-index for the backdrop
         document.body.appendChild(backdrop);
     }
     
     // Show the modal
     modal.style.display = 'flex';
     modal.classList.add('show');
+    modal.style.zIndex = '2100'; // Set an even higher z-index for the modal
     
     // Prevent body scrolling
     document.body.classList.add('modal-open');
