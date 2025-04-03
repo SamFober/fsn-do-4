@@ -16,6 +16,9 @@ For convenience, a Makefile has been created with all common commands:
 # Show available commands
 make
 
+# Fix script permissions and line endings (for Windows/WSL users, but MacOS and Linux users can also use this)
+make fix-scripts
+
 # Start the application (with proper Serveo configuration)
 make start
 
