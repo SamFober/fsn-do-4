@@ -129,3 +129,5 @@ After starting the application properly, you can access:
 - Web API: http://localhost:5001
 - Swagger UI: http://localhost:5001/swagger
 - Email interface: http://localhost:8025
+
+Authored by https://github.com/CasualCarlos
