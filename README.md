@@ -10,6 +10,8 @@ This repository contains the Cinemagia movie ticket booking application with Mol
 
 ## Quick Start
 
+It is **required** to have the Docker Engine installed on your device. (https://docs.docker.com/engine/)
+
 For convenience, a Makefile has been created with all common commands:
 
 ```bash
